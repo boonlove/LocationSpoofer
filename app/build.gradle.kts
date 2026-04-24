@@ -18,14 +18,26 @@ android {
             useSupportLibrary = true
         }
     }
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("KEYSTORE_FILE_PATH") ?: "/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks"
+            if (file(keystorePath).exists()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "LinuxisUbuntu18"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "suse-app-key"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "LinuxisUbuntu18"
+            }
+        }
+    }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
