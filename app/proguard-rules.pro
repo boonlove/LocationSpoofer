@@ -18,8 +18,9 @@
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 -keep class kotlinx.coroutines.** { *; }
 
-# Models / Serialization
+# Models / Utils
 -keep class com.suseoaa.locationspoofer.utils.ConfigManager { *; }
+-keep class com.suseoaa.locationspoofer.utils.LSPosedManager { *; }
 -keep class com.suseoaa.locationspoofer.provider.** { *; }
 
 # General safety for Android lifecycle
