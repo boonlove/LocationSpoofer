@@ -1,15 +1,29 @@
+# ─── Local ───────────────────────────────────────────────
+*.DS_Store
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
 local.properties
+
+# ─── Gradle ──────────────────────────────────────────────
+.gradle/
+build/
+app/build/
+**/build/
+gradle-wrapper.jar
+
+# ─── Android / Kotlin ────────────────────────────────────
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.log
+captures/
+*.hprof
+
+# ─── Secrets / Keys ──────────────────────────────────────
+# 不要把 API Key、Keystore 提交进仓库
+*.jks
+*.keystore
+keystore.properties
+google-services.json
