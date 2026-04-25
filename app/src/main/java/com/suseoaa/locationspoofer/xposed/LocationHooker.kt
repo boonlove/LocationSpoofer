@@ -293,9 +293,20 @@ class LocationHooker : IXposedHookLoadPackage {
                 }
             }
             try {
-                XposedHelpers.findAndHookMethod("com.amap.api.location.AMapLocation", classLoader, "getLatitude", amapHook)
-                XposedHelpers.findAndHookMethod("com.amap.api.location.AMapLocation", classLoader, "getLongitude", amapHook)
-            } catch (e: Throwable) { /* AMap SDK 不存在则跳过 */ }
+                XposedHelpers.findAndHookMethod(
+                    "com.amap.api.location.AMapLocation",
+                    classLoader,
+                    "getLatitude",
+                    amapHook
+                )
+                XposedHelpers.findAndHookMethod(
+                    "com.amap.api.location.AMapLocation",
+                    classLoader,
+                    "getLongitude",
+                    amapHook
+                )
+            } catch (e: Throwable) { /* AMap SDK 不存在则跳过 */
+            }
 
             // ★★★ 高德SDK深度反检测（strategy:500 的来源）
             // mockData JSON 就是 AMapLocation.getMockData() 的返回值，直接抹零
@@ -328,28 +339,66 @@ class LocationHooker : IXposedHookLoadPackage {
                 val amapLocClass = "com.amap.api.location.AMapLocation"
 
                 // 1. getMockData() → null（直接砍掉 mockData 字段的数据来源）
-                XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getMockData", amapNullHook)
+                XposedHelpers.findAndHookMethod(
+                    amapLocClass,
+                    classLoader,
+                    "getMockData",
+                    amapNullHook
+                )
                 // 2. getMockFlag() / getMockType() → 0
-                try { XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getMockFlag", amapZeroHook) } catch (e: Throwable) {}
-                try { XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getMockType", amapZeroHook) } catch (e: Throwable) {}
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        amapLocClass,
+                        classLoader,
+                        "getMockFlag",
+                        amapZeroHook
+                    )
+                } catch (e: Throwable) {
+                }
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        amapLocClass,
+                        classLoader,
+                        "getMockType",
+                        amapZeroHook
+                    )
+                } catch (e: Throwable) {
+                }
                 // 3. isMocked() → false（AMap SDK 12.0+ 新接口）
-                try { XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "isMocked", amapFalseHook) } catch (e: Throwable) {}
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        amapLocClass,
+                        classLoader,
+                        "isMocked",
+                        amapFalseHook
+                    )
+                } catch (e: Throwable) {
+                }
                 // 4. getErrorCode() → 0（非0表示定位失败）
-                XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getErrorCode", amapZeroHook)
+                XposedHelpers.findAndHookMethod(
+                    amapLocClass,
+                    classLoader,
+                    "getErrorCode",
+                    amapZeroHook
+                )
                 // 5. getLocationType() → 1（GPS类型，最可信）
-                XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getLocationType",
+                XposedHelpers.findAndHookMethod(
+                    amapLocClass, classLoader, "getLocationType",
                     object : XC_MethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             val config = readConfig()
-                            if (config != null && config.optBoolean("active", false)) param.result = 1 // 1 = GPS定位
+                            if (config != null && config.optBoolean("active", false)) param.result =
+                                1 // 1 = GPS定位
                         }
                     })
                 // 6. getProvider() → "gps"
-                XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getProvider",
+                XposedHelpers.findAndHookMethod(
+                    amapLocClass, classLoader, "getProvider",
                     object : XC_MethodHook() {
                         override fun afterHookedMethod(param: MethodHookParam) {
                             val config = readConfig()
-                            if (config != null && config.optBoolean("active", false)) param.result = "gps"
+                            if (config != null && config.optBoolean("active", false)) param.result =
+                                "gps"
                         }
                     })
                 // 7. 直接写底层 mock 相关字段（防反射读字段绕过 getter）
@@ -358,24 +407,66 @@ class LocationHooker : IXposedHookLoadPackage {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val obj = param.thisObject ?: return
-                            try { XposedHelpers.setObjectField(obj, "mockData", null) } catch (e: Throwable) {}
-                            try { XposedHelpers.setIntField(obj, "mockFlag", 0) } catch (e: Throwable) {}
-                            try { XposedHelpers.setIntField(obj, "mockType", 0) } catch (e: Throwable) {}
-                            try { XposedHelpers.setBooleanField(obj, "isMocked", false) } catch (e: Throwable) {}
-                            try { XposedHelpers.setBooleanField(obj, "mMock", false) } catch (e: Throwable) {}
-                            try { XposedHelpers.setIntField(obj, "errorCode", 0) } catch (e: Throwable) {}
+                            try {
+                                XposedHelpers.setObjectField(obj, "mockData", null)
+                            } catch (e: Throwable) {
+                            }
+                            try {
+                                XposedHelpers.setIntField(obj, "mockFlag", 0)
+                            } catch (e: Throwable) {
+                            }
+                            try {
+                                XposedHelpers.setIntField(obj, "mockType", 0)
+                            } catch (e: Throwable) {
+                            }
+                            try {
+                                XposedHelpers.setBooleanField(obj, "isMocked", false)
+                            } catch (e: Throwable) {
+                            }
+                            try {
+                                XposedHelpers.setBooleanField(obj, "mMock", false)
+                            } catch (e: Throwable) {
+                            }
+                            try {
+                                XposedHelpers.setIntField(obj, "errorCode", 0)
+                            } catch (e: Throwable) {
+                            }
                         }
                     }
                 }
-                XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getLatitude", setFieldHook)
-            } catch (e: Throwable) { XposedBridge.log(e) }
+                XposedHelpers.findAndHookMethod(
+                    amapLocClass,
+                    classLoader,
+                    "getLatitude",
+                    setFieldHook
+                )
+            } catch (e: Throwable) {
+                XposedBridge.log(e)
+            }
 
             // 8. AMapLocationQualityReport 质量报告也要清零
             try {
                 val qualityClass = "com.amap.api.location.AMapLocationQualityReport"
-                try { XposedHelpers.findAndHookMethod(qualityClass, classLoader, "getMockInfo", amapNullHook) } catch (e: Throwable) {}
-                try { XposedHelpers.findAndHookMethod(qualityClass, classLoader, "isMockLocation", amapFalseHook) } catch (e: Throwable) {}
-            } catch (e: Throwable) {}
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        qualityClass,
+                        classLoader,
+                        "getMockInfo",
+                        amapNullHook
+                    )
+                } catch (e: Throwable) {
+                }
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        qualityClass,
+                        classLoader,
+                        "isMockLocation",
+                        amapFalseHook
+                    )
+                } catch (e: Throwable) {
+                }
+            } catch (e: Throwable) {
+            }
 
             // 9. setMockEnable(false) 让高德SDK禁用自身的 mock 校验流程
             try {
@@ -392,7 +483,8 @@ class LocationHooker : IXposedHookLoadPackage {
                         }
                     }
                 )
-            } catch (e: Throwable) {}
+            } catch (e: Throwable) {
+            }
 
         } catch (e: Throwable) {
             XposedBridge.log(e)

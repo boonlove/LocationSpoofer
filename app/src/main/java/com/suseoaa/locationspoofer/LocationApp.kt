@@ -10,10 +10,10 @@ import org.koin.core.context.startKoin
 class LocationApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        
+
         MapsInitializer.updatePrivacyShow(this, true, true)
         MapsInitializer.updatePrivacyAgree(this, true)
-        
+
         startKoin {
             androidLogger()
             androidContext(this@LocationApp)

@@ -1,5 +1,8 @@
 package com.suseoaa.locationspoofer
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -75,6 +78,24 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 动态申请高版本必要的权限（位置权限是Android 14启动Location FGS的硬性要求）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val permissions = mutableListOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            val notGranted = permissions.filter {
+                checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+            }
+            if (notGranted.isNotEmpty()) {
+                requestPermissions(notGranted.toTypedArray(), 100)
+            }
+        }
+
         setContent {
             MaterialTheme(colorScheme = AppColorScheme) {
                 Surface(modifier = Modifier.fillMaxSize(), color = DarkBg) {
@@ -109,28 +130,52 @@ fun MainScreen(viewModel: MainViewModel, uiState: AppState) {
             title = "需要 Root 权限",
             message = "本应用需要 KernelSU Root 权限才能运行。\n请在 KernelSU 中授权后重启应用。"
         )
+
         !uiState.isLSPosedActive -> BlockingScreen(
             icon = Icons.Rounded.Extension,
             title = "LSPosed 模块未激活",
             message = "请在 LSPosed 管理器中启用本模块，\n勾选需要欺骗的应用后重启目标应用。"
         )
+
         else -> SpoofingScreen(viewModel = viewModel, uiState = uiState)
     }
 }
 
 @Composable
 fun InitializingScreen() {
-    Box(modifier = Modifier.fillMaxSize().background(DarkBg), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(DarkBg), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             Box(
-                modifier = Modifier.size(72.dp).clip(CircleShape).background(SurfaceCard),
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(SurfaceCard),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(36.dp))
+                Icon(
+                    Icons.Rounded.MyLocation,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(36.dp)
+                )
             }
-            Text("LocationSpoofer", color = TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "LocationSpoofer",
+                color = TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.height(8.dp))
-            CircularProgressIndicator(color = AccentBlue, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            CircularProgressIndicator(
+                color = AccentBlue,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(28.dp)
+            )
             Text("正在初始化环境...", color = TextSecondary, fontSize = 13.sp)
         }
     }
@@ -138,21 +183,36 @@ fun InitializingScreen() {
 
 @Composable
 fun BlockingScreen(icon: ImageVector, title: String, message: String) {
-    Box(modifier = Modifier.fillMaxSize().background(DarkBg).padding(32.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBg)
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
-                modifier = Modifier.size(80.dp).clip(CircleShape)
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
                     .background(Color(0xFFF85149).copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = Color(0xFFF85149), modifier = Modifier.size(40.dp))
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = Color(0xFFF85149),
+                    modifier = Modifier.size(40.dp)
+                )
             }
             Text(title, color = TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text(message, color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Text(
+                message, color = TextSecondary, fontSize = 13.sp, lineHeight = 20.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
@@ -196,7 +256,9 @@ fun AMapView(modifier: Modifier = Modifier, onMapReady: (AMap) -> Unit) {
 fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
     val scrollState = rememberScrollState()
 
-    Column(modifier = Modifier.fillMaxSize().background(DarkBg)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(DarkBg)) {
 
         // ── 顶部 Header ──
         Row(
@@ -207,13 +269,26 @@ fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(AccentBlue.copy(alpha = 0.15f)),
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(AccentBlue.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Rounded.MyLocation,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(20.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
-            Text("LocationSpoofer", color = TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "LocationSpoofer",
+                color = TextPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.weight(1f))
             // 运行状态指示
             AnimatedContent(
@@ -228,9 +303,17 @@ fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
                             .background(Accent.copy(alpha = 0.15f))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Accent))
+                        Box(modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Accent))
                         Spacer(Modifier.width(6.dp))
-                        Text("运行中", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "运行中",
+                            color = Accent,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 } else {
                     Row(
@@ -240,9 +323,19 @@ fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
                             .background(TextSecondary.copy(alpha = 0.1f))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(TextSecondary))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(TextSecondary)
+                        )
                         Spacer(Modifier.width(6.dp))
-                        Text("待机", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "待机",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
@@ -265,8 +358,18 @@ fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
                     override fun onCameraChange(position: CameraPosition) {}
                     override fun onCameraChangeFinish(position: CameraPosition) {
                         if (!uiState.isSpoofingActive) {
-                            viewModel.updateLongitude(String.format("%.6f", position.target.longitude))
-                            viewModel.updateLatitude(String.format("%.6f", position.target.latitude))
+                            viewModel.updateLongitude(
+                                String.format(
+                                    "%.6f",
+                                    position.target.longitude
+                                )
+                            )
+                            viewModel.updateLatitude(
+                                String.format(
+                                    "%.6f",
+                                    position.target.latitude
+                                )
+                            )
                         }
                     }
                 })
@@ -277,7 +380,9 @@ fun SpoofingScreen(viewModel: MainViewModel, uiState: AppState) {
                 Icons.Rounded.AddLocationAlt,
                 contentDescription = null,
                 tint = AccentBlue,
-                modifier = Modifier.align(Alignment.Center).size(32.dp)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(32.dp)
             )
 
             // 地图底部渐变遮罩
@@ -330,10 +435,12 @@ fun WifiStatusCard(uiState: AppState) {
             AccentOrange.copy(alpha = 0.12f), AccentOrange,
             "正在拉取当地 Wi-Fi 指纹数据...", Icons.Outlined.CloudDownload
         )
+
         WifiLoadStatus.DONE -> Quadruple(
             Accent.copy(alpha = 0.12f), Accent,
             "Wi-Fi 指纹已就绪（${uiState.wifiApCount} 个热点）", Icons.Outlined.Wifi
         )
+
         else -> Quadruple(
             AccentBlue.copy(alpha = 0.12f), AccentBlue,
             "GPS 定位已接管", Icons.Outlined.GpsFixed
@@ -349,7 +456,11 @@ fun WifiStatusCard(uiState: AppState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (uiState.wifiLoadStatus == WifiLoadStatus.LOADING) {
-            CircularProgressIndicator(color = iconTint, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            CircularProgressIndicator(
+                color = iconTint,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp)
+            )
         } else {
             Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
         }
@@ -376,7 +487,14 @@ fun CoordinateInputCard(viewModel: MainViewModel, uiState: AppState) {
                 onValueChange = { viewModel.updateLongitude(it) },
                 label = { Text("经度") },
                 placeholder = { Text("拖动地图自动获取", color = TextSecondary) },
-                leadingIcon = { Icon(Icons.Outlined.East, null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.East,
+                        null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 isError = uiState.showCoordinateError,
@@ -390,7 +508,14 @@ fun CoordinateInputCard(viewModel: MainViewModel, uiState: AppState) {
                 onValueChange = { viewModel.updateLatitude(it) },
                 label = { Text("纬度") },
                 placeholder = { Text("拖动地图自动获取", color = TextSecondary) },
-                leadingIcon = { Icon(Icons.Outlined.North, null, tint = TextSecondary, modifier = Modifier.size(18.dp)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.North,
+                        null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 isError = uiState.showCoordinateError,
@@ -401,9 +526,18 @@ fun CoordinateInputCard(viewModel: MainViewModel, uiState: AppState) {
             if (uiState.showCoordinateError) {
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
+                    Icon(
+                        Icons.Outlined.ErrorOutline,
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp)
+                    )
                     Spacer(Modifier.width(4.dp))
-                    Text("经纬度数值超出合法范围", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    Text(
+                        "经纬度数值超出合法范围",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -435,7 +569,9 @@ fun ActionButton(viewModel: MainViewModel, uiState: AppState) {
 
     Button(
         onClick = { if (uiState.isSpoofingActive) viewModel.stopSpoofing() else viewModel.startSpoofing() },
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp),
         shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(containerColor = activeColor)
     ) {
@@ -458,7 +594,11 @@ fun AppScopeCard() {
             RECOMMENDED_APPS.forEachIndexed { index, app ->
                 AppScopeRow(app)
                 if (index < RECOMMENDED_APPS.lastIndex) {
-                    Divider(color = DividerColor, thickness = 0.5.dp, modifier = Modifier.padding(horizontal = 16.dp))
+                    Divider(
+                        color = DividerColor,
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
                 }
             }
         }
@@ -468,21 +608,36 @@ fun AppScopeCard() {
 @Composable
 fun AppScopeRow(app: RecommendedApp) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(AccentBlue.copy(alpha = 0.12f)),
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(AccentBlue.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(app.icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+            Icon(
+                app.icon,
+                contentDescription = null,
+                tint = AccentBlue,
+                modifier = Modifier.size(18.dp)
+            )
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(app.name, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             Text(app.packageName, color = TextSecondary, fontSize = 11.sp)
         }
-        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+        Icon(
+            Icons.Outlined.ChevronRight,
+            contentDescription = null,
+            tint = TextSecondary,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -491,6 +646,12 @@ fun SectionHeader(icon: ImageVector, title: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(6.dp))
-        Text(title.uppercase(), color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+        Text(
+            title.uppercase(),
+            color = TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.8.sp
+        )
     }
 }
