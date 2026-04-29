@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -108,6 +109,11 @@ fun MainScreen(
     isDark: Boolean
 ) {
     var isFullScreenMap by remember { mutableStateOf(false) }
+
+    // 拦截系统返回键：在全屏地图时返回主页，而不是退出应用
+    BackHandler(enabled = isFullScreenMap) {
+        isFullScreenMap = false
+    }
 
     AnimatedContent(
         targetState = isFullScreenMap,

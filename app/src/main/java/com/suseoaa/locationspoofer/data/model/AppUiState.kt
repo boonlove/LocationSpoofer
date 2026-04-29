@@ -7,7 +7,8 @@ enum class SimMode(val label: String, val speedMs: Double) {
     WALKING("步行", 1.4),
     RUNNING("慢跑", 3.0),
     CYCLING("骑行", 5.5),
-    DRIVING("驾车", 15.0)
+    DRIVING("驾车", 15.0),
+    CUSTOM("自定义", 0.0)
 }
 
 /** 路线规划阶段 */
@@ -51,5 +52,9 @@ data class AppState(
     /** 路线运行模式（手动 / 循环） */
     val routeRunMode: RouteRunMode = RouteRunMode.MANUAL,
     /** 循环模式使用的速度 */
-    val routeSimMode: SimMode = SimMode.WALKING
+    val routeSimMode: SimMode = SimMode.WALKING,
+    /** 自定义速度 (m/s)，仅当 routeSimMode == CUSTOM 时使用 */
+    val customSpeedMs: Double = 1.5,
+    /** 首页地图已确认的选点（点击地图后出现确认按钮，确认后填充坐标） */
+    val mapConfirmedPoint: Pair<Double, Double>? = null
 )

@@ -77,19 +77,25 @@ class MainViewModel(
     // 当前位置获取
 
     fun fetchCurrentLocation(ctx: Context) {
-        val client = AMapLocationClient(ctx.applicationContext)
+        val client = try {
+            AMapLocationClient(ctx.applicationContext)
+        } catch (e: Exception) {
+            return
+        }
         client.setLocationOption(AMapLocationClientOption().apply {
             locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
             isOnceLocation = true
         })
         client.setLocationListener { loc ->
             if (loc != null && loc.errorCode == 0) {
-                _uiState.update {
-                    it.copy(
-                        latitudeInput = String.format("%.6f", loc.latitude),
-                        longitudeInput = String.format("%.6f", loc.longitude),
-                        showCoordinateError = false
-                    )
+                if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            latitudeInput = String.format("%.6f", loc.latitude),
+                            longitudeInput = String.format("%.6f", loc.longitude),
+                            showCoordinateError = false
+                        )
+                    }
                 }
             }
             client.stopLocation()
@@ -248,6 +254,35 @@ class MainViewModel(
         _uiState.update { it.copy(routeSimMode = mode) }
     }
 
+    /** 设置自定义速度 (m/s) */
+    fun setCustomSpeedMs(speed: Double) {
+        _uiState.update { it.copy(customSpeedMs = speed.coerceIn(0.1, 100.0)) }
+    }
+
+    /** 获取实际生效的速度 (m/s) */
+    private fun getEffectiveSpeedMs(): Double {
+        val state = _uiState.value
+        return if (state.routeSimMode == SimMode.CUSTOM) state.customSpeedMs
+        else state.routeSimMode.speedMs
+    }
+
+    /** 首页地图确认选点 */
+    fun confirmMapPoint(lat: Double, lng: Double) {
+        _uiState.update {
+            it.copy(
+                latitudeInput = String.format("%.6f", lat),
+                longitudeInput = String.format("%.6f", lng),
+                mapConfirmedPoint = Pair(lat, lng),
+                showCoordinateError = false
+            )
+        }
+    }
+
+    /** 清除地图选点状态 */
+    fun clearMapPoint() {
+        _uiState.update { it.copy(mapConfirmedPoint = null) }
+    }
+
     /**
      * 开始路线模拟。
      * - 手动模式：启动 spoofing（STILL），由摇杆驱动 moveByJoystick 实时更新坐标。
@@ -359,7 +394,7 @@ class MainViewModel(
             val points = _uiState.value.routePoints
             if (points.size < 2) return@launch
 
-            val speedMs = _uiState.value.routeSimMode.speedMs
+            val speedMs = getEffectiveSpeedMs()
             if (speedMs <= 0.0) return@launch
 
             val tickMs = 100L

@@ -11,8 +11,8 @@ android {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 123
-        versionName = "1.2.3"
+        versionCode = 124
+        versionName = "1.2.4"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -20,7 +20,8 @@ android {
     }
     signingConfigs {
         create("release") {
-            val keystorePath = System.getenv("KEYSTORE_FILE_PATH") ?: "/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks"
+            val keystorePath = System.getenv("KEYSTORE_FILE_PATH")
+                ?: "/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks"
             if (file(keystorePath).exists()) {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "LinuxisUbuntu18"
@@ -31,6 +32,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
