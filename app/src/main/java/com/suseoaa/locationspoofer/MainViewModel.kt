@@ -9,6 +9,8 @@ import com.suseoaa.locationspoofer.service.SpoofingService
 import com.suseoaa.locationspoofer.utils.ConfigManager
 import com.suseoaa.locationspoofer.utils.LSPosedManager
 import com.suseoaa.locationspoofer.utils.RootManager
+import com.suseoaa.locationspoofer.utils.SettingsManager
+import com.suseoaa.locationspoofer.utils.SavedLocation
 import com.suseoaa.locationspoofer.utils.WigleClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +31,10 @@ data class AppState(
     val showCoordinateError: Boolean = false,
     val isSpoofingActive: Boolean = false,
     val wifiLoadStatus: WifiLoadStatus = WifiLoadStatus.IDLE,
-    val wifiApCount: Int = 0
+    val wifiApCount: Int = 0,
+    val savedLocations: List<SavedLocation> = emptyList(),
+    val searchKeyword: String = "",
+    val searchResults: List<SavedLocation> = emptyList()
 )
 
 class MainViewModel(
@@ -37,6 +42,7 @@ class MainViewModel(
     private val configManager: ConfigManager,
     private val lsposedManager: LSPosedManager,
     private val wigleClient: WigleClient,
+    private val settingsManager: SettingsManager,
     private val context: Context
 ) : ViewModel() {
 
@@ -44,7 +50,11 @@ class MainViewModel(
     private val wigleToken =
         "QUlEODRhYjYwNzVjYjI4MTY5ZDU4Yjk2NzQxM2ZiYTFiMDA6YmY2NWE5M2RiYWQ1YzYwNmYwNzdkOTQ2NjE2NmI4MzM="
 
-    private val _uiState = MutableStateFlow(AppState())
+    private val _uiState = MutableStateFlow(
+        AppState(
+            savedLocations = settingsManager.getSavedLocations()
+        )
+    )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
 
     init {
@@ -73,6 +83,27 @@ class MainViewModel(
                 )
             }
         }
+    }
+
+    fun saveCurrentLocation(name: String) {
+        val lng = _uiState.value.longitudeInput.toDoubleOrNull() ?: return
+        val lat = _uiState.value.latitudeInput.toDoubleOrNull() ?: return
+        val loc = SavedLocation(name, lat, lng)
+        settingsManager.addSavedLocation(loc)
+        _uiState.update { it.copy(savedLocations = settingsManager.getSavedLocations()) }
+    }
+
+    fun removeSavedLocation(loc: SavedLocation) {
+        settingsManager.removeSavedLocation(loc)
+        _uiState.update { it.copy(savedLocations = settingsManager.getSavedLocations()) }
+    }
+
+    fun updateSearchKeyword(keyword: String) {
+        _uiState.update { it.copy(searchKeyword = keyword) }
+    }
+
+    fun updateSearchResults(results: List<SavedLocation>) {
+        _uiState.update { it.copy(searchResults = results) }
     }
 
     fun updateLongitude(value: String) {

@@ -9,12 +9,14 @@ koin = "3.5.3"
 xposed = "82"
 amap = "10.0.600"
 amapLocation = "6.4.9"
+amapSearch = "9.7.0"
 okhttp = "4.12.0"
 
 [libraries]
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 amap-map = { module = "com.amap.api:3dmap", version.ref = "amap" }
 amap-location = { module = "com.amap.api:location", version.ref = "amapLocation" }
+amap-search = { module = "com.amap.api:search", version.ref = "amapSearch" }
 xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposed" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

@@ -64,6 +64,7 @@ dependencies {
     compileOnly(libs.xposed.api)
     implementation(libs.koin.androidx.compose)
     implementation(libs.amap.map)
+    implementation(libs.amap.search)
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
