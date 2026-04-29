@@ -1,6 +1,7 @@
 package com.suseoaa.locationspoofer
 
 import android.app.Application
+import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
 import com.suseoaa.locationspoofer.di.appModule
@@ -16,6 +17,8 @@ class LocationApp : Application() {
         MapsInitializer.updatePrivacyAgree(this, true)
         ServiceSettings.updatePrivacyShow(this, true, true)
         ServiceSettings.updatePrivacyAgree(this, true)
+        AMapLocationClient.updatePrivacyShow(this, true, true)
+        AMapLocationClient.updatePrivacyAgree(this, true)
 
         startKoin {
             androidLogger()

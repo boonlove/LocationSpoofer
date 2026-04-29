@@ -823,6 +823,16 @@ class LocationHooker : IXposedHookLoadPackage {
                     val lat = cursor.getDouble(cursor.getColumnIndexOrThrow("lat"))
                     val lng = cursor.getDouble(cursor.getColumnIndexOrThrow("lng"))
                     val wifiJson = cursor.getString(cursor.getColumnIndexOrThrow("wifi_json"))
+                    
+                    val simModeIdx = cursor.getColumnIndex("sim_mode")
+                    val simMode = if (simModeIdx != -1) cursor.getString(simModeIdx) else "STILL"
+                    
+                    val simBearingIdx = cursor.getColumnIndex("sim_bearing")
+                    val simBearing = if (simBearingIdx != -1) cursor.getFloat(simBearingIdx) else 0f
+                    
+                    val startTimestampIdx = cursor.getColumnIndex("start_timestamp")
+                    val startTimestamp = if (startTimestampIdx != -1) cursor.getLong(startTimestampIdx) else System.currentTimeMillis()
+                    
                     cursor.close()
 
                     val config = JSONObject()
@@ -830,6 +840,9 @@ class LocationHooker : IXposedHookLoadPackage {
                     config.put("lat", lat)
                     config.put("lng", lng)
                     config.put("wifi_json", org.json.JSONArray(wifiJson))
+                    config.put("sim_mode", simMode)
+                    config.put("sim_bearing", simBearing.toDouble())
+                    config.put("start_timestamp", startTimestamp)
 
                     lastConfig = config
                     lastReadTime = currentTime

@@ -13,12 +13,17 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.suseoaa.locationspoofer.data.model.RoutePoint
+import com.suseoaa.locationspoofer.data.model.SimulatedLocation
+import com.suseoaa.locationspoofer.provider.SpooferProvider
+import com.suseoaa.locationspoofer.utils.TrajectorySimulator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 class SpoofingService : Service() {
 
@@ -51,10 +56,7 @@ class SpoofingService : Service() {
                 val lng = intent.getDoubleExtra(EXTRA_LNG, 0.0)
                 startSpoofing(lat, lng)
             }
-
-            ACTION_STOP -> {
-                stopSpoofing()
-            }
+            ACTION_STOP -> stopSpoofing()
         }
         return START_STICKY
     }
@@ -64,7 +66,7 @@ class SpoofingService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("位置模拟器")
-            .setContentText("正在模拟位置:$lat, $lng")
+            .setContentText("正在模拟位置: $lat, $lng")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
@@ -77,20 +79,50 @@ class SpoofingService : Service() {
 
         spoofingJob = serviceScope.launch {
             while (isActive) {
-                pushLocation(LocationManager.GPS_PROVIDER, lat, lng)
-                pushLocation(LocationManager.NETWORK_PROVIDER, lat, lng)
+                val currentLoc = computeCurrentLocation()
+                pushLocation(LocationManager.GPS_PROVIDER, currentLoc)
+                pushLocation(LocationManager.NETWORK_PROVIDER, currentLoc)
                 delay(1000)
             }
+        }
+    }
+
+    private fun computeCurrentLocation(): SimulatedLocation {
+        val routePoints = parseRoutePoints(SpooferProvider.routeJson)
+        return if (SpooferProvider.isRouteMode && routePoints.size >= 2) {
+            TrajectorySimulator.calculateRoutePosition(
+                routePoints,
+                SpooferProvider.startTimestamp,
+                SpooferProvider.simMode
+            )
+        } else {
+            TrajectorySimulator.calculateSimulatedLocation(
+                SpooferProvider.latitude,
+                SpooferProvider.longitude,
+                SpooferProvider.startTimestamp,
+                SpooferProvider.simMode,
+                SpooferProvider.simBearing
+            )
+        }
+    }
+
+    private fun parseRoutePoints(json: String): List<RoutePoint> {
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                RoutePoint(obj.getDouble("lat"), obj.getDouble("lng"))
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
     private fun stopSpoofing() {
         spoofingJob?.cancel()
         isRunning = false
-
         removeTestProvider(LocationManager.GPS_PROVIDER)
         removeTestProvider(LocationManager.NETWORK_PROVIDER)
-
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -98,20 +130,12 @@ class SpoofingService : Service() {
     private fun setupTestProvider(provider: String) {
         try {
             locationManager.addTestProvider(
-                provider,
-                false,
-                false,
-                false,
-                false,
-                true,
-                true,
-                true,
-                Criteria.POWER_LOW,
-                Criteria.ACCURACY_FINE
+                provider, false, false, false, false,
+                true, true, true, Criteria.POWER_LOW, Criteria.ACCURACY_FINE
             )
             locationManager.setTestProviderEnabled(provider, true)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "设置TestProvider失败:$provider", e)
+            Log.e("SpoofingService", "设置TestProvider失败: $provider", e)
         }
     }
 
@@ -119,34 +143,32 @@ class SpoofingService : Service() {
         try {
             locationManager.removeTestProvider(provider)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "移除TestProvider失败:$provider", e)
+            Log.e("SpoofingService", "移除TestProvider失败: $provider", e)
         }
     }
 
-    private fun pushLocation(provider: String, lat: Double, lng: Double) {
+    private fun pushLocation(provider: String, loc: SimulatedLocation) {
         try {
             val location = Location(provider).apply {
-                latitude = lat
-                longitude = lng
-                accuracy = 5.0f
+                latitude = loc.lat
+                longitude = loc.lng
+                accuracy = loc.accuracy
+                altitude = loc.altitude
+                speed = loc.speed
+                bearing = loc.bearing
                 time = System.currentTimeMillis()
                 elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
             }
             locationManager.setTestProviderLocation(provider, location)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "推送位置失败:$provider", e)
+            Log.e("SpoofingService", "推送位置失败: $provider", e)
         }
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "位置模拟服务",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            val channel = NotificationChannel(CHANNEL_ID, "位置模拟服务", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 

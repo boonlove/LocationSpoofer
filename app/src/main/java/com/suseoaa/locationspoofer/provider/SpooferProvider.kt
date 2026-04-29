@@ -13,6 +13,11 @@ class SpooferProvider : ContentProvider() {
         var latitude = 0.0
         var longitude = 0.0
         var wifiJson = "[]"
+        var simMode = "STILL"
+        var simBearing = 0f
+        var startTimestamp = 0L
+        var routeJson = "[]"
+        var isRouteMode = false
     }
 
     override fun onCreate(): Boolean = true
@@ -21,8 +26,26 @@ class SpooferProvider : ContentProvider() {
         uri: Uri, projection: Array<out String>?, selection: String?,
         selectionArgs: Array<out String>?, sortOrder: String?
     ): Cursor {
-        val cursor = MatrixCursor(arrayOf("active", "lat", "lng", "wifi_json"))
-        cursor.addRow(arrayOf(if (isActive) 1 else 0, latitude, longitude, wifiJson))
+        val cursor = MatrixCursor(
+            arrayOf(
+                "active", "lat", "lng", "wifi_json",
+                "sim_mode", "sim_bearing", "start_timestamp",
+                "route_json", "is_route_mode"
+            )
+        )
+        cursor.addRow(
+            arrayOf(
+                if (isActive) 1 else 0,
+                latitude,
+                longitude,
+                wifiJson,
+                simMode,
+                simBearing,
+                startTimestamp,
+                routeJson,
+                if (isRouteMode) 1 else 0
+            )
+        )
         return cursor
     }
 
@@ -30,9 +53,7 @@ class SpooferProvider : ContentProvider() {
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
     override fun update(
-        uri: Uri,
-        values: ContentValues?,
-        selection: String?,
-        selectionArgs: Array<out String>?
+        uri: Uri, values: ContentValues?,
+        selection: String?, selectionArgs: Array<out String>?
     ): Int = 0
 }
