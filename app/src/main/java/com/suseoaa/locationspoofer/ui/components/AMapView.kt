@@ -11,18 +11,21 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.amap.api.maps.AMap
-import com.amap.api.maps.MapView
+import com.amap.api.maps.TextureMapView
 
 @Composable
 fun AMapView(modifier: Modifier = Modifier, onMapReady: (AMap) -> Unit) {
     val context = LocalContext.current
-    val mapView = remember { MapView(context) }
+    val mapView = remember { 
+        TextureMapView(context).apply {
+            onCreate(Bundle())
+        }
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     DisposableEffect(lifecycle, mapView) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_CREATE  -> mapView.onCreate(Bundle())
                 Lifecycle.Event.ON_RESUME  -> mapView.onResume()
                 Lifecycle.Event.ON_PAUSE   -> mapView.onPause()
                 Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
@@ -30,8 +33,14 @@ fun AMapView(modifier: Modifier = Modifier, onMapReady: (AMap) -> Unit) {
             }
         }
         lifecycle.addObserver(observer)
+        
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            mapView.onResume()
+        }
+
         onDispose {
             lifecycle.removeObserver(observer)
+            mapView.onPause()
             mapView.onDestroy()
         }
     }

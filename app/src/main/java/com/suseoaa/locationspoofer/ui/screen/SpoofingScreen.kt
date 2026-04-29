@@ -40,7 +40,6 @@ import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.model.LatLng
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.SavedLocation
-import com.suseoaa.locationspoofer.data.model.SimMode
 import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
 import com.suseoaa.locationspoofer.ui.components.AMapView
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
@@ -101,7 +100,7 @@ fun SpoofingScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // ── Header ──
+        // 头部
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -135,7 +134,7 @@ fun SpoofingScreen(
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 
-        // ── 地图缩略图 ──
+        // 地图缩略图
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
             AMapView(modifier = Modifier.fillMaxSize()) { map ->
                 smallMapRef = map
@@ -179,7 +178,7 @@ fun SpoofingScreen(
             )
         }
 
-        // ── 滚动内容 ──
+        // 滚动内容
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -196,9 +195,6 @@ fun SpoofingScreen(
             }
 
             CoordinateInputCard(viewModel, uiState, isDark) { showSaveDialog = true }
-            Spacer(Modifier.height(12.dp))
-
-            SimulationSettingsCard(viewModel, uiState, isDark)
             Spacer(Modifier.height(12.dp))
 
             ActionButtons(viewModel, uiState, onExpandMap)
@@ -237,7 +233,7 @@ fun SpoofingScreen(
 }
 
 
-// ── Wifi Status Card ──────────────────────────────────────────
+// Wi-Fi 状态卡片
 
 private data class StatusStyle(
     val bgColor: Color, val tint: Color, val text: String, val icon: ImageVector
@@ -278,7 +274,7 @@ fun WifiStatusCard(uiState: AppState) {
     }
 }
 
-// ── Coordinate Input Card ─────────────────────────────────────
+// 坐标输入卡片
 
 @Composable
 fun CoordinateInputCard(
@@ -362,62 +358,7 @@ fun coordinateFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = AccentBlue
 )
 
-// ── Simulation Settings Card ──────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SimulationSettingsCard(viewModel: MainViewModel, uiState: AppState, isDark: Boolean) {
-    val textSecondary = AppColors.textSecondary(isDark)
-
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            SectionHeader(Icons.AutoMirrored.Outlined.DirectionsWalk, "轨迹模拟 (速度/步频/抖动)", isDark)
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                SimMode.entries.forEach { mode ->
-                    FilterChip(
-                        selected = uiState.simMode == mode,
-                        onClick = { viewModel.updateSimMode(mode) },
-                        label = { Text(mode.label, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AccentBlue.copy(alpha = 0.15f),
-                            selectedLabelColor = AccentBlue
-                        )
-                    )
-                }
-            }
-
-            // 路线模式下方向由路线决定，隐藏方向滑块
-            AnimatedVisibility(visible = uiState.simMode != SimMode.STILL && !uiState.isRouteMode) {
-                Column {
-                    Spacer(Modifier.height(16.dp))
-                    Text("移动方向 (角度: ${uiState.simBearing.toInt()}°)", fontSize = 12.sp, color = textSecondary)
-                    Slider(
-                        value = uiState.simBearing,
-                        onValueChange = { viewModel.updateSimBearing(it) },
-                        valueRange = 0f..360f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = AccentBlue,
-                            activeTrackColor = AccentBlue,
-                            inactiveTrackColor = MaterialTheme.colorScheme.outline
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Action Buttons ────────────────────────────────────────────
+// 操作按钮
 
 @Composable
 fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> Unit) {
@@ -434,13 +375,9 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
         ) {
             Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(
-                if (uiState.isRouteMode) "停止路线模拟" else "停止模拟并恢复系统定位",
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold
-            )
+            Text("停止模拟", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     } else {
-        val hasRoute = uiState.routePoints.size >= 2
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -456,49 +393,20 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
                 Text("定点模拟", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
             Button(
-                onClick = {
-                    if (hasRoute) viewModel.startRouteSimulation()
-                    else { viewModel.setEditingRoute(true); onOpenMap() }
-                },
+                onClick = { viewModel.enterRoutePlanning(); onOpenMap() },
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
             ) {
-                Icon(
-                    if (hasRoute) Icons.Rounded.Route else Icons.Rounded.EditLocationAlt,
-                    null, modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Rounded.Route, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(
-                    if (hasRoute) "路线模拟" else "规划路线",
-                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        if (uiState.routePoints.isNotEmpty()) {
-            Spacer(Modifier.height(6.dp))
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val tagColor = if (hasRoute) AccentGreen else AccentOrange
-                Icon(Icons.Outlined.CheckCircle, null, tint = tagColor, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "已规划 ${uiState.routePoints.size} 个路点",
-                    color = tagColor, fontSize = 12.sp, modifier = Modifier.weight(1f)
-                )
-                TextButton(
-                    onClick = { viewModel.setEditingRoute(true); onOpenMap() },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                ) { Text("编辑", fontSize = 12.sp) }
-                TextButton(
-                    onClick = { viewModel.clearRoute() },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                ) { Text("清除", color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                Text("规划路线", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
 }
 
-// ── App Scope Card ────────────────────────────────────────────
+// 应用作用域卡片
 
 @Composable
 fun AppScopeCard(isDark: Boolean) {
@@ -541,7 +449,7 @@ fun AppScopeCard(isDark: Boolean) {
     }
 }
 
-// ── Section Header ────────────────────────────────────────────
+// 章节标题
 
 @Composable
 fun SectionHeader(icon: ImageVector, title: String, isDark: Boolean) {
@@ -559,7 +467,7 @@ fun SectionHeader(icon: ImageVector, title: String, isDark: Boolean) {
     }
 }
 
-// ── Saved Locations Dialog ────────────────────────────────────
+// 已保存位置对话框
 
 @Composable
 fun SavedLocationsDialog(
@@ -607,27 +515,4 @@ fun SavedLocationsDialog(
     }
 }
 
-// ── Save Name Dialog ──────────────────────────────────────────
 
-@Composable
-fun SaveNameDialog(title: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("名称") },
-                singleLine = true
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { if (name.isNotBlank()) onConfirm(name) }) { Text("保存") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
-    )
-}

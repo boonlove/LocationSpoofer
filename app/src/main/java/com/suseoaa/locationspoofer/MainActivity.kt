@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        requestLocationPermissions()
+        checkAndRequestPermissions()
 
         setContent {
             val uiState by viewModel.uiState.collectAsState()
@@ -49,19 +49,54 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestLocationPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val permissions = mutableListOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+    private fun checkAndRequestPermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_PHONE_STATE
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        val notGranted = permissions.filter {
+            checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (notGranted.isNotEmpty()) {
+            requestPermissions(notGranted.toTypedArray(), 100)
+        } else {
+            // 如果已授予位置权限，检查后台位置权限 (Android 10+)
+            checkBackgroundLocation()
+        }
+
+        // 悬浮窗权限（特殊）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
+            val intent = android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:$packageName")
             )
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            startActivity(intent)
+        }
+    }
+
+    private fun checkBackgroundLocation() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // Android 11+ 需要单独申请后台位置权限
+                requestPermissions(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), 101)
             }
-            val notGranted = permissions.filter {
-                checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100) {
+            // 检查是否已授予位置权限以触发后台位置权限请求
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                checkBackgroundLocation()
             }
-            if (notGranted.isNotEmpty()) requestPermissions(notGranted.toTypedArray(), 100)
         }
     }
 }
@@ -86,7 +121,7 @@ fun MainScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
-                onClose = { viewModel.setEditingRoute(false); isFullScreenMap = false }
+                onClose = { isFullScreenMap = false }
             )
         } else {
             when {

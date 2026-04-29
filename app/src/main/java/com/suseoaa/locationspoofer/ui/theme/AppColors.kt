@@ -4,7 +4,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// ── Dark palette ──────────────────────────────────────────────
+// 深色调色板
 val DarkBg = Color(0xFF0D1117)
 val SurfaceDark = Color(0xFF161B22)
 val SurfaceCardDark = Color(0xFF1C2333)
@@ -12,7 +12,7 @@ val DividerColorDark = Color(0xFF30363D)
 val TextPrimaryDark = Color(0xFFE6EDF3)
 val TextSecondaryDark = Color(0xFF8B949E)
 
-// ── Light palette ──────────────────────────────────────────────
+// 浅色调色板
 val LightBg = Color(0xFFF6F8FA)
 val SurfaceLight = Color(0xFFFFFFFF)
 val SurfaceCardLight = Color(0xFFFFFFFF)
@@ -20,7 +20,7 @@ val DividerColorLight = Color(0xFFD0D7DE)
 val TextPrimaryLight = Color(0xFF24292F)
 val TextSecondaryLight = Color(0xFF57606A)
 
-// ── Accent ──────────────────────────────────────────────
+// 强调色
 val AccentBlue = Color(0xFF388BFD)
 val AccentGreen = Color(0xFF2EA043)
 val AccentOrange = Color(0xFFD29922)

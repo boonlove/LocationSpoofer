@@ -583,7 +583,7 @@ class LocationHooker : IXposedHookLoadPackage {
                                 )
                                 fakeList.add(fakeScanResult)
                             }
-                        } catch (e: Throwable) { /* Ignore */
+                        } catch (e: Throwable) { // 忽略
                         }
                     }
                     param.result = fakeList
@@ -684,7 +684,7 @@ class LocationHooker : IXposedHookLoadPackage {
                                     } catch (e: Throwable) {
                                     }
                                     param.result = fakeWifiInfo
-                                } catch (e: Throwable) { /* Ignore */
+                                } catch (e: Throwable) { // 忽略
                                 }
                             }
                         }
@@ -848,11 +848,11 @@ class LocationHooker : IXposedHookLoadPackage {
                     lastReadTime = currentTime
                     return config
                 }
-            } catch (e: Throwable) { /* Ignore query error */
+            } catch (e: Throwable) { // 忽略查询错误
             }
         }
 
-        // Fallback to local file
+        // 回退到本地文件
         return try {
             val file = File("/data/local/tmp/locationspoofer_config.json")
             if (file.exists() && file.canRead()) {
