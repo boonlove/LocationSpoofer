@@ -8,8 +8,13 @@
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
 [![KernelSU](https://img.shields.io/badge/Root-KernelSU-orange.svg)](https://kernelsu.org)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-purple.svg)](https://github.com/LSPosed/LSPosed)
+[![Telegram](https://img.shields.io/badge/Telegram-交流群-blue.svg)](https://t.me/+CsxZGItXdW40ZWVl)
 
 </div>
+
+---
+
+> **📢 加入我们的 [Telegram 交流群](https://t.me/+CsxZGItXdW40ZWVl) ，虽然我也不知道为什么要有一个TG群，但是大家都想要，而且别人也有，那我也要有！**
 
 ---
 
