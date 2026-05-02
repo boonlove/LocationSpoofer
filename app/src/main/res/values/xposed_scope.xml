@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.tencent.mm</item>
+        <item>com.chaoxing.mobile</item>
+        <item>cn.chaoxing.lemon</item>
+        <item>com.alibaba.android.rimet</item>
+        <item>com.sankuai.meituan</item>
+        <item>com.baidu.BaiduMap</item>
+        <item>com.autonavi.minimap</item>
+        <item>com.tencent.map</item>
+        <item>com.android.systemui</item>
+        <item>com.google.android.gms</item>
+        <item>android</item>
+        <item>system</item>
+        <item>com.android.phone</item>
+        <item>com.android.providers.settings</item>
+    </string-array>
+</resources>
