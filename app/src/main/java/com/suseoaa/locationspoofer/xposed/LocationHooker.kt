@@ -7,6 +7,10 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class LocationHooker : IXposedHookLoadPackage {
 
@@ -73,10 +77,44 @@ class LocationHooker : IXposedHookLoadPackage {
 
     private var startTimestamp = System.currentTimeMillis()
 
+    // ── GCJ-02 → WGS-84 转换（Xposed模块运行在目标App进程，必须自带转换代码）──
+    private val GCJ_A = 6378245.0
+    private val GCJ_EE = 0.00669342162296594
+
+    private fun gcj02ToWgs84(gcjLat: Double, gcjLng: Double): Pair<Double, Double> {
+        if (gcjLng < 72.004 || gcjLng > 137.8347 || gcjLat < 0.8293 || gcjLat > 55.8271)
+            return Pair(gcjLat, gcjLng)
+        val dLat = gcjTransformLat(gcjLng - 105.0, gcjLat - 35.0)
+        val dLng = gcjTransformLng(gcjLng - 105.0, gcjLat - 35.0)
+        val radLat = gcjLat / 180.0 * Math.PI
+        var magic = sin(radLat)
+        magic = 1 - GCJ_EE * magic * magic
+        val sqrtMagic = sqrt(magic)
+        val mLat = (dLat * 180.0) / ((GCJ_A * (1 - GCJ_EE)) / (magic * sqrtMagic) * Math.PI)
+        val mLng = (dLng * 180.0) / (GCJ_A / sqrtMagic * cos(radLat) * Math.PI)
+        return Pair(gcjLat - mLat, gcjLng - mLng)
+    }
+
+    private fun gcjTransformLat(x: Double, y: Double): Double {
+        var ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * sqrt(abs(x))
+        ret += (20.0 * sin(6.0 * x * Math.PI) + 20.0 * sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(y * Math.PI) + 40.0 * sin(y / 3.0 * Math.PI)) * 2.0 / 3.0
+        ret += (160.0 * sin(y / 12.0 * Math.PI) + 320.0 * sin(y * Math.PI / 30.0)) * 2.0 / 3.0
+        return ret
+    }
+
+    private fun gcjTransformLng(x: Double, y: Double): Double {
+        var ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * sqrt(abs(x))
+        ret += (20.0 * sin(6.0 * x * Math.PI) + 20.0 * sin(2.0 * x * Math.PI)) * 2.0 / 3.0
+        ret += (20.0 * sin(x * Math.PI) + 40.0 * sin(x / 3.0 * Math.PI)) * 2.0 / 3.0
+        ret += (150.0 * sin(x / 12.0 * Math.PI) + 300.0 * sin(x / 30.0 * Math.PI)) * 2.0 / 3.0
+        return ret
+    }
+
     private fun getJitteredLocation(baseLat: Double, baseLng: Double): Pair<Double, Double> {
         val elapsed = System.currentTimeMillis() - startTimestamp
-        val driftLat = kotlin.math.sin(elapsed / 10000.0) * 0.000015
-        val driftLng = kotlin.math.cos(elapsed / 12000.0) * 0.000015
+        val driftLat = sin(elapsed / 10000.0) * 0.000015
+        val driftLng = cos(elapsed / 12000.0) * 0.000015
         return Pair(baseLat + driftLat, baseLng + driftLng)
     }
 
@@ -87,13 +125,15 @@ class LocationHooker : IXposedHookLoadPackage {
 
     private fun hookLocationAPIs(classLoader: ClassLoader) {
         try {
+            // android.location.Location 标准接口：返回 WGS-84（GPS坐标系）
+            // readConfig() 已预计算 wgs84_lat/wgs84_lng，直接读取即可
             val getLatHook = object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        val baseLat = config.optDouble("lat", param.result as Double)
-                        val baseLng = config.optDouble("lng", 0.0)
-                        param.result = getJitteredLocation(baseLat, baseLng).first
+                        val wgsLat = config.optDouble("wgs84_lat", param.result as Double)
+                        val wgsLng = config.optDouble("wgs84_lng", 0.0)
+                        param.result = getJitteredLocation(wgsLat, wgsLng).first
                     }
                 }
             }
@@ -102,9 +142,9 @@ class LocationHooker : IXposedHookLoadPackage {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        val baseLat = config.optDouble("lat", 0.0)
-                        val baseLng = config.optDouble("lng", param.result as Double)
-                        param.result = getJitteredLocation(baseLat, baseLng).second
+                        val wgsLat = config.optDouble("wgs84_lat", 0.0)
+                        val wgsLng = config.optDouble("wgs84_lng", param.result as Double)
+                        param.result = getJitteredLocation(wgsLat, wgsLng).second
                     }
                 }
             }
@@ -823,22 +863,26 @@ class LocationHooker : IXposedHookLoadPackage {
                     val lat = cursor.getDouble(cursor.getColumnIndexOrThrow("lat"))
                     val lng = cursor.getDouble(cursor.getColumnIndexOrThrow("lng"))
                     val wifiJson = cursor.getString(cursor.getColumnIndexOrThrow("wifi_json"))
-                    
+
                     val simModeIdx = cursor.getColumnIndex("sim_mode")
                     val simMode = if (simModeIdx != -1) cursor.getString(simModeIdx) else "STILL"
-                    
+
                     val simBearingIdx = cursor.getColumnIndex("sim_bearing")
                     val simBearing = if (simBearingIdx != -1) cursor.getFloat(simBearingIdx) else 0f
-                    
+
                     val startTimestampIdx = cursor.getColumnIndex("start_timestamp")
                     val startTimestamp = if (startTimestampIdx != -1) cursor.getLong(startTimestampIdx) else System.currentTimeMillis()
-                    
+
                     cursor.close()
 
                     val config = JSONObject()
                     config.put("active", active)
-                    config.put("lat", lat)
-                    config.put("lng", lng)
+                    config.put("lat", lat)           // GCJ-02
+                    config.put("lng", lng)           // GCJ-02
+                    // 预计算 WGS-84，避免每次 hook 调用都重复转换
+                    val wgs84 = gcj02ToWgs84(lat, lng)
+                    config.put("wgs84_lat", wgs84.first)
+                    config.put("wgs84_lng", wgs84.second)
                     config.put("wifi_json", org.json.JSONArray(wifiJson))
                     config.put("sim_mode", simMode)
                     config.put("sim_bearing", simBearing.toDouble())
@@ -859,6 +903,12 @@ class LocationHooker : IXposedHookLoadPackage {
                 val content = file.readText()
                 val config = JSONObject(content)
                 if (!config.has("wifi_json")) config.put("wifi_json", org.json.JSONArray())
+                // 预计算 WGS-84
+                val lat = config.optDouble("lat", 0.0)
+                val lng = config.optDouble("lng", 0.0)
+                val wgs84 = gcj02ToWgs84(lat, lng)
+                config.put("wgs84_lat", wgs84.first)
+                config.put("wgs84_lng", wgs84.second)
                 lastConfig = config
                 lastReadTime = currentTime
                 config

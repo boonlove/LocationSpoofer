@@ -10,8 +10,8 @@ class SpooferProvider : ContentProvider() {
 
     companion object {
         var isActive = false
-        var latitude = 0.0
-        var longitude = 0.0
+        var latitude = 0.0      // GCJ-02（高德坐标系，存入即为GCJ-02）
+        var longitude = 0.0     // GCJ-02
         var wifiJson = "[]"
         var simMode = "STILL"
         var simBearing = 0f

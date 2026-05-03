@@ -16,6 +16,7 @@ import androidx.core.app.NotificationCompat
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.SimulatedLocation
 import com.suseoaa.locationspoofer.provider.SpooferProvider
+import com.suseoaa.locationspoofer.utils.CoordinateUtils
 import com.suseoaa.locationspoofer.utils.TrajectorySimulator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -129,6 +130,7 @@ class SpoofingService : Service() {
 
     private fun setupTestProvider(provider: String) {
         try {
+            @Suppress("DEPRECATION")
             locationManager.addTestProvider(
                 provider, false, false, false, false,
                 true, true, true, Criteria.POWER_LOW, Criteria.ACCURACY_FINE
@@ -149,9 +151,12 @@ class SpoofingService : Service() {
 
     private fun pushLocation(provider: String, loc: SimulatedLocation) {
         try {
+            // SpooferProvider 中存储的是 GCJ-02（高德坐标系），
+            // setTestProviderLocation 要求 WGS-84（GPS坐标系），必须转换
+            val wgs84 = CoordinateUtils.gcj02ToWgs84(loc.lat, loc.lng)
             val location = Location(provider).apply {
-                latitude = loc.lat
-                longitude = loc.lng
+                latitude = wgs84.lat
+                longitude = wgs84.lng
                 accuracy = loc.accuracy
                 altitude = loc.altitude
                 speed = loc.speed
