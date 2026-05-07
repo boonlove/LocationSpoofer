@@ -86,8 +86,7 @@ fun SpoofingScreen(
     var searchResults by remember { mutableStateOf<List<PoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    // 首页地图是否已被用户点击（控制确认选点按钮的显示）
-    var mapTapped by remember { mutableStateOf(false) }
+
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
     BackHandler(enabled = showSearchResults) {
@@ -217,43 +216,24 @@ fun SpoofingScreen(
                 val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
                 val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
                 map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(initLat, initLng), 15f))
-                // 点击地图显示确认选点按钮
-                map.setOnMapClickListener { latLng ->
-                    mapTapped = true
-                    map.clear()
-                    map.addMarker(MarkerOptions().position(latLng).title("选中位置"))
-                }
-            }
 
-            // 十字准星（首次打开不显示按钮，点击地图后出现）
-            if (!mapTapped) {
-                Icon(
-                    Icons.Rounded.AddLocationAlt, null,
-                    tint = AccentBlue.copy(alpha = 0.5f),
-                    modifier = Modifier.align(Alignment.Center).size(32.dp)
-                )
-            }
-
-            // 确认选点按钮（点击地图后出现）
-            if (mapTapped) {
-                Button(
-                    onClick = {
-                        smallMapRef?.cameraPosition?.target?.let { t ->
+                // 移动地图即选点
+                map.setOnCameraChangeListener(object : AMap.OnCameraChangeListener {
+                    override fun onCameraChange(p0: com.amap.api.maps.model.CameraPosition?) {}
+                    override fun onCameraChangeFinish(p0: com.amap.api.maps.model.CameraPosition?) {
+                        p0?.target?.let { t ->
                             viewModel.confirmMapPoint(t.latitude, t.longitude)
-                            mapTapped = false
-                            smallMapRef?.clear()
-                            Toast.makeText(context, "已选定坐标", Toast.LENGTH_SHORT).show()
                         }
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 56.dp).height(44.dp)
-                ) {
-                    Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("确认选点", fontWeight = FontWeight.Bold)
-                }
+                    }
+                })
             }
+
+            // 十字准星（始终显示在中间）
+            Icon(
+                Icons.Rounded.AddLocationAlt, null,
+                tint = AccentBlue.copy(alpha = 0.8f),
+                modifier = Modifier.align(Alignment.Center).size(32.dp).padding(bottom = 16.dp) // 准星底部对齐中心
+            )
 
             Box(
                 modifier = Modifier
