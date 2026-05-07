@@ -337,6 +337,16 @@ class MainViewModel(
     }
 
     /** 停止路线模拟，重置所有状态 */
+    fun cancelRoutePlanning() {
+        _uiState.update {
+            it.copy(
+                routePlanStage = RoutePlanStage.IDLE,
+                routePoints = emptyList(),
+                routeRunMode = RouteRunMode.MANUAL
+            )
+        }
+    }
+
     fun stopRoutePlanning() {
         locationSyncJob?.cancel()
         locationSyncJob = null

@@ -155,11 +155,11 @@ fun FullScreenMapPage(
         }
 
         // 选点模式的十字准星
-        if (stage == RoutePlanStage.SELECTING) {
+        if (stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.IDLE) {
             Icon(
-                Icons.Rounded.AddLocation, null,
-                tint = AccentBlue,
-                modifier = Modifier.align(Alignment.Center).size(40.dp)
+                Icons.Rounded.AddLocationAlt, null,
+                tint = AccentBlue.copy(alpha = 0.8f),
+                modifier = Modifier.align(Alignment.Center).size(40.dp).padding(bottom = 16.dp)
             )
         }
 
@@ -312,21 +312,46 @@ fun FullScreenMapPage(
             JoystickPanel(viewModel = viewModel, maxSpeedMs = uiState.routeSimMode.speedMs.toFloat())
         }
 
-        // 底部操作栏
-        BottomActionBar(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            stage = stage,
-            routePoints = routePoints,
-            onConfirmPoint = {
-                mapRef?.cameraPosition?.target?.let { t ->
-                    viewModel.addRoutePoint(t.latitude, t.longitude)
-                }
-            },
-            onFinishSelecting = { viewModel.finishSelectingPoints() },
-            onRestartSelecting = { viewModel.restartSelectingPoints() },
-            onStartPlanning = { showConfigDialog = true },
-            onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
-        )
+        // IDLE阶段（全屏选点模式）只显示单一确认选点按钮
+        if (stage == RoutePlanStage.IDLE) {
+            Button(
+                onClick = {
+                    mapRef?.cameraPosition?.target?.let { t ->
+                        viewModel.confirmMapPoint(t.latitude, t.longitude)
+                        Toast.makeText(context, "已选定坐标", Toast.LENGTH_SHORT).show()
+                        onClose()
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) {
+                Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("确认选点", fontWeight = FontWeight.Bold)
+            }
+        } else {
+            // 底部操作栏 (路线规划模式)
+            BottomActionBar(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                stage = stage,
+                routePoints = routePoints,
+                onConfirmPoint = {
+                    mapRef?.cameraPosition?.target?.let { t ->
+                        viewModel.addRoutePoint(t.latitude, t.longitude)
+                    }
+                },
+                onFinishSelecting = { viewModel.finishSelectingPoints() },
+                onRestartSelecting = { viewModel.restartSelectingPoints() },
+                onStartPlanning = { showConfigDialog = true },
+                onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
+            )
+        }
     }
 
     // 配置弹窗
@@ -370,32 +395,40 @@ private fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.size(44.dp).clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface).shadow(4.dp, CircleShape)
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onBackground)
-        }
-
         Surface(
-            shape = RoundedCornerShape(22.dp),
+            onClick = onBack,
+            shape = CircleShape,
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 4.dp,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.size(44.dp)
         ) {
-            Text(
-                text = when (stage) {
-                    RoutePlanStage.IDLE -> "路线规划"
-                    RoutePlanStage.SELECTING -> "点击确认选点添加路点（已选 $routePointCount 个）"
-                    RoutePlanStage.READY -> "路线已就绪，共 $routePointCount 个路点"
-                    RoutePlanStage.RUNNING -> if (isManual) "摇杆控制中" else "路线自动循环中"
-                },
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onBackground)
+            }
+        }
+
+        if (stage != RoutePlanStage.IDLE) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 4.dp,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = when (stage) {
+                        RoutePlanStage.IDLE -> ""
+                        RoutePlanStage.SELECTING -> "点击确认选点添加路点（已选 $routePointCount 个）"
+                        RoutePlanStage.READY -> "路线已就绪，共 $routePointCount 个路点"
+                        RoutePlanStage.RUNNING -> if (isManual) "摇杆控制中" else "路线自动循环中"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+        } else {
+            Spacer(Modifier.weight(1f))
         }
 
         AnimatedVisibility(visible = canUndo) {
@@ -436,7 +469,7 @@ private fun BottomActionBar(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         when (stage) {
-            RoutePlanStage.IDLE -> { /* 不显示 */ }
+            RoutePlanStage.IDLE -> { /* 不会到达此处 */ }
 
             RoutePlanStage.SELECTING -> {
                 Text(

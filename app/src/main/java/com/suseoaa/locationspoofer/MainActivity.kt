@@ -110,9 +110,17 @@ fun MainScreen(
 ) {
     var isFullScreenMap by remember { mutableStateOf(false) }
 
+    val closeMapAndResetRouteIfNeeded = {
+        if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
+            uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.READY) {
+            viewModel.cancelRoutePlanning()
+        }
+        isFullScreenMap = false
+    }
+
     // 拦截系统返回键：在全屏地图时返回主页，而不是退出应用
     BackHandler(enabled = isFullScreenMap) {
-        isFullScreenMap = false
+        closeMapAndResetRouteIfNeeded()
     }
 
     AnimatedContent(
@@ -127,7 +135,7 @@ fun MainScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
-                onClose = { isFullScreenMap = false }
+                onClose = { closeMapAndResetRouteIfNeeded() }
             )
         } else {
             when {
