@@ -11,8 +11,8 @@ android {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 162
-        versionName = "1.6.2"
+        versionCode = 172
+        versionName = "1.7.2"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.amap.search)
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)

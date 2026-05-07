@@ -1,6 +1,7 @@
 package com.suseoaa.locationspoofer
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -19,21 +20,49 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.ui.screen.BlockingScreen
 import com.suseoaa.locationspoofer.ui.screen.FullScreenMapPage
 import com.suseoaa.locationspoofer.ui.screen.InitializingScreen
 import com.suseoaa.locationspoofer.ui.screen.SpoofingScreen
+import com.suseoaa.locationspoofer.ui.screen.LanguageSelectionScreen
 import com.suseoaa.locationspoofer.ui.theme.AppColorSchemeDark
 import com.suseoaa.locationspoofer.ui.theme.AppColorSchemeLight
+import com.suseoaa.locationspoofer.utils.LocaleUtils
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModel()
 
+    override fun attachBaseContext(newBase: Context) {
+        val prefs = newBase.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val isLangSet = prefs.getBoolean("is_language_set", false)
+        val lang = if (isLangSet) prefs.getString("language", "") ?: "" else ""
+        
+        val context = if (lang.isNotEmpty()) {
+            LocaleUtils.wrap(newBase, lang)
+        } else {
+            newBase
+        }
+        super.attachBaseContext(context)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // 仅在初始启动或语言变更后同步系统 Locale
+        // AppCompatDelegate.setApplicationLocales 会自动处理持久化
+        val savedLang = viewModel.getSavedLanguage()
+        val currentLocales = androidx.appcompat.app.AppCompatDelegate.getApplicationLocales()
+        if (savedLang.isNotEmpty() && (currentLocales.isEmpty || currentLocales.toLanguageTags() != savedLang)) {
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                androidx.core.os.LocaleListCompat.forLanguageTags(savedLang)
+            )
+        }
 
         checkAndRequestPermissions()
 
@@ -42,9 +71,26 @@ class MainActivity : ComponentActivity() {
             val isDark = isSystemInDarkTheme()
             val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
 
-            MaterialTheme(colorScheme = colorScheme) {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark)
+            // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新
+            // 使用 remember(uiState.currentLanguage) 确保语言切换时重新计算 Context
+            val context = LocalContext.current
+            val wrappedContext = remember(uiState.currentLanguage) {
+                if (uiState.currentLanguage.isNotEmpty()) {
+                    LocaleUtils.wrap(context, uiState.currentLanguage)
+                } else {
+                    context
+                }
+            }
+            val configuration = wrappedContext.resources.configuration
+
+            CompositionLocalProvider(
+                LocalContext provides wrappedContext,
+                LocalConfiguration provides configuration
+            ) {
+                MaterialTheme(colorScheme = colorScheme) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark)
+                    }
                 }
             }
         }
@@ -68,11 +114,9 @@ class MainActivity : ComponentActivity() {
         if (notGranted.isNotEmpty()) {
             requestPermissions(notGranted.toTypedArray(), 100)
         } else {
-            // 如果已授予位置权限，检查后台位置权限 (Android 10+)
             checkBackgroundLocation()
         }
 
-        // 悬浮窗权限（特殊）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
             val intent = android.content.Intent(
                 android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -85,7 +129,6 @@ class MainActivity : ComponentActivity() {
     private fun checkBackgroundLocation() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                // Android 11+ 需要单独申请后台位置权限
                 requestPermissions(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), 101)
             }
         }
@@ -94,7 +137,6 @@ class MainActivity : ComponentActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 100) {
-            // 检查是否已授予位置权限以触发后台位置权限请求
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 checkBackgroundLocation()
             }
@@ -118,7 +160,6 @@ fun MainScreen(
         isFullScreenMap = false
     }
 
-    // 拦截系统返回键：在全屏地图时返回主页，而不是退出应用
     BackHandler(enabled = isFullScreenMap) {
         closeMapAndResetRouteIfNeeded()
     }
@@ -140,16 +181,17 @@ fun MainScreen(
         } else {
             when {
                 uiState.isInitializing -> InitializingScreen(isDark)
+                !uiState.isLanguageSet -> LanguageSelectionScreen(viewModel)
                 !uiState.hasRootAccess -> BlockingScreen(
                     icon = Icons.Rounded.Lock,
-                    title = "需要 Root 权限",
-                    message = "本应用需要 KernelSU Root 权限才能运行。\n请在 KernelSU 中授权后重启应用。",
+                    title = stringResource(R.string.root_required),
+                    message = stringResource(R.string.root_message),
                     isDark = isDark
                 )
                 !uiState.isLSPosedActive -> BlockingScreen(
                     icon = Icons.Rounded.Extension,
-                    title = "LSPosed 模块未激活",
-                    message = "请在 LSPosed 管理器中启用本模块，\n勾选需要欺骗的应用后重启目标应用。",
+                    title = stringResource(R.string.lsposed_not_active),
+                    message = stringResource(R.string.lsposed_message),
                     isDark = isDark
                 )
                 else -> SpoofingScreen(

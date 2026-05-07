@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 
 @Composable
@@ -43,7 +45,7 @@ fun InitializingScreen(isDark: Boolean) {
                 )
             }
             Text(
-                "LocationSpoofer",
+                stringResource(R.string.app_name),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
@@ -54,7 +56,7 @@ fun InitializingScreen(isDark: Boolean) {
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp)
             )
-            Text("正在初始化环境...", color = textSecondary, fontSize = 13.sp)
+            Text(stringResource(R.string.initializing_env), color = textSecondary, fontSize = 13.sp)
         }
     }
 }

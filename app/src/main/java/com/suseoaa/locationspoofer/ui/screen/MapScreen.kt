@@ -50,6 +50,8 @@ import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.PolylineOptions
 import com.amap.api.services.core.PoiItem
 import com.amap.api.services.poisearch.PoiSearch
+import androidx.compose.ui.res.stringResource
+import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
@@ -130,7 +132,7 @@ fun FullScreenMapPage(
                     MarkerOptions()
                         .position(pos)
                         .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE))
-                        .title("当前位置")
+                        .title(context.getString(R.string.current_location))
                 )
             }
         }
@@ -220,7 +222,7 @@ fun FullScreenMapPage(
                                 Spacer(Modifier.width(8.dp))
                                 Box(modifier = Modifier.weight(1f)) {
                                     if (searchQuery.isEmpty()) {
-                                        Text("搜索地点", fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                                        Text(stringResource(R.string.search_location_hint), fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                                     }
                                     innerTextField()
                                 }
@@ -277,7 +279,7 @@ fun FullScreenMapPage(
         ) {
             MapFab(
                 icon = Icons.Rounded.MyLocation,
-                contentDescription = "定位到当前位置",
+                contentDescription = stringResource(R.string.locate_to_current),
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = AccentBlue
             ) {
@@ -294,7 +296,7 @@ fun FullScreenMapPage(
                             mapRef?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f))
                         }
                     } else {
-                        Toast.makeText(context, "定位失败: ${loc?.errorInfo ?: "未知错误"}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.location_failed, loc?.errorInfo ?: "Unknown"), Toast.LENGTH_SHORT).show()
                     }
                     client.stopLocation(); client.onDestroy()
                 }
@@ -318,7 +320,7 @@ fun FullScreenMapPage(
                 onClick = {
                     mapRef?.cameraPosition?.target?.let { t ->
                         viewModel.confirmMapPoint(t.latitude, t.longitude)
-                        Toast.makeText(context, "已选定坐标", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.coordinate_selected), Toast.LENGTH_SHORT).show()
                         onClose()
                     }
                 },
@@ -333,9 +335,10 @@ fun FullScreenMapPage(
             ) {
                 Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("确认选点", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold)
             }
-        } else {
+        }
+ else {
             // 底部操作栏 (路线规划模式)
             BottomActionBar(
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -403,7 +406,7 @@ private fun TopBar(
             modifier = Modifier.size(44.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onBackground)
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = MaterialTheme.colorScheme.onBackground)
             }
         }
 
@@ -417,9 +420,9 @@ private fun TopBar(
                 Text(
                     text = when (stage) {
                         RoutePlanStage.IDLE -> ""
-                        RoutePlanStage.SELECTING -> "点击确认选点添加路点（已选 $routePointCount 个）"
-                        RoutePlanStage.READY -> "路线已就绪，共 $routePointCount 个路点"
-                        RoutePlanStage.RUNNING -> if (isManual) "摇杆控制中" else "路线自动循环中"
+                        RoutePlanStage.SELECTING -> stringResource(R.string.selecting_points_hint, routePointCount)
+                        RoutePlanStage.READY -> stringResource(R.string.route_ready_hint, routePointCount)
+                        RoutePlanStage.RUNNING -> if (isManual) stringResource(R.string.joystick_controlling) else stringResource(R.string.route_looping)
                     },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
@@ -434,7 +437,7 @@ private fun TopBar(
         AnimatedVisibility(visible = canUndo) {
             MapFab(
                 icon = Icons.AutoMirrored.Rounded.Undo,
-                contentDescription = "撤销",
+                contentDescription = stringResource(R.string.undo),
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onBackground,
                 onClick = onUndo
@@ -473,7 +476,7 @@ private fun BottomActionBar(
 
             RoutePlanStage.SELECTING -> {
                 Text(
-                    "已选 ${routePoints.size} 个路点${if (routePoints.size < 2) "（至少需要 2 个）" else ""}",
+                    stringResource(R.string.selected_points_count, routePoints.size, if (routePoints.size < 2) stringResource(R.string.at_least_two_points) else ""),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -487,7 +490,7 @@ private fun BottomActionBar(
                     ) {
                         Icon(Icons.Rounded.AddLocation, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("确认选点", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = onFinishSelecting,
@@ -498,7 +501,7 @@ private fun BottomActionBar(
                     ) {
                         Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("结束选点", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.finish_selecting), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -512,7 +515,7 @@ private fun BottomActionBar(
                     ) {
                         Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("重新选点", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.re_select), fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = onStartPlanning,
@@ -522,7 +525,7 @@ private fun BottomActionBar(
                     ) {
                         Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("开始规划", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.start_planning), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -536,7 +539,7 @@ private fun BottomActionBar(
                 ) {
                     Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("结束规划", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.stop_planning), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -564,7 +567,7 @@ private fun RoutePlanConfigDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    "路线配置",
+                    stringResource(R.string.route_config),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -572,7 +575,7 @@ private fun RoutePlanConfigDialog(
 
                 // 模式选择
                 Text(
-                    "控制方式",
+                    stringResource(R.string.control_mode),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
@@ -580,7 +583,7 @@ private fun RoutePlanConfigDialog(
                     FilterChip(
                         selected = uiState.routeRunMode == RouteRunMode.MANUAL,
                         onClick = { onRunModeChange(RouteRunMode.MANUAL) },
-                        label = { Text("手动（摇杆）") },
+                        label = { Text(stringResource(R.string.manual_joystick)) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AccentOrange.copy(alpha = 0.15f),
                             selectedLabelColor = AccentOrange
@@ -589,7 +592,7 @@ private fun RoutePlanConfigDialog(
                     FilterChip(
                         selected = uiState.routeRunMode == RouteRunMode.LOOP,
                         onClick = { onRunModeChange(RouteRunMode.LOOP) },
-                        label = { Text("循环（自动）") },
+                        label = { Text(stringResource(R.string.loop_auto)) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AccentBlue.copy(alpha = 0.15f),
                             selectedLabelColor = AccentBlue
@@ -601,18 +604,18 @@ private fun RoutePlanConfigDialog(
                 AnimatedVisibility(uiState.routeRunMode == RouteRunMode.LOOP) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "循环路线说明",
+                            stringResource(R.string.loop_auto),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                         )
                         Text(
-                            "从起点到终点，再从终点到起点，不断循环",
+                            stringResource(R.string.loop_description),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "移动速度",
+                            stringResource(R.string.movement_speed),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
@@ -626,7 +629,13 @@ private fun RoutePlanConfigDialog(
                                     onClick = { onSpeedChange(mode) },
                                     label = {
                                         Text(
-                                            "${mode.label}\n${mode.speedMs.toInt()}m/s",
+                                            "${when(mode){
+                                                SimMode.WALKING -> stringResource(R.string.walking)
+                                                SimMode.RUNNING -> stringResource(R.string.running)
+                                                SimMode.CYCLING -> stringResource(R.string.cycling)
+                                                SimMode.DRIVING -> stringResource(R.string.driving)
+                                                else -> stringResource(R.string.custom)
+                                            }}\n${mode.speedMs.toInt()}m/s",
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center
                                         )
@@ -647,7 +656,7 @@ private fun RoutePlanConfigDialog(
                                     customInput = v
                                     v.toDoubleOrNull()?.let { onCustomSpeedChange(it) }
                                 },
-                                label = { Text("速度 (m/s)") },
+                                label = { Text(stringResource(R.string.speed_unit)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
@@ -660,7 +669,7 @@ private fun RoutePlanConfigDialog(
                 // 手动模式说明
                 AnimatedVisibility(uiState.routeRunMode == RouteRunMode.MANUAL) {
                     Text(
-                        "使用屏幕摇杆控制移动方向，实时更新定位",
+                        stringResource(R.string.joystick_description),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                     )
@@ -675,13 +684,13 @@ private fun RoutePlanConfigDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp)
-                    ) { Text("取消") }
+                    ) { Text(stringResource(R.string.cancel)) }
                     Button(
                         onClick = onStartRoute,
                         modifier = Modifier.weight(1f).height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                    ) { Text("开始模拟", fontWeight = FontWeight.Bold) }
+                    ) { Text(stringResource(R.string.start_simulation), fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -767,9 +776,9 @@ fun SaveNameDialog(title: String, onConfirm: (String) -> Unit, onDismiss: () -> 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true)
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
         },
-        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name) }) { Text("保存") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name) }) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }

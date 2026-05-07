@@ -17,4 +17,16 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     fun addSavedRoute(route: SavedRoute) = settingsManager.addSavedRoute(route)
 
     fun removeSavedRoute(route: SavedRoute) = settingsManager.removeSavedRoute(route)
+
+    fun isLanguageSet(): Boolean = settingsManager.isLanguageSet
+
+    fun setLanguageSet(value: Boolean) {
+        settingsManager.isLanguageSet = value
+    }
+
+    fun getLanguage(): String = settingsManager.language
+
+    fun setLanguage(value: String) {
+        settingsManager.language = value
+    }
 }

@@ -38,7 +38,11 @@ class MainViewModel(
         "QUlEODRhYjYwNzVjYjI4MTY5ZDU4Yjk2NzQxM2ZiYTFiMDA6YmY2NWE5M2RiYWQ1YzYwNmYwNzdkOTQ2NjE2NmI4MzM="
 
     private val _uiState = MutableStateFlow(
-        AppState(savedLocations = settingsRepository.getSavedLocations())
+        AppState(
+            savedLocations = settingsRepository.getSavedLocations(),
+            currentLanguage = settingsRepository.getLanguage(),
+            isLanguageSet = settingsRepository.isLanguageSet()
+        )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
 
@@ -73,6 +77,14 @@ class MainViewModel(
             fetchCurrentLocation(context)
         }
     }
+
+    fun selectLanguage(languageCode: String) {
+        settingsRepository.setLanguage(languageCode)
+        settingsRepository.setLanguageSet(true)
+        _uiState.update { it.copy(isLanguageSet = true, currentLanguage = languageCode) }
+    }
+
+    fun getSavedLanguage(): String = settingsRepository.getLanguage()
 
     // 当前位置获取
 

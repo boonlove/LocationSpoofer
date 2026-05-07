@@ -3,12 +3,15 @@
 <h1>LocationSpoofer</h1>
 
 <p>基于 KernelSU + LSPosed 的高保真 Android 系统级虚拟定位模块</p>
+<p>High-fidelity Android system-level location spoofing module based on KernelSU + LSPosed</p>
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
 [![KernelSU](https://img.shields.io/badge/Root-KernelSU-orange.svg)](https://kernelsu.org)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-purple.svg)](https://github.com/LSPosed/LSPosed)
 [![Telegram](https://img.shields.io/badge/Telegram-交流群-blue.svg)](https://t.me/+CsxZGItXdW40ZWVl)
+
+[简体中文](README.md) | [English](README_EN.md)
 
 </div>
 
@@ -22,6 +25,7 @@
 
 | 功能 | 说明 |
 |---|---|
+| 🌍 **多语言支持** | 支持 **中文**、**English**、**العربية**，自动跟随系统或手动切换 |
 | 🗺️ **地图可视化选点** | 集成高德 3D 地图，支持准星拖拽、搜索历史位置及收藏夹 |
 | 🔀 **路线规划系统** | 状态机驱动的多路点规划，支持撤销、重置及实时预览 |
 | 🕹️ **虚拟摇杆控制** | 手动模拟模式下可通过浮动摇杆实时控制位置移动，支持平滑方位角过渡 |

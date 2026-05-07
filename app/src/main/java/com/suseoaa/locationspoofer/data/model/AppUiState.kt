@@ -33,6 +33,8 @@ enum class RouteRunMode {
 
 data class AppState(
     val isInitializing: Boolean = true,
+    val isLanguageSet: Boolean = true, // Default to true to avoid flicker if not needed
+    val currentLanguage: String = "",
     val hasRootAccess: Boolean = false,
     val isLSPosedActive: Boolean = false,
     val longitudeInput: String = "",

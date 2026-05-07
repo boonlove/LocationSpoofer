@@ -47,6 +47,8 @@ import com.amap.api.maps.model.LatLng
 import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.services.core.PoiItem
 import com.amap.api.services.poisearch.PoiSearch
+import androidx.compose.ui.res.stringResource
+import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
@@ -57,17 +59,17 @@ import com.suseoaa.locationspoofer.ui.theme.AccentOrange
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 
-data class RecommendedApp(val name: String, val packageName: String, val icon: ImageVector)
+data class RecommendedApp(val nameRes: Int, val packageName: String, val icon: ImageVector)
 
 val RECOMMENDED_APPS = listOf(
-    RecommendedApp("微信", "com.tencent.mm", Icons.AutoMirrored.Outlined.Chat),
-    RecommendedApp("超星学习通", "com.chaoxing.mobile", Icons.Outlined.School),
-    RecommendedApp("高德地图", "com.autonavi.minimap", Icons.Outlined.Map),
-    RecommendedApp("百度地图", "com.baidu.BaiduMap", Icons.Outlined.Map),
-    RecommendedApp("腾讯地图", "com.tencent.map", Icons.Outlined.Map),
-    RecommendedApp("美团", "com.sankuai.meituan", Icons.Outlined.LocalDining),
-    RecommendedApp("钉钉", "com.alibaba.android.rimet", Icons.Outlined.Work),
-    RecommendedApp("Google 服务", "com.google.android.gms", Icons.Outlined.Android),
+    RecommendedApp(R.string.app_wechat, "com.tencent.mm", Icons.AutoMirrored.Outlined.Chat),
+    RecommendedApp(R.string.app_chaoxing, "com.chaoxing.mobile", Icons.Outlined.School),
+    RecommendedApp(R.string.app_amap, "com.autonavi.minimap", Icons.Outlined.Map),
+    RecommendedApp(R.string.app_baidumap, "com.baidu.BaiduMap", Icons.Outlined.Map),
+    RecommendedApp(R.string.app_tencentmap, "com.tencent.map", Icons.Outlined.Map),
+    RecommendedApp(R.string.app_meituan, "com.sankuai.meituan", Icons.Outlined.LocalDining),
+    RecommendedApp(R.string.app_dingtalk, "com.alibaba.android.rimet", Icons.Outlined.Work),
+    RecommendedApp(R.string.app_google, "com.google.android.gms", Icons.Outlined.Android),
 )
 
 @Composable
@@ -80,6 +82,7 @@ fun SpoofingScreen(
     val scrollState = rememberScrollState()
     var showSavedLocations by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val topBarBg = AppColors.surface(isDark)
     var searchQuery by remember { mutableStateOf("") }
@@ -136,7 +139,7 @@ fun SpoofingScreen(
             }
             Spacer(Modifier.width(12.dp))
             Text(
-                "LocationSpoofer",
+                stringResource(R.string.app_name),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
@@ -144,7 +147,15 @@ fun SpoofingScreen(
             Spacer(Modifier.weight(1f))
             IconButton(onClick = { showSavedLocations = true }, modifier = Modifier.size(36.dp)) {
                 Icon(
-                    Icons.Rounded.Bookmarks, "保存的位置",
+                    Icons.Rounded.Bookmarks, stringResource(R.string.collection_list),
+                    tint = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { showSettings = true }, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    Icons.Rounded.Settings, stringResource(R.string.settings),
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(20.dp)
                 )
@@ -247,7 +258,7 @@ fun SpoofingScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Fullscreen, null, tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("全屏选点", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.fullscreen_selection), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
                 }
             }
 
@@ -282,7 +293,7 @@ fun SpoofingScreen(
 
             // 已保存的位置列表（显示在操作按钮下方）
             if (uiState.savedLocations.isNotEmpty()) {
-                SectionHeader(Icons.Outlined.Bookmarks, "保存的位置", isDark)
+                SectionHeader(Icons.Outlined.Bookmarks, stringResource(R.string.collection_list), isDark)
                 Spacer(Modifier.height(8.dp))
                 SavedLocationsCard(
                     savedLocations = uiState.savedLocations,
@@ -295,7 +306,7 @@ fun SpoofingScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            SectionHeader(Icons.Outlined.AppRegistration, "LSPosed 作用域", isDark)
+            SectionHeader(Icons.Outlined.AppRegistration, stringResource(R.string.lsposed_scope), isDark)
             Spacer(Modifier.height(8.dp))
             AppScopeCard(isDark)
             Spacer(Modifier.height(24.dp))
@@ -304,7 +315,7 @@ fun SpoofingScreen(
 
     if (showSaveDialog) {
         SaveNameDialog(
-            title = "保存当前位置",
+            title = stringResource(R.string.save_current_location),
             onConfirm = { name ->
                 viewModel.saveCurrentLocation(name)
                 showSaveDialog = false
@@ -325,6 +336,53 @@ fun SpoofingScreen(
             onDelete = { loc -> viewModel.removeSavedLocation(loc) }
         )
     }
+
+    if (showSettings) {
+        Dialog(onDismissRequest = { showSettings = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.settings),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        stringResource(R.string.select_language),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    
+                    LANGUAGES.forEach { lang ->
+                        LanguageItem(
+                            option = lang,
+                            isSelected = viewModel.getSavedLanguage() == lang.code,
+                            onClick = {
+                                viewModel.selectLanguage(lang.code)
+                                androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                                    androidx.core.os.LocaleListCompat.forLanguageTags(lang.code)
+                                )
+                                showSettings = false
+                            }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { showSettings = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text(stringResource(R.string.close))
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -339,15 +397,15 @@ fun WifiStatusCard(uiState: AppState) {
     val style = when (uiState.wifiLoadStatus) {
         WifiLoadStatus.LOADING -> StatusStyle(
             AccentOrange.copy(alpha = 0.12f), AccentOrange,
-            "正在拉取当地 Wi-Fi 指纹数据...", Icons.Outlined.CloudDownload
+            stringResource(R.string.fetching_wifi), Icons.Outlined.CloudDownload
         )
         WifiLoadStatus.DONE -> StatusStyle(
             AccentGreen.copy(alpha = 0.12f), AccentGreen,
-            "Wi-Fi 指纹已就绪（${uiState.wifiApCount} 个热点）", Icons.Outlined.Wifi
+            stringResource(R.string.wifi_ready, uiState.wifiApCount), Icons.Outlined.Wifi
         )
         else -> StatusStyle(
             AccentBlue.copy(alpha = 0.12f), AccentBlue,
-            "GPS 定位已接管", Icons.Outlined.GpsFixed
+            stringResource(R.string.gps_taken_over), Icons.Outlined.GpsFixed
         )
     }
 
@@ -387,12 +445,12 @@ fun CoordinateInputCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionHeader(Icons.Outlined.PinDrop, "目标坐标", isDark)
+                SectionHeader(Icons.Outlined.PinDrop, stringResource(R.string.target_coordinates), isDark)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onSaveClick) {
                     Icon(Icons.Rounded.StarBorder, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("保存")
+                    Text(stringResource(R.string.save))
                 }
             }
             Spacer(Modifier.height(4.dp))
@@ -400,8 +458,8 @@ fun CoordinateInputCard(
             OutlinedTextField(
                 value = uiState.longitudeInput,
                 onValueChange = { viewModel.updateLongitude(it) },
-                label = { Text("经度") },
-                placeholder = { Text("点击上方地图进入全屏选点", color = textSecondary) },
+                label = { Text(stringResource(R.string.longitude)) },
+                placeholder = { Text(stringResource(R.string.coordinate_hint), color = textSecondary) },
                 leadingIcon = { Icon(Icons.Outlined.East, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
@@ -414,8 +472,8 @@ fun CoordinateInputCard(
             OutlinedTextField(
                 value = uiState.latitudeInput,
                 onValueChange = { viewModel.updateLatitude(it) },
-                label = { Text("纬度") },
-                placeholder = { Text("点击上方地图进入全屏选点", color = textSecondary) },
+                label = { Text(stringResource(R.string.latitude)) },
+                placeholder = { Text(stringResource(R.string.coordinate_hint), color = textSecondary) },
                 leadingIcon = { Icon(Icons.Outlined.North, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
@@ -430,7 +488,7 @@ fun CoordinateInputCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("经纬度数值超出合法范围", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    Text(stringResource(R.string.invalid_coordinates), color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 }
             }
         }
@@ -470,7 +528,7 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
         ) {
             Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text("停止模拟", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.stop_simulation), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     } else {
         Row(
@@ -485,7 +543,7 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
             ) {
                 Icon(Icons.Rounded.MyLocation, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("定点模拟", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.fixed_simulation), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
             Button(
                 onClick = { viewModel.enterRoutePlanning(); onOpenMap() },
@@ -495,7 +553,7 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
             ) {
                 Icon(Icons.Rounded.Route, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("规划路线", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.route_planning), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -527,7 +585,7 @@ fun AppScopeCard(isDark: Boolean) {
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(app.name, color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(app.nameRes), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Text(app.packageName, color = textSecondary, fontSize = 11.sp)
                     }
                     Icon(Icons.Outlined.ChevronRight, null, tint = textSecondary, modifier = Modifier.size(16.dp))
@@ -577,10 +635,10 @@ fun SavedLocationsDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                Text("保存的位置", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                Text(stringResource(R.string.saved_locations), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                 Spacer(Modifier.height(12.dp))
                 if (savedLocations.isEmpty()) {
-                    Text("暂无保存的位置", color = MaterialTheme.colorScheme.outline, fontSize = 14.sp)
+                    Text(stringResource(R.string.no_saved_locations), color = MaterialTheme.colorScheme.outline, fontSize = 14.sp)
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(savedLocations) { loc ->
@@ -596,7 +654,7 @@ fun SavedLocationsDialog(
                                     Text("${loc.lat}, ${loc.lng}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
                                 }
                                 IconButton(onClick = { onDelete(loc) }) {
-                                    Icon(Icons.Rounded.DeleteOutline, "删除", tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
                                 }
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
@@ -604,7 +662,7 @@ fun SavedLocationsDialog(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("关闭") }
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.close)) }
             }
         }
     }
@@ -646,7 +704,7 @@ fun HomeSearchBar(
                     Spacer(Modifier.width(8.dp))
                     Box(modifier = Modifier.weight(1f)) {
                         if (query.isEmpty()) {
-                            Text("搜索地点", fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                            Text(stringResource(R.string.search_location_hint), fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                         }
                         innerTextField()
                     }
@@ -665,7 +723,7 @@ fun HomeSearchBar(
             shape = RoundedCornerShape(12.dp),
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = AccentBlue)
         ) {
-            Icon(Icons.Rounded.Search, "搜索", tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = Color.White, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -698,7 +756,7 @@ fun SavedLocationsCard(
                         Text("${loc.lat}, ${loc.lng}", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                     }
                     IconButton(onClick = { onDelete(loc) }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Rounded.DeleteOutline, "删除", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                     }
                 }
                 if (index < savedLocations.lastIndex) {

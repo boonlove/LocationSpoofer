@@ -15,6 +15,14 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean("is_dark_mode", true)
         set(value) = prefs.edit().putBoolean("is_dark_mode", value).apply()
 
+    var language: String
+        get() = prefs.getString("language", "") ?: ""
+        set(value) = prefs.edit().putString("language", value).apply()
+
+    var isLanguageSet: Boolean
+        get() = prefs.getBoolean("is_language_set", false)
+        set(value) = prefs.edit().putBoolean("is_language_set", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()
