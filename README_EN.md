@@ -24,7 +24,7 @@
 
 | Feature | Description |
 |---|---|
-| 🌍 **Multi-language Support** | Supports **Chinese**, **English**, **Arabic**; auto-follows system or manual switch. |
+| 🌍 **Multi-lang & Dual-Map** | Supports **Chinese/English/Arabic**; Auto-switches to **Google Maps** overseas, and AMap in China. |
 | 🗺️ **Visual Map Selection** | Integrated AMap 3D, supports crosshair dragging, historical search, and favorites. |
 | 🔀 **Route Planning System** | State-machine driven multi-point planning with undo, reset, and real-time preview. |
 | 🕹️ **Virtual Joystick Control** | Real-time movement control via floating joystick in manual mode with smooth bearing transitions. |
@@ -34,6 +34,7 @@
 | 🔵 **BLE Beacon Shielding** | Intercepts Bluetooth scans to prevent indoor location leaks via iBeacon etc. |
 | 🏗️ **Cell Info Forgery** | Simulates Cell Location information to provide a complete geo-spoofing chain. |
 | 🕵️ **Deep Anti-detection** | Erases `isMock` flags and AMap SDK internal mock detection, covering Android 13+ fields. |
+| 🔐 **Secure CI/CD & APIs** | API keys are isolated via `local.yml` locally and injected via GitHub Actions Secrets during CI builds. |
 
 ---
 
@@ -45,8 +46,8 @@ Adopts **MVVM** architecture combined with a **State-Machine** for complex route
 ┌─────────────────────────────────────────┐
 │            LocationSpoofer (App)         │
 │  ┌──────────┐  ┌──────────────────────┐ │
-│  │ AMap UI  │  │  RouteStateMachine   │ │
-│  │ (Map Sel) │  │  (IDLE/READY/RUN...) │ │
+│  │ Dual-Map │  │  RouteStateMachine   │ │
+│  │(AMap/GMap)│  │  (IDLE/READY/RUN...) │ │
 │  └────┬─────┘  └──────────┬───────────┘ │
 │       │                   │             │
 │  ┌────▼───────────────────▼───────────┐ │
@@ -116,7 +117,7 @@ git clone https://github.com/your-username/LocationSpoofer.git
 - **Language**: Kotlin
 - **UI**: Jetpack Compose + Material 3
 - **Framework**: LSPosed / Xposed API 93
-- **Map**: AMap 3DMap SDK
+- **Map**: AMap 3DMap SDK / Google Maps SDK / FusedLocationProvider
 - **Data**: Koin (DI), OkHttp 4, Coroutines Flow
 - **Simulation**: TrajectorySimulator (Haversine Algorithm + Bearing Interpolation)
 

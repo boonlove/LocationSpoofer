@@ -25,7 +25,7 @@
 
 | 功能 | 说明 |
 |---|---|
-| 🌍 **多语言支持** | 支持 **中文**、**English**、**العربية**，自动跟随系统或手动切换 |
+| 🌍 **多语言与双地图** | 支持 **中文**、**English**、**العربية**，国内自动使用高德地图，海外自动无缝切换至 **Google Maps** |
 | 🗺️ **地图可视化选点** | 集成高德 3D 地图，支持准星拖拽、搜索历史位置及收藏夹 |
 | 🔀 **路线规划系统** | 状态机驱动的多路点规划，支持撤销、重置及实时预览 |
 | 🕹️ **虚拟摇杆控制** | 手动模拟模式下可通过浮动摇杆实时控制位置移动，支持平滑方位角过渡 |
@@ -35,6 +35,7 @@
 | 🔵 **BLE 信标屏蔽** | 拦截蓝牙扫描，防止通过 iBeacon 等室内定位技术泄露真实位置 |
 | 🏗️ **基站信息伪造** | 模拟 Cell Location 信息，提供完整的地理位置欺骗链路 |
 | 🕵️ **深度反检测** | 抹除 `isMock` 标志位及高德 SDK 内部 Mock 检测，覆盖 Android 13+ 字段 |
+| 🔐 **安全集成与 CI/CD** | API 密钥与代码完全隔离，本地通过 `local.yml` 读取，云端基于 GitHub Actions Secrets 自动注入打包发布 |
 
 ---
 
@@ -46,8 +47,8 @@
 ┌─────────────────────────────────────────┐
 │            LocationSpoofer (App)         │
 │  ┌──────────┐  ┌──────────────────────┐ │
-│  │ AMap UI  │  │  RouteStateMachine   │ │
-│  │ (地图选点) │  │  (IDLE/READY/RUN...) │ │
+│  │ Dual-Map │  │  RouteStateMachine   │ │
+│  │(高德/谷歌)│  │  (IDLE/READY/RUN...) │ │
 │  └────┬─────┘  └──────────┬───────────┘ │
 │       │                   │             │
 │  ┌────▼───────────────────▼───────────┐ │
@@ -117,7 +118,7 @@ git clone https://github.com/your-username/LocationSpoofer.git
 - **Language**: Kotlin
 - **UI**: Jetpack Compose + Material 3 (Material Design 3)
 - **Framework**: LSPosed / Xposed API 93
-- **Map**: AMap 3DMap SDK
+- **Map**: AMap 3DMap SDK / Google Maps SDK / FusedLocationProvider
 - **Data**: Koin (DI), OkHttp 4, Coroutines Flow
 - **Simulation**: TrajectorySimulator (Haversine 算法 + 方位角插值)
 
