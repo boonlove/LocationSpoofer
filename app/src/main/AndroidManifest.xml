@@ -30,6 +30,10 @@
             android:name="com.amap.api.v2.apikey"
             android:value="72dd56ef8ddc4589d3783b4a210caea3" />
         
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${googleMapsApiKey}" />
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"

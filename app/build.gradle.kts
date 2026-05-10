@@ -7,16 +7,31 @@ android {
     namespace = "com.suseoaa.locationspoofer"
     compileSdk = 36
 
+    fun getLocalConfig(key: String): String? {
+        val localYml = file("../local.yml")
+        if (localYml.exists()) {
+            val line = localYml.readLines().find { it.startsWith("$key:") }
+            if (line != null) {
+                return line.substringAfter(":").trim().removeSurrounding("\"").removeSurrounding("'")
+            }
+        }
+        return null
+    }
+
+    val googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
+
     defaultConfig {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 172
-        versionName = "1.7.2"
+        versionCode = 193
+        versionName = "1.9.3"
 
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
     }
     signingConfigs {
         create("release") {
@@ -34,6 +49,7 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
         release {
             isMinifyEnabled = true
@@ -42,6 +58,7 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
     }
     compileOptions {
@@ -53,6 +70,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"
@@ -69,6 +87,8 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.amap.map)
     implementation(libs.amap.search)
+    implementation(libs.google.maps)
+    implementation(libs.play.services.location)
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

@@ -7,6 +7,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -52,12 +56,19 @@ import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
-import com.suseoaa.locationspoofer.ui.components.AMapView
+import com.suseoaa.locationspoofer.ui.components.AppMapView
+import com.suseoaa.locationspoofer.ui.components.AppMapController
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
 import com.suseoaa.locationspoofer.ui.theme.AccentOrange
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
+import com.suseoaa.locationspoofer.BuildConfig
+
+data class AppPoiItem(val title: String, val snippet: String, val lat: Double, val lng: Double)
 
 data class RecommendedApp(val nameRes: Int, val packageName: String, val icon: ImageVector)
 
@@ -85,8 +96,9 @@ fun SpoofingScreen(
     var showSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val topBarBg = AppColors.surface(isDark)
+    val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<PoiItem>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
@@ -107,12 +119,12 @@ fun SpoofingScreen(
     }
 
     // 小地图实例，用于响应坐标更新
-    var smallMapRef by remember { mutableStateOf<AMap?>(null) }
+    var smallMapRef by remember { mutableStateOf<AppMapController?>(null) }
     val lat = uiState.latitudeInput.toDoubleOrNull()
     val lng = uiState.longitudeInput.toDoubleOrNull()
     LaunchedEffect(lat, lng, smallMapRef) {
         if (lat != null && lng != null) {
-            smallMapRef?.animateCamera(CameraUpdateFactory.newLatLng(LatLng(lat, lng)))
+            smallMapRef?.animateCamera(lat, lng)
         }
     }
 
@@ -171,7 +183,7 @@ fun SpoofingScreen(
             onSearch = {
                 focusManager.clearFocus()
                 if (searchQuery.isNotBlank()) {
-                    performPoiSearch(context, searchQuery) { results ->
+                    performPoiSearch(context, searchQuery, isDomestic) { results ->
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
                     }
@@ -191,14 +203,13 @@ fun SpoofingScreen(
                         Row(
                             modifier = Modifier.fillMaxWidth()
                                 .clickable {
-                                    val p = poi.latLonPoint
-                                    viewModel.updateLatitude(String.format("%.6f", p.latitude))
-                                    viewModel.updateLongitude(String.format("%.6f", p.longitude))
-                                    smallMapRef?.animateCamera(
-                                        CameraUpdateFactory.newLatLngZoom(LatLng(p.latitude, p.longitude), 16f)
-                                    )
+                                    val pLat = poi.lat
+                                    val pLng = poi.lng
+                                    viewModel.updateLatitude(String.format("%.6f", pLat))
+                                    viewModel.updateLongitude(String.format("%.6f", pLng))
+                                    smallMapRef?.animateCamera(pLat, pLng, 16f)
                                     showSearchResults = false
-                                    searchQuery = poi.title ?: ""
+                                    searchQuery = poi.title
                                 }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -206,8 +217,8 @@ fun SpoofingScreen(
                             Icon(Icons.Rounded.Place, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Column {
-                                Text(poi.title ?: "", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                Text(poi.snippet ?: "", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                                Text(poi.title, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
+                                Text(poi.snippet, fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                             }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -218,25 +229,17 @@ fun SpoofingScreen(
 
         // 地图缩略图
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
-            AMapView(modifier = Modifier.fillMaxSize()) { map ->
+            AppMapView(isDomestic = isDomestic, modifier = Modifier.fillMaxSize()) { map ->
                 smallMapRef = map
-                map.uiSettings.isZoomControlsEnabled = false
-                map.uiSettings.isMyLocationButtonEnabled = false
-                map.uiSettings.isCompassEnabled = false
-                map.uiSettings.setAllGesturesEnabled(true)
+                map.disableUiControls()
                 val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
                 val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
-                map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(initLat, initLng), 15f))
+                map.moveCamera(initLat, initLng, 15f)
 
                 // 移动地图即选点
-                map.setOnCameraChangeListener(object : AMap.OnCameraChangeListener {
-                    override fun onCameraChange(p0: com.amap.api.maps.model.CameraPosition?) {}
-                    override fun onCameraChangeFinish(p0: com.amap.api.maps.model.CameraPosition?) {
-                        p0?.target?.let { t ->
-                            viewModel.confirmMapPoint(t.latitude, t.longitude)
-                        }
-                    }
-                })
+                map.setOnCameraChangeListener { lat, lng ->
+                    viewModel.confirmMapPoint(lat, lng)
+                }
             }
 
             // 十字准星（始终显示在中间）
@@ -772,26 +775,61 @@ fun SavedLocationsCard(
 fun performPoiSearch(
     context: android.content.Context,
     keyword: String,
-    onResult: (List<PoiItem>) -> Unit
+    isDomestic: Boolean,
+    onResult: (List<AppPoiItem>) -> Unit
 ) {
-    try {
-        val query = PoiSearch.Query(keyword, "", "")
-        query.pageSize = 10
-        query.pageNum = 0
-        val search = PoiSearch(context, query)
-        search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
-            override fun onPoiSearched(result: com.amap.api.services.poisearch.PoiResult?, rCode: Int) {
-                if (rCode == 1000 && result != null) {
-                    onResult(result.pois ?: emptyList())
-                } else {
-                    onResult(emptyList())
+    if (isDomestic) {
+        try {
+            val query = PoiSearch.Query(keyword, "", "")
+            query.pageSize = 10
+            query.pageNum = 0
+            val search = PoiSearch(context, query)
+            search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
+                override fun onPoiSearched(result: com.amap.api.services.poisearch.PoiResult?, rCode: Int) {
+                    if (rCode == 1000 && result != null) {
+                        onResult(result.pois?.map { AppPoiItem(it.title ?: "", it.snippet ?: "", it.latLonPoint.latitude, it.latLonPoint.longitude) } ?: emptyList())
+                    } else {
+                        onResult(emptyList())
+                    }
                 }
+                override fun onPoiItemSearched(item: PoiItem?, rCode: Int) {}
+            })
+            search.searchPOIAsyn()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onResult(emptyList())
+        }
+    } else {
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val apiKey = BuildConfig.GOOGLE_MAPS_API_KEY
+                val url = "https://maps.googleapis.com/maps/api/place/textsearch/json?query=${java.net.URLEncoder.encode(keyword, "UTF-8")}&key=$apiKey"
+                val request = Request.Builder().url(url).build()
+                val response = OkHttpClient().newCall(request).execute()
+                val json = JSONObject(response.body?.string() ?: "")
+                if (json.optString("status") == "OK") {
+                    val results = json.getJSONArray("results")
+                    val items = mutableListOf<AppPoiItem>()
+                    for (i in 0 until results.length()) {
+                        val item = results.getJSONObject(i)
+                        val loc = item.getJSONObject("geometry").getJSONObject("location")
+                        items.add(
+                            AppPoiItem(
+                                title = item.optString("name", ""),
+                                snippet = item.optString("formatted_address", ""),
+                                lat = loc.getDouble("lat"),
+                                lng = loc.getDouble("lng")
+                            )
+                        )
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(items) }
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(emptyList()) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(emptyList()) }
             }
-            override fun onPoiItemSearched(item: PoiItem?, rCode: Int) {}
-        })
-        search.searchPOIAsyn()
-    } catch (e: Exception) {
-        e.printStackTrace()
-        onResult(emptyList())
+        }
     }
 }

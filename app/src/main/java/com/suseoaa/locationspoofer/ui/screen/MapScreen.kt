@@ -39,17 +39,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.amap.api.location.AMapLocationClient
-import com.amap.api.location.AMapLocationClientOption
-import com.amap.api.maps.AMap
-import com.amap.api.maps.CameraUpdateFactory
-import com.amap.api.maps.model.BitmapDescriptorFactory
-import com.amap.api.maps.model.LatLng
-import com.amap.api.maps.model.Marker
-import com.amap.api.maps.model.MarkerOptions
-import com.amap.api.maps.model.PolylineOptions
-import com.amap.api.services.core.PoiItem
-import com.amap.api.services.poisearch.PoiSearch
+import com.suseoaa.locationspoofer.ui.components.AppMapView
+import com.suseoaa.locationspoofer.ui.components.AppMapController
+import com.suseoaa.locationspoofer.ui.components.AppMapMarker
+import com.suseoaa.locationspoofer.ui.components.MarkerType
 import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
@@ -57,7 +50,6 @@ import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SimMode
-import com.suseoaa.locationspoofer.ui.components.AMapView
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
 import com.suseoaa.locationspoofer.ui.theme.AccentOrange
@@ -76,10 +68,11 @@ fun FullScreenMapPage(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-    var mapRef by remember { mutableStateOf<AMap?>(null) }
+    var mapRef by remember { mutableStateOf<AppMapController?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
+    val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
-    var searchResults by remember { mutableStateOf<List<PoiItem>>(emptyList()) }
+    var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
@@ -94,26 +87,25 @@ fun FullScreenMapPage(
     val routePoints = uiState.routePoints
 
     // 同步路点标记和折线到地图
-    var liveMarker by remember { mutableStateOf<Marker?>(null) }
+    var liveMarker by remember { mutableStateOf<AppMapMarker?>(null) }
     LaunchedEffect(routePoints, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         map.clear()
         liveMarker = null
         if (routePoints.size >= 2) {
             map.addPolyline(
-                PolylineOptions()
-                    .color(android.graphics.Color.parseColor("#FF388BFD"))
-                    .width(8f)
-                    .apply { routePoints.forEach { add(LatLng(it.lat, it.lng)) } }
+                routePoints.map { Pair(it.lat, it.lng) },
+                android.graphics.Color.parseColor("#FF388BFD"),
+                8f
             )
         }
         routePoints.forEachIndexed { idx, p ->
-            val opts = MarkerOptions().position(LatLng(p.lat, p.lng)).title("${idx + 1}")
-            when (idx) {
-                0 -> opts.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
-                routePoints.lastIndex -> opts.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED))
+            val type = when (idx) {
+                0 -> MarkerType.GREEN
+                routePoints.lastIndex -> MarkerType.RED
+                else -> MarkerType.DEFAULT
             }
-            map.addMarker(opts)
+            map.addMarker(p.lat, p.lng, "${idx + 1}", type)
         }
     }
 
@@ -122,17 +114,15 @@ fun FullScreenMapPage(
     val lng = uiState.longitudeInput.toDoubleOrNull()
     LaunchedEffect(lat, lng, isRunning) {
         if (isRunning && lat != null && lng != null) {
-            val pos = LatLng(lat, lng)
-            mapRef?.animateCamera(CameraUpdateFactory.newLatLng(pos))
+            mapRef?.animateCamera(lat, lng)
             // 更新或创建实时位置标记
             if (liveMarker != null) {
-                liveMarker?.position = pos
+                liveMarker?.setPosition(lat, lng)
             } else {
                 liveMarker = mapRef?.addMarker(
-                    MarkerOptions()
-                        .position(pos)
-                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE))
-                        .title(context.getString(R.string.current_location))
+                    lat, lng,
+                    context.getString(R.string.current_location),
+                    MarkerType.ORANGE
                 )
             }
         }
@@ -146,14 +136,12 @@ fun FullScreenMapPage(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 地图
-        AMapView(modifier = Modifier.fillMaxSize()) { map ->
+        AppMapView(isDomestic = isDomestic, modifier = Modifier.fillMaxSize()) { map ->
             mapRef = map
-            map.uiSettings.isZoomControlsEnabled = false
-            map.uiSettings.isMyLocationButtonEnabled = false
-            map.uiSettings.isCompassEnabled = false
+            map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
             val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
-            map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(initLat, initLng), 15f))
+            map.moveCamera(initLat, initLng, 15f)
         }
 
         // 选点模式的十字准星
@@ -204,7 +192,7 @@ fun FullScreenMapPage(
                         keyboardActions = KeyboardActions(onSearch = {
                             focusManager.clearFocus()
                             if (searchQuery.isNotBlank()) {
-                                performPoiSearch(context, searchQuery) { r ->
+                                performPoiSearch(context, searchQuery, isDomestic) { r ->
                                     searchResults = r
                                     showSearchResults = r.isNotEmpty()
                                 }
@@ -247,12 +235,11 @@ fun FullScreenMapPage(
                                 Row(
                                     modifier = Modifier.fillMaxWidth()
                                         .clickable {
-                                            val p = poi.latLonPoint
-                                            mapRef?.animateCamera(
-                                                CameraUpdateFactory.newLatLngZoom(LatLng(p.latitude, p.longitude), 16f)
-                                            )
-                                            showSearchResults = false
-                                            searchQuery = poi.title ?: ""
+                                        val pLat = poi.lat
+                                        val pLng = poi.lng
+                                        mapRef?.animateCamera(pLat, pLng, 16f)
+                                        showSearchResults = false
+                                        searchQuery = poi.title
                                         }
                                         .padding(horizontal = 12.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -260,8 +247,8 @@ fun FullScreenMapPage(
                                     Icon(Icons.Rounded.Place, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Column {
-                                        Text(poi.title ?: "", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                        Text(poi.snippet ?: "", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                        Text(poi.title, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
+                                        Text(poi.snippet, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
                                     }
                                 }
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -283,24 +270,9 @@ fun FullScreenMapPage(
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = AccentBlue
             ) {
-                val client = AMapLocationClient(context.applicationContext)
-                client.setLocationOption(AMapLocationClientOption().apply {
-                    locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                    isOnceLocation = true
-                })
-                client.setLocationListener { loc ->
-                    if (loc != null && loc.errorCode == 0) {
-                        viewModel.updateLatitude(String.format("%.6f", loc.latitude))
-                        viewModel.updateLongitude(String.format("%.6f", loc.longitude))
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            mapRef?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(loc.latitude, loc.longitude), 16f))
-                        }
-                    } else {
-                        Toast.makeText(context, context.getString(R.string.location_failed, loc?.errorInfo ?: "Unknown"), Toast.LENGTH_SHORT).show()
-                    }
-                    client.stopLocation(); client.onDestroy()
+                viewModel.fetchCurrentLocation(context) { lLat, lLng ->
+                    mapRef?.animateCamera(lLat, lLng, 16f)
                 }
-                client.startLocation()
             }
         }
 
@@ -318,8 +290,10 @@ fun FullScreenMapPage(
         if (stage == RoutePlanStage.IDLE) {
             Button(
                 onClick = {
-                    mapRef?.cameraPosition?.target?.let { t ->
-                        viewModel.confirmMapPoint(t.latitude, t.longitude)
+                    val tLat = mapRef?.cameraTargetLat
+                    val tLng = mapRef?.cameraTargetLng
+                    if (tLat != null && tLng != null) {
+                        viewModel.confirmMapPoint(tLat, tLng)
                         Toast.makeText(context, context.getString(R.string.coordinate_selected), Toast.LENGTH_SHORT).show()
                         onClose()
                     }
@@ -345,8 +319,10 @@ fun FullScreenMapPage(
                 stage = stage,
                 routePoints = routePoints,
                 onConfirmPoint = {
-                    mapRef?.cameraPosition?.target?.let { t ->
-                        viewModel.addRoutePoint(t.latitude, t.longitude)
+                    val tLat = mapRef?.cameraTargetLat
+                    val tLng = mapRef?.cameraTargetLng
+                    if (tLat != null && tLng != null) {
+                        viewModel.addRoutePoint(tLat, tLng)
                     }
                 },
                 onFinishSelecting = { viewModel.finishSelectingPoints() },

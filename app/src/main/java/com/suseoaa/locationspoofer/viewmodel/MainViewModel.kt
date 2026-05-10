@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
+import com.google.android.gms.location.LocationServices
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
@@ -81,32 +82,61 @@ class MainViewModel(
 
     // 当前位置获取
 
-    fun fetchCurrentLocation(ctx: Context) {
-        val client = try {
-            AMapLocationClient(ctx.applicationContext)
-        } catch (e: Exception) {
-            return
-        }
-        client.setLocationOption(AMapLocationClientOption().apply {
-            locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-            isOnceLocation = true
-        })
-        client.setLocationListener { loc ->
-            if (loc != null && loc.errorCode == 0) {
-                if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            latitudeInput = String.format("%.6f", loc.latitude),
-                            longitudeInput = String.format("%.6f", loc.longitude),
-                            showCoordinateError = false
-                        )
+    fun isDomesticEnvironment(): Boolean {
+        val lang = getSavedLanguage()
+        return lang == "zh" || (lang.isEmpty() && java.util.Locale.getDefault().language == "zh")
+    }
+
+    fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
+        val isDomestic = isDomesticEnvironment()
+        if (isDomestic) {
+            val client = try {
+                AMapLocationClient(ctx.applicationContext)
+            } catch (e: Exception) {
+                return
+            }
+            client.setLocationOption(AMapLocationClientOption().apply {
+                locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                isOnceLocation = true
+            })
+            client.setLocationListener { loc ->
+                if (loc != null && loc.errorCode == 0) {
+                    if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
+                        _uiState.update {
+                            it.copy(
+                                latitudeInput = String.format("%.6f", loc.latitude),
+                                longitudeInput = String.format("%.6f", loc.longitude),
+                                showCoordinateError = false
+                            )
+                        }
+                        forceCallback?.invoke(loc.latitude, loc.longitude)
                     }
                 }
+                client.stopLocation()
+                client.onDestroy()
             }
-            client.stopLocation()
-            client.onDestroy()
+            client.startLocation()
+        } else {
+            try {
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(ctx)
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    if (location != null) {
+                        if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
+                            _uiState.update {
+                                it.copy(
+                                    latitudeInput = String.format("%.6f", location.latitude),
+                                    longitudeInput = String.format("%.6f", location.longitude),
+                                    showCoordinateError = false
+                                )
+                            }
+                            forceCallback?.invoke(location.latitude, location.longitude)
+                        }
+                    }
+                }
+            } catch (e: SecurityException) {
+                // Ignore missing permissions
+            }
         }
-        client.startLocation()
     }
 
     // 坐标输入
