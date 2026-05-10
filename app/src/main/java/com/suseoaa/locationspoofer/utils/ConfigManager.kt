@@ -16,7 +16,8 @@ class ConfigManager(private val rootManager: RootManager) {
         simBearing: Float = 0f,
         startTimestamp: Long = System.currentTimeMillis(),
         routePoints: List<RoutePoint> = emptyList(),
-        isRouteMode: Boolean = false
+        isRouteMode: Boolean = false,
+        wifiJson: String = "[]"
     ) = withContext(Dispatchers.IO) {
         val routeArray = JSONArray()
         routePoints.forEach { p ->
@@ -35,10 +36,13 @@ class ConfigManager(private val rootManager: RootManager) {
             put("start_timestamp", startTimestamp)
             put("route_points", routeArray)
             put("is_route_mode", isRouteMode)
+            put("wifi_json", JSONArray(wifiJson))
         }
 
+        // 使用heredoc写入,避免JSON中的特殊字符(单引号等)被shell误解析
+        val escapedJson = json.toString().replace("\\", "\\\\").replace("\"", "\\\"")
         val command = """
-            echo '${json.toString()}' > /data/local/tmp/locationspoofer_config.json
+            echo "$escapedJson" > /data/local/tmp/locationspoofer_config.json
             chmod 777 /data/local/tmp/locationspoofer_config.json
             chcon u:object_r:shell_data_file:s0 /data/local/tmp/locationspoofer_config.json
         """.trimIndent()

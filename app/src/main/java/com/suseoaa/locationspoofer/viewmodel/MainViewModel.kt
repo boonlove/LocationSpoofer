@@ -11,10 +11,8 @@ import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.SimMode
-import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
 import com.suseoaa.locationspoofer.data.repository.LocationRepository
 import com.suseoaa.locationspoofer.data.repository.SettingsRepository
-import com.suseoaa.locationspoofer.data.repository.WifiRepository
 import com.suseoaa.locationspoofer.provider.SpooferProvider
 import com.suseoaa.locationspoofer.service.SpoofingService
 import kotlinx.coroutines.Dispatchers
@@ -30,12 +28,8 @@ import kotlinx.coroutines.launch
 class MainViewModel(
     private val locationRepository: LocationRepository,
     private val settingsRepository: SettingsRepository,
-    private val wifiRepository: WifiRepository,
     private val context: Context
 ) : ViewModel() {
-
-    private val wigleToken =
-        "QUlEODRhYjYwNzVjYjI4MTY5ZDU4Yjk2NzQxM2ZiYTFiMDA6YmY2NWE5M2RiYWQ1YzYwNmYwNzdkOTQ2NjE2NmI4MzM="
 
     private val _uiState = MutableStateFlow(
         AppState(
@@ -59,7 +53,6 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val root = locationRepository.checkRootAccess()
             val lsposed = locationRepository.isModuleActive()
-            wifiRepository.validateToken(wigleToken)
 
             if (SpoofingService.isRunning) {
                 locationRepository.stopSpoofing(context)
@@ -149,16 +142,8 @@ class MainViewModel(
                 emptyList(), false
             )
             _uiState.update {
-                it.copy(
-                    isSpoofingActive = true,
-                    wifiLoadStatus = WifiLoadStatus.LOADING,
-                    wifiApCount = 0
-                )
+                it.copy(isSpoofingActive = true)
             }
-            val wifiJson = wifiRepository.fetchWifiData(lat, lng, wigleToken)
-            val apCount = try { org.json.JSONArray(wifiJson).length() } catch (e: Exception) { 0 }
-            locationRepository.updateWifiJson(wifiJson)
-            _uiState.update { it.copy(wifiLoadStatus = WifiLoadStatus.DONE, wifiApCount = apCount) }
         }
     }
 
@@ -170,11 +155,7 @@ class MainViewModel(
         viewModelScope.launch {
             locationRepository.stopSpoofing(context)
             _uiState.update {
-                it.copy(
-                    isSpoofingActive = false,
-                    wifiLoadStatus = WifiLoadStatus.IDLE,
-                    wifiApCount = 0
-                )
+                it.copy(isSpoofingActive = false)
             }
         }
     }
@@ -330,16 +311,8 @@ class MainViewModel(
                 0f, now, routePoints, isLoop
             )
             _uiState.update {
-                it.copy(
-                    isSpoofingActive = true,
-                    wifiLoadStatus = WifiLoadStatus.LOADING,
-                    wifiApCount = 0
-                )
+                it.copy(isSpoofingActive = true)
             }
-            val wifiJson = wifiRepository.fetchWifiData(startPoint.lat, startPoint.lng, wigleToken)
-            val apCount = try { org.json.JSONArray(wifiJson).length() } catch (e: Exception) { 0 }
-            locationRepository.updateWifiJson(wifiJson)
-            _uiState.update { it.copy(wifiLoadStatus = WifiLoadStatus.DONE, wifiApCount = apCount) }
         }
 
         if (isLoop) {
@@ -369,8 +342,6 @@ class MainViewModel(
             _uiState.update {
                 it.copy(
                     isSpoofingActive = false,
-                    wifiLoadStatus = WifiLoadStatus.IDLE,
-                    wifiApCount = 0,
                     routePlanStage = RoutePlanStage.IDLE,
                     routePoints = emptyList(),
                     routeRunMode = RouteRunMode.MANUAL

@@ -40,7 +40,7 @@ class LocationRepository(
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -83,8 +83,18 @@ class LocationRepository(
         configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode)
     }
 
-    fun updateWifiJson(wifiJson: String) {
+    suspend fun updateWifiJson(wifiJson: String) {
         SpooferProvider.wifiJson = wifiJson
+        // 同步写入配置文件,确保Xposed端能读取到WiFi数据
+        configManager.saveConfig(
+            SpooferProvider.latitude,
+            SpooferProvider.longitude,
+            SpooferProvider.isActive,
+            SpooferProvider.simMode,
+            SpooferProvider.simBearing,
+            SpooferProvider.startTimestamp,
+            wifiJson = wifiJson
+        )
     }
 
     private fun routePointsToJson(points: List<RoutePoint>): String {

@@ -86,4 +86,20 @@ object CoordinateUtils {
     private fun outOfChina(lat: Double, lng: Double): Boolean {
         return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271
     }
+
+    // ── GCJ-02 → BD-09 转换常量 ──
+    private const val BD_PI = PI * 3000.0 / 180.0
+
+    /**
+     * GCJ-02 → BD-09(百度坐标系)
+     * 百度地图/百度定位SDK使用BD-09坐标系,在GCJ-02基础上施加极坐标旋转偏移。
+     * 若直接将GCJ-02坐标传入百度SDK,会产生约100-500米的固定偏移。
+     */
+    fun gcj02ToBd09(gcjLat: Double, gcjLng: Double): LatLng {
+        val x = gcjLng + 0.0065
+        val y = gcjLat + 0.006
+        val z = sqrt(x * x + y * y) + 0.00002 * sin(y * BD_PI)
+        val theta = Math.atan2(y, x) + 0.000003 * cos(x * BD_PI)
+        return LatLng(z * sin(theta) + 0.006, z * cos(theta) + 0.0065)
+    }
 }
