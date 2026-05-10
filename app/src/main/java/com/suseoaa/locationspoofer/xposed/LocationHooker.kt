@@ -142,13 +142,10 @@ class LocationHooker : IXposedHookLoadPackage {
      * @return Pair(BD-09纬度, BD-09经度)
      */
     private fun gcj02ToBd09(gcjLat: Double, gcjLng: Double): Pair<Double, Double> {
-        // 施加百度偏移常量
-        val x = gcjLng + 0.0065
-        val y = gcjLat + 0.006
-        // 转极坐标
+        val x = gcjLng
+        val y = gcjLat
         val z = sqrt(x * x + y * y) + 0.00002 * sin(y * BD_PI)
         val theta = Math.atan2(y, x) + 0.000003 * cos(x * BD_PI)
-        // 极坐标转回直角坐标即为BD-09
         val bdLng = z * cos(theta) + 0.0065
         val bdLat = z * sin(theta) + 0.006
         return Pair(bdLat, bdLng)
@@ -750,9 +747,30 @@ class LocationHooker : IXposedHookLoadPackage {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val config = readConfig()
                 if (config != null && config.optBoolean("active", false)) {
-                    val bdLat = config.optDouble("bd09_lat", 0.0)
-                    val bdLng = config.optDouble("bd09_lng", 0.0)
-                    val jittered = getJitteredLocation(bdLat, bdLng)
+                    // 动态获取当前BDLocation期望的坐标系(App可通过LocationClientOption.setCoorType设置)
+                    val coorType = try {
+                        XposedHelpers.callMethod(param.thisObject, "getCoorType") as? String
+                    } catch (e: Throwable) { null }
+
+                    val targetLat: Double
+                    val targetLng: Double
+                    
+                    when (coorType) {
+                        "bd09ll", "bd09mc", "bd09" -> {
+                            targetLat = config.optDouble("bd09_lat", 0.0)
+                            targetLng = config.optDouble("bd09_lng", 0.0)
+                        }
+                        "wgs84" -> {
+                            targetLat = config.optDouble("wgs84_lat", 0.0)
+                            targetLng = config.optDouble("wgs84_lng", 0.0)
+                        }
+                        else -> { // gcj02 或默认(中国标准坐标系)
+                            targetLat = config.optDouble("lat", 0.0)
+                            targetLng = config.optDouble("lng", 0.0)
+                        }
+                    }
+
+                    val jittered = getJitteredLocation(targetLat, targetLng)
                     when (param.method.name) {
                         "getLatitude" -> param.result = jittered.first
                         "getLongitude" -> param.result = jittered.second
@@ -800,18 +818,6 @@ class LocationHooker : IXposedHookLoadPackage {
                 })
             } catch (e: Throwable) { /* 忽略 */ }
 
-            // getCoorType -> "bd09ll"
-            try {
-                XposedBridge.hookAllMethods(baiduClazz, "getCoorType", object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            param.result = "bd09ll"
-                        }
-                    }
-                })
-            } catch (e: Throwable) { /* 忽略 */ }
-
             // getSatelliteNumber -> 12-18颗
             try {
                 XposedBridge.hookAllMethods(baiduClazz, "getSatelliteNumber", object : XC_MethodHook() {
@@ -847,9 +853,29 @@ class LocationHooker : IXposedHookLoadPackage {
                             if (param.args.isEmpty()) return
 
                             val bdLoc = param.args[0] ?: return
-                            val bdLat = config.optDouble("bd09_lat", 0.0)
-                            val bdLng = config.optDouble("bd09_lng", 0.0)
-                            val jittered = getJitteredLocation(bdLat, bdLng)
+                            
+                            val coorType = try {
+                                XposedHelpers.callMethod(bdLoc, "getCoorType") as? String
+                            } catch (e: Throwable) { null }
+
+                            val targetLat: Double
+                            val targetLng: Double
+                            when (coorType) {
+                                "bd09ll", "bd09mc", "bd09" -> {
+                                    targetLat = config.optDouble("bd09_lat", 0.0)
+                                    targetLng = config.optDouble("bd09_lng", 0.0)
+                                }
+                                "wgs84" -> {
+                                    targetLat = config.optDouble("wgs84_lat", 0.0)
+                                    targetLng = config.optDouble("wgs84_lng", 0.0)
+                                }
+                                else -> { // gcj02 或默认(中国标准坐标系)
+                                    targetLat = config.optDouble("lat", 0.0)
+                                    targetLng = config.optDouble("lng", 0.0)
+                                }
+                            }
+                            
+                            val jittered = getJitteredLocation(targetLat, targetLng)
 
                             // 通过反射直接写入BDLocation实例的经纬度
                             try { XposedHelpers.callMethod(bdLoc, "setLatitude", jittered.first) } catch (e: Throwable) {
@@ -858,9 +884,8 @@ class LocationHooker : IXposedHookLoadPackage {
                             try { XposedHelpers.callMethod(bdLoc, "setLongitude", jittered.second) } catch (e: Throwable) {
                                 try { XposedHelpers.setDoubleField(bdLoc, "mLongitude", jittered.second) } catch (e2: Throwable) {}
                             }
-                            // 同时修改定位类型和坐标系标记
+                            // 只修改定位类型，不强制覆盖坐标系类型
                             try { XposedHelpers.callMethod(bdLoc, "setLocType", 61) } catch (e: Throwable) {}
-                            try { XposedHelpers.callMethod(bdLoc, "setCoorType", "bd09ll") } catch (e: Throwable) {}
                         }
                     }
                 )
