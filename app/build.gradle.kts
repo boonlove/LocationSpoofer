@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.amap.map)
     implementation(libs.amap.search)
     implementation(libs.google.maps)
+    implementation(libs.google.places)
     implementation(libs.play.services.location)
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)

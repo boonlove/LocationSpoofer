@@ -52,17 +52,39 @@ jobs:
           # 获取上一个 tag 的名字
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
-          # 指定输出格式为纯文本，并且过滤掉 Merge Commit
+          # 获取提交记录
           if [ -z "$PREV_TAG" ]; then
             echo "没有找到上一个 tag，获取所有提交记录。"
-            LOGS=$(git log --no-merges --pretty=format:"- %s")
+            COMMITS=$(git log --no-merges --pretty=format:"%s")
           else
             echo "上一个 tag: $PREV_TAG"
-            LOGS=$(git log $PREV_TAG..HEAD --no-merges --pretty=format:"- %s")
+            COMMITS=$(git log $PREV_TAG..HEAD --no-merges --pretty=format:"%s")
           fi
           
-          # 将日志写入文件（解决多行输出的问题），作为 Release 的正文
-          echo "$LOGS" > changelog.txt
+          # 初始化 changelog 文件
+          echo "" > changelog.txt
+          
+          # 提取功能更新 (feat:)
+          FEATS=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat:[[:space:]]*/- /' || true)
+          if [ -n "$FEATS" ]; then
+            echo "## 功能" >> changelog.txt
+            echo "$FEATS" >> changelog.txt
+            echo "" >> changelog.txt
+          fi
+          
+          # 提取修复 (fix:)
+          FIXES=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix:[[:space:]]*/- /' || true)
+          if [ -n "$FIXES" ]; then
+            echo "## 修复" >> changelog.txt
+            echo "$FIXES" >> changelog.txt
+            echo "" >> changelog.txt
+          fi
+          
+          # 如果没有任何匹配的内容，至少留一行记录
+          if [ -z "$FEATS" ] && [ -z "$FIXES" ]; then
+            echo "常规更新与优化" >> changelog.txt
+          fi
+          
           cat changelog.txt
           
       - name: Setup Java

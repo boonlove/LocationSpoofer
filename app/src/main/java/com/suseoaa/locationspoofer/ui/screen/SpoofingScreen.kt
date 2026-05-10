@@ -772,6 +772,8 @@ fun SavedLocationsCard(
 
 // 高德 POI 搜索
 
+private var cachedPlacesClient: com.google.android.libraries.places.api.net.PlacesClient? = null
+
 fun performPoiSearch(
     context: android.content.Context,
     keyword: String,
@@ -800,36 +802,76 @@ fun performPoiSearch(
             onResult(emptyList())
         }
     } else {
-        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val apiKey = BuildConfig.GOOGLE_MAPS_API_KEY
-                val url = "https://maps.googleapis.com/maps/api/place/textsearch/json?query=${java.net.URLEncoder.encode(keyword, "UTF-8")}&key=$apiKey"
-                val request = Request.Builder().url(url).build()
-                val response = OkHttpClient().newCall(request).execute()
-                val json = JSONObject(response.body?.string() ?: "")
-                if (json.optString("status") == "OK") {
-                    val results = json.getJSONArray("results")
-                    val items = mutableListOf<AppPoiItem>()
-                    for (i in 0 until results.length()) {
-                        val item = results.getJSONObject(i)
-                        val loc = item.getJSONObject("geometry").getJSONObject("location")
-                        items.add(
-                            AppPoiItem(
-                                title = item.optString("name", ""),
-                                snippet = item.optString("formatted_address", ""),
-                                lat = loc.getDouble("lat"),
-                                lng = loc.getDouble("lng")
-                            )
-                        )
-                    }
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(items) }
-                } else {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(emptyList()) }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onResult(emptyList()) }
+        try {
+            val placesClient = cachedPlacesClient ?: com.google.android.libraries.places.api.Places.createClient(context.applicationContext).also {
+                cachedPlacesClient = it
             }
+            // 使用 Autocomplete 接口：全球关键词搜索，不限制国家/地区
+            // 通过 sessionToken 分组请求，避免重复计费；不设置 country 限制以支持全球搜索
+            val sessionToken = com.google.android.libraries.places.api.model.AutocompleteSessionToken.newInstance()
+            // 设置覆盖全球的矩形偏移，阻止服务器根据 IP 推断区域，实现真正全球搜索
+            val worldBounds = com.google.android.libraries.places.api.model.RectangularBounds.newInstance(
+                com.google.android.gms.maps.model.LatLng(-90.0, -180.0),
+                com.google.android.gms.maps.model.LatLng(90.0, 180.0)
+            )
+            val autocompleteRequest = com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest.builder()
+                .setQuery(keyword)
+                .setLocationBias(worldBounds)
+                .setSessionToken(sessionToken)
+                .build()
+
+            placesClient.findAutocompletePredictions(autocompleteRequest)
+                .addOnSuccessListener { autocompleteResponse ->
+                    val predictions = autocompleteResponse.autocompletePredictions
+                    android.util.Log.d("SpoofingScreen", "Autocomplete got ${predictions.size} predictions")
+                    if (predictions.isEmpty()) {
+                        android.widget.Toast.makeText(context, "No predictions found for: $keyword", android.widget.Toast.LENGTH_SHORT).show()
+                        onResult(emptyList())
+                        return@addOnSuccessListener
+                    }
+                    // 批量获取前5条预测结果的详情（坐标）
+                    val fetchFields = listOf(
+                        com.google.android.libraries.places.api.model.Place.Field.ID,
+                        com.google.android.libraries.places.api.model.Place.Field.NAME,
+                        com.google.android.libraries.places.api.model.Place.Field.LAT_LNG,
+                        com.google.android.libraries.places.api.model.Place.Field.ADDRESS
+                    )
+                    val resultList = mutableListOf<AppPoiItem>()
+                    val topPredictions = predictions.take(5)
+                    var completedCount = 0
+                    topPredictions.forEach { prediction ->
+                        val fetchRequest = com.google.android.libraries.places.api.net.FetchPlaceRequest.newInstance(prediction.placeId, fetchFields)
+                        placesClient.fetchPlace(fetchRequest)
+                            .addOnSuccessListener { fetchResponse ->
+                                val place = fetchResponse.place
+                                val latLng = place.latLng
+                                if (latLng != null) {
+                                    resultList.add(AppPoiItem(
+                                        title = place.name ?: prediction.getPrimaryText(null).toString(),
+                                        snippet = place.address ?: prediction.getSecondaryText(null).toString(),
+                                        lat = latLng.latitude,
+                                        lng = latLng.longitude
+                                    ))
+                                }
+                            }
+                            .addOnCompleteListener {
+                                completedCount++
+                                if (completedCount == topPredictions.size) {
+                                    android.widget.Toast.makeText(context, "Search Success: ${resultList.size} results", android.widget.Toast.LENGTH_SHORT).show()
+                                    onResult(resultList)
+                                }
+                            }
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    android.widget.Toast.makeText(context, "Search Error: ${exception.message}", android.widget.Toast.LENGTH_LONG).show()
+                    android.util.Log.e("SpoofingScreen", "Autocomplete failed: ${exception.message}", exception)
+                    onResult(emptyList())
+                }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Search Catch Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            android.util.Log.e("SpoofingScreen", "Places API exception: ${e.message}", e)
+            onResult(emptyList())
         }
     }
 }

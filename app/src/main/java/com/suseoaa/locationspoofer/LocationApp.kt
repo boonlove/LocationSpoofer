@@ -4,6 +4,7 @@ import android.app.Application
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
+import com.google.android.libraries.places.api.Places
 import com.suseoaa.locationspoofer.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -19,6 +20,10 @@ class LocationApp : Application() {
         ServiceSettings.updatePrivacyAgree(this, true)
         AMapLocationClient.updatePrivacyShow(this, true, true)
         AMapLocationClient.updatePrivacyAgree(this, true)
+
+        if (!Places.isInitialized()) {
+            Places.initialize(this, BuildConfig.GOOGLE_MAPS_API_KEY)
+        }
 
         startKoin {
             androidLogger()

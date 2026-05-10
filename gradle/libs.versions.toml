@@ -13,6 +13,7 @@ amapSearch = "9.7.0"
 okhttp = "4.12.0"
 googleMaps = "18.2.0"
 playServicesLocation = "21.2.0"
+places = "3.4.0"
 
 [libraries]
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
@@ -22,6 +23,7 @@ amap-search = { module = "com.amap.api:search", version.ref = "amapSearch" }
 xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposed" }
 google-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "googleMaps" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+google-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "places" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.6.1" }
