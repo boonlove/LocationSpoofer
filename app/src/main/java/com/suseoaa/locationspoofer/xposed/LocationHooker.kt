@@ -7,6 +7,7 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
 import org.json.JSONObject
 import java.io.File
+import java.util.Random
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -73,6 +74,7 @@ class LocationHooker : IXposedHookLoadPackage {
         hookLocationAPIs(lpparam.classLoader)
         hookNetworkAndCellAPIs(lpparam.classLoader)
         hookBluetoothLE(lpparam.classLoader)
+        hookGnssStatus(lpparam.classLoader)
     }
 
     private var startTimestamp = System.currentTimeMillis()
@@ -111,17 +113,39 @@ class LocationHooker : IXposedHookLoadPackage {
         return ret
     }
 
+    /**
+     * 高斯随机游走状态(Xposed进程内独立维护)
+     * 使用Ornstein-Uhlenbeck过程: X(t+dt) = X(t) + sigma*sqrt(dt)*N(0,1) - alpha*X(t)*dt
+     * 产生白噪声频谱,FFT检测无法发现单频峰
+     */
+    private val rng = Random()
+    private var hookDriftLat = 0.0
+    private var hookDriftLng = 0.0
+    private var hookAccuracyDrift = 0.0
+    private var hookLastCallTime = 0L
+
     private fun getJitteredLocation(baseLat: Double, baseLng: Double): Pair<Double, Double> {
-        val elapsed = System.currentTimeMillis() - startTimestamp
-        val driftLat = sin(elapsed / 10000.0) * 0.000015
-        val driftLng = cos(elapsed / 12000.0) * 0.000015
-        return Pair(baseLat + driftLat, baseLng + driftLng)
+        val now = System.currentTimeMillis()
+        val dt = if (hookLastCallTime > 0) {
+            ((now - hookLastCallTime) / 1000.0).coerceIn(0.01, 5.0)
+        } else 1.0
+        hookLastCallTime = now
+
+        // sigma=0.000005度(约0.5米), alpha=0.05(均值回归防止无限漂移)
+        val sigma = 0.000005
+        val alpha = 0.05
+        hookDriftLat += sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLat * dt
+        hookDriftLng += sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLng * dt
+
+        return Pair(baseLat + hookDriftLat, baseLng + hookDriftLng)
     }
 
     private fun getJitteredAccuracy(): Float {
-        val elapsed = System.currentTimeMillis() - startTimestamp
-        return (20.0 + 10.0 * kotlin.math.sin(elapsed / 5000.0)).toFloat()
+        // 精度值在基准20m附近做高斯漂移,模拟GDOP变化
+        hookAccuracyDrift += 0.5 * rng.nextGaussian() - 0.03 * hookAccuracyDrift
+        return (20.0 + hookAccuracyDrift).coerceIn(3.0, 45.0).toFloat()
     }
+
 
     private fun hookLocationAPIs(classLoader: ClassLoader) {
         try {
@@ -582,8 +606,25 @@ class LocationHooker : IXposedHookLoadPackage {
             XposedBridge.log(e)
         }
 
-        // 2. 伪造 Wi-Fi 扫描列表（getScanResults）
+        // 2. 伪造Wi-Fi扫描列表(getScanResults) -- 多维度拟真
+        // 真实扫描周期约4-5秒,timestamp字段必须接近SystemClock.elapsedRealtimeNanos()
+        // 缺失timestamp是反作弊SDK最常用的检测维度之一
         val wifiScanHook = object : XC_MethodHook() {
+            // 真实设备常见的加密协议组合(从真机抓包统计)
+            // 单一的[WPA2-PSK-CCMP][ESS]会被标记为批量生成特征
+            val realCapabilities = listOf(
+                "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS]",
+                "[WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP][ESS]",
+                "[WPA2-PSK-CCMP][ESS][WPS]",
+                "[WPA-PSK-TKIP+CCMP][WPA2-PSK-TKIP+CCMP][ESS]",
+                "[RSN-PSK-CCMP][ESS]",
+                "[WPA2-EAP-CCMP][RSN-EAP-CCMP][ESS]",
+                "[ESS]",
+                "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS][WPS]",
+                "[WPA2-SAE-CCMP][RSN-SAE-CCMP][ESS]",
+                "[WPA2-PSK+SAE-CCMP][RSN-PSK+SAE-CCMP][ESS]"
+            )
+
             override fun afterHookedMethod(param: MethodHookParam) {
                 val config = readConfig()
                 if (config != null && config.optBoolean("active", false)) {
@@ -593,34 +634,42 @@ class LocationHooker : IXposedHookLoadPackage {
                         try {
                             val scanResultClass =
                                 XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
+                            // 基准时间戳: 当前系统单调时钟(纳秒)
+                            val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
                             for (i in 0 until wifiArray.length()) {
                                 val wifi = wifiArray.getJSONObject(i)
                                 val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
                                 XposedHelpers.setObjectField(
-                                    fakeScanResult,
-                                    "SSID",
-                                    wifi.optString("ssid")
+                                    fakeScanResult, "SSID", wifi.optString("ssid")
                                 )
                                 XposedHelpers.setObjectField(
-                                    fakeScanResult,
-                                    "BSSID",
-                                    wifi.optString("bssid")
+                                    fakeScanResult, "BSSID", wifi.optString("bssid")
                                 )
+                                // 信号强度: 高斯分布(均值-65dBm, 标准差10dBm)
+                                // 真实环境中AP信号受多径衰落影响呈正态分布
+                                val level = (-65 + (rng.nextGaussian() * 10).toInt())
+                                    .coerceIn(-90, -30)
+                                XposedHelpers.setIntField(fakeScanResult, "level", level)
                                 XposedHelpers.setIntField(
-                                    fakeScanResult,
-                                    "level",
-                                    (-80..-40).random()
+                                    fakeScanResult, "frequency",
+                                    listOf(2412, 2417, 2422, 2427, 2432, 2437, 2442,
+                                        2447, 2452, 2457, 2462, 5180, 5200, 5220, 5240,
+                                        5260, 5280, 5300, 5320, 5745, 5765, 5785, 5805).random()
                                 )
-                                XposedHelpers.setIntField(
-                                    fakeScanResult,
-                                    "frequency",
-                                    listOf(2412, 2437, 2462, 5180, 5240).random()
-                                )
+                                // 加密协议: 从真实常见组合中随机抽取
                                 XposedHelpers.setObjectField(
-                                    fakeScanResult,
-                                    "capabilities",
-                                    "[WPA2-PSK-CCMP][ESS]"
+                                    fakeScanResult, "capabilities",
+                                    realCapabilities.random()
                                 )
+                                // 时间戳: 基准时间 - 随机微秒偏移(模拟各AP被扫描到的先后差异)
+                                // 每个AP的扫描时间差约在0-200毫秒(200_000微秒)之间
+                                try {
+                                    val offsetNanos = (rng.nextInt(200_000) * 1000L)
+                                    XposedHelpers.setLongField(
+                                        fakeScanResult, "timestamp",
+                                        (baseTimestamp - offsetNanos) / 1000 // timestamp字段单位为微秒
+                                    )
+                                } catch (e: Throwable) { /* 部分ROM该字段可能不存在 */ }
                                 fakeList.add(fakeScanResult)
                             }
                         } catch (e: Throwable) { // 忽略
@@ -734,11 +783,17 @@ class LocationHooker : IXposedHookLoadPackage {
             XposedBridge.log(e)
         }
 
-        // 5. 基站信息伪造（CellLocation / AllCellInfo / NeighboringCellInfo）
+        // 5. 基站信息伪造(CellLocation/AllCellInfo/NeighboringCellInfo) -- 动态构造
+        // 旧实现问题: 硬编码LAC=1234/CID=5678,且getAllCellInfo返回空列表
+        // 反作弊SDK会检查: 1)基站参数是否与GPS坐标地理一致 2)CellInfo列表是否为空
+        // 新方案: 基于目标坐标的hash值生成伪随机但确定性的TAC/CI,确保同一位置始终返回相同基站
         val cellHook = object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
                 val config = readConfig()
                 if (config != null && config.optBoolean("active", false)) {
+                    val lat = config.optDouble("lat", 0.0)
+                    val lng = config.optDouble("lng", 0.0)
+
                     when (param.method.name) {
                         "getCellLocation" -> {
                             try {
@@ -747,14 +802,30 @@ class LocationHooker : IXposedHookLoadPackage {
                                     classLoader
                                 )
                                 val fakeLocation = XposedHelpers.newInstance(gsmCellLocationClass)
-                                XposedHelpers.callMethod(fakeLocation, "setLacAndCid", 1234, 5678)
+                                // 基于坐标生成确定性的LAC/CID(同一位置始终相同)
+                                val coordSeed = ((lat * 1e5).toLong() xor (lng * 1e5).toLong())
+                                val lac = (10000 + (coordSeed and 0xFFFF).toInt() % 50000)
+                                    .coerceIn(1, 65534)
+                                val cid = (100000 + ((coordSeed shr 16) and 0xFFFFFF).toInt() % 900000)
+                                    .coerceIn(1, 268435455)
+                                XposedHelpers.callMethod(fakeLocation, "setLacAndCid", lac, cid)
                                 param.result = fakeLocation
                             } catch (e: Throwable) {
                                 param.result = null
                             }
                         }
 
-                        "getAllCellInfo", "getNeighboringCellInfo" -> param.result =
+                        "getAllCellInfo" -> {
+                            // 构造2-3个CellInfoLte对象,模拟服务小区+邻区
+                            try {
+                                param.result = buildFakeCellInfoList(classLoader, lat, lng)
+                            } catch (e: Throwable) {
+                                XposedBridge.log("[LocationSpoofer] CellInfo构造失败: $e")
+                                param.result = java.util.ArrayList<Any>()
+                            }
+                        }
+
+                        "getNeighboringCellInfo" -> param.result =
                             java.util.ArrayList<Any>()
                     }
                 }
@@ -840,6 +911,264 @@ class LocationHooker : IXposedHookLoadPackage {
             )
         } catch (e: Throwable) {
             XposedBridge.log(e)
+        }
+    }
+
+    /**
+     * 通过反射+Parcel机制构造CellInfoLte对象列表
+     *
+     * CellInfoLte/CellIdentityLte等类的构造器在Android各版本中签名不同,
+     * 直接new会因API版本差异崩溃。通过反射调用内部构造器并设置字段值,
+     * 兼容Android 7.0~14。
+     *
+     * 参数生成策略:
+     * - MCC=460(中国), MNC=01(中国移动)或11(中国电信): 使用中国运营商真实前缀
+     * - TAC(Tracking Area Code): 基于经纬度hash生成,范围1-65534
+     * - CI(Cell Identity): 基于坐标生成,范围1-268435455(28bit)
+     * - 生成2-3个基站: 第一个为服务小区(isRegistered=true),其余为邻区
+     *
+     * @param classLoader 目标App的ClassLoader
+     * @param lat 目标纬度(GCJ-02)
+     * @param lng 目标经度(GCJ-02)
+     * @return 包含2-3个CellInfoLte对象的ArrayList
+     */
+    private fun buildFakeCellInfoList(
+        classLoader: ClassLoader, lat: Double, lng: Double
+    ): java.util.ArrayList<Any> {
+        val result = java.util.ArrayList<Any>()
+        val coordSeed = ((lat * 1e5).toLong() xor (lng * 1e5).toLong())
+
+        // 中国运营商MCC/MNC组合
+        val operators = listOf(
+            Pair(460, 0),  // 中国移动
+            Pair(460, 1),  // 中国联通
+            Pair(460, 11)  // 中国电信
+        )
+
+        // 生成2-3个基站(1个服务小区+1-2个邻区)
+        val cellCount = 2 + (coordSeed and 1).toInt()
+        for (i in 0 until cellCount) {
+            try {
+                val mcc = operators[i % operators.size].first
+                val mnc = operators[i % operators.size].second
+                // 每个基站的TAC/CI基于坐标+索引偏移,确保同一位置的多个基站参数不同但确定
+                val tac = (10000 + ((coordSeed + i * 7919) and 0xFFFF).toInt() % 50000)
+                    .coerceIn(1, 65534)
+                val ci = (100000 + (((coordSeed shr 8) + i * 104729) and 0xFFFFFF).toInt() % 900000)
+                    .coerceIn(1, 268435455)
+                val pci = (coordSeed + i * 31).toInt() and 0x1FF // 物理小区ID, 0-503
+
+                // 方案A: 通过反射CellIdentityLte构造器(Android 9+有多参数版本)
+                val cellIdentityLteClass = XposedHelpers.findClass(
+                    "android.telephony.CellIdentityLte", classLoader
+                )
+                val cellInfoLteClass = XposedHelpers.findClass(
+                    "android.telephony.CellInfoLte", classLoader
+                )
+
+                val cellInfo = XposedHelpers.newInstance(cellInfoLteClass)
+
+                // 设置isRegistered: 第一个为服务小区
+                try {
+                    XposedHelpers.setBooleanField(cellInfo, "mRegistered", i == 0)
+                } catch (e: Throwable) {
+                    try {
+                        XposedHelpers.callMethod(cellInfo, "setRegistered", i == 0)
+                    } catch (e2: Throwable) { /* 忽略 */ }
+                }
+
+                // 设置时间戳
+                try {
+                    XposedHelpers.setLongField(
+                        cellInfo, "mTimeStamp",
+                        android.os.SystemClock.elapsedRealtimeNanos()
+                    )
+                } catch (e: Throwable) { /* 忽略 */ }
+
+                // 构造CellIdentityLte并注入字段
+                val cellIdentity = try {
+                    // Android 9+ 构造器: (int ci, int pci, int tac, int earfcn, ...mcc, mnc...)
+                    XposedHelpers.newInstance(
+                        cellIdentityLteClass,
+                        mcc, mnc, ci, pci, tac
+                    )
+                } catch (e: Throwable) {
+                    // 降级: 用空构造器+反射写字段
+                    val identity = XposedHelpers.newInstance(cellIdentityLteClass)
+                    try { XposedHelpers.setIntField(identity, "mMcc", mcc) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(identity, "mMnc", mnc) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(identity, "mCi", ci) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(identity, "mPci", pci) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(identity, "mTac", tac) } catch (e2: Throwable) {}
+                    identity
+                }
+
+                // 将CellIdentityLte写入CellInfoLte
+                try {
+                    XposedHelpers.setObjectField(cellInfo, "mCellIdentityLte", cellIdentity)
+                } catch (e: Throwable) { /* 忽略 */ }
+
+                // 构造CellSignalStrengthLte
+                try {
+                    val cssClass = XposedHelpers.findClass(
+                        "android.telephony.CellSignalStrengthLte", classLoader
+                    )
+                    val css = XposedHelpers.newInstance(cssClass)
+                    // RSRP: -140~-44 dBm, 典型值-80~-100
+                    val rsrp = -80 - rng.nextInt(20)
+                    // RSRQ: -20~-3 dB
+                    val rsrq = -10 - rng.nextInt(7)
+                    // RSSI: -113~-51 dBm
+                    val rssi = -70 - rng.nextInt(20)
+                    try { XposedHelpers.setIntField(css, "mRsrp", rsrp) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(css, "mRsrq", rsrq) } catch (e2: Throwable) {}
+                    try { XposedHelpers.setIntField(css, "mSignalStrength", rssi) } catch (e2: Throwable) {}
+                    XposedHelpers.setObjectField(cellInfo, "mCellSignalStrengthLte", css)
+                } catch (e: Throwable) { /* 忽略 */ }
+
+                result.add(cellInfo)
+            } catch (e: Throwable) {
+                XposedBridge.log("[LocationSpoofer] 构造第${i}个CellInfo失败: $e")
+            }
+        }
+        return result
+    }
+
+    /**
+     * 拦截GnssStatus回调,注入伪造的卫星星座数据
+     *
+     * 反作弊SDK通过registerGnssStatusCallback获取卫星可见数和信噪比(C/N0),
+     * 若Location坐标正常但卫星数为0或信噪比全为0,则判定为模拟位置。
+     *
+     * 伪造策略:
+     * - 可见卫星数: 12-18颗(真实室外环境的典型值)
+     * - 信噪比(C/N0): 15-40 dB-Hz(真实GPS信号的典型范围)
+     * - 卫星类型: GPS(1) + GLONASS(3) + BDS(5)混合星座
+     */
+    private fun hookGnssStatus(classLoader: ClassLoader) {
+        try {
+            // Hook GnssStatus.getSatelliteCount() -- 返回伪造的卫星数
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getSatelliteCount",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            // 12-18颗可见卫星(随时间缓慢波动)
+                            param.result = 12 + rng.nextInt(7)
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.getCn0DbHz(int) -- 返回伪造的信噪比
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getCn0DbHz",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            // 信噪比15-40 dB-Hz,高斯分布(均值28, 标准差6)
+                            val cn0 = (28.0 + rng.nextGaussian() * 6.0)
+                                .coerceIn(15.0, 42.0).toFloat()
+                            param.result = cn0
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.usedInFix(int) -- 标记部分卫星参与定位
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "usedInFix",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val satIndex = param.args[0] as Int
+                            // 约70%的可见卫星参与定位(真实场景中部分卫星仰角低或被遮挡)
+                            param.result = (satIndex % 10) < 7
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.getConstellationType(int) -- 返回混合星座类型
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getConstellationType",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val satIndex = param.args[0] as Int
+                            // GPS(1), SBAS(2), GLONASS(3), QZSS(4), BDS(5), GALILEO(6)
+                            param.result = when (satIndex % 5) {
+                                0, 1, 2 -> 1 // GPS(约60%)
+                                3 -> 3        // GLONASS
+                                else -> 5     // BDS(北斗)
+                            }
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.getAzimuthDegrees(int) -- 方位角
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getAzimuthDegrees",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val satIndex = param.args[0] as Int
+                            // 均匀分布在0-360度(卫星在天球上的方位角)
+                            param.result = ((satIndex * 137.5f + rng.nextFloat() * 10f) % 360f)
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.getElevationDegrees(int) -- 仰角
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getElevationDegrees",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val satIndex = param.args[0] as Int
+                            // 仰角5-85度(低于5度的信号通常被遮挡忽略)
+                            param.result = 5f + (satIndex * 23.7f + rng.nextFloat() * 8f) % 80f
+                        }
+                    }
+                }
+            )
+
+            // Hook GnssStatus.getSvid(int) -- 卫星编号
+            XposedHelpers.findAndHookMethod(
+                "android.location.GnssStatus", classLoader, "getSvid",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val satIndex = param.args[0] as Int
+                            // GPS: 1-32, GLONASS: 65-96, BDS: 201-237
+                            param.result = when (satIndex % 5) {
+                                0, 1, 2 -> 1 + (satIndex * 7) % 32   // GPS PRN
+                                3 -> 65 + (satIndex * 3) % 24         // GLONASS
+                                else -> 201 + (satIndex * 5) % 37     // BDS
+                            }
+                        }
+                    }
+                }
+            )
+
+            XposedBridge.log("[LocationSpoofer] GnssStatus hooks installed")
+        } catch (e: Throwable) {
+            XposedBridge.log("[LocationSpoofer] GnssStatus hook failed: $e")
         }
     }
 

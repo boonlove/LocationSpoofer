@@ -78,8 +78,38 @@ class WigleClient {
             }
         }
 
+    /**
+     * 生成符合真实OUI规范的BSSID
+     *
+     * IEEE OUI(Organizationally Unique Identifier)是MAC地址前3字节,由IEEE分配给设备厂商。
+     * 反作弊SDK会校验OUI前缀是否属于已注册的合法厂商,纯随机MAC会因OUI不存在而被标记。
+     * 以下OUI均来自中国市场主流路由器/AP厂商的真实注册前缀。
+     */
     private fun generateRandomBssid(): String {
-        val ouis = listOf("00:14:22", "cc:2d:e0", "44:a8:42", "00:25:9c")
+        val ouis = listOf(
+            "00:14:22", // Dell
+            "cc:2d:e0", // Routerboard
+            "44:a8:42", // Cisco Meraki
+            "00:25:9c", // Cisco-Linksys
+            "60:e3:27", // TP-Link(普联)
+            "b0:95:75", // TP-Link(普联)
+            "10:41:7f", // TP-Link(普联)
+            "88:25:93", // Tenda(腾达)
+            "c8:3a:35", // Tenda(腾达)
+            "48:7d:2e", // Huawei(华为)
+            "e0:19:1d", // Huawei(华为)
+            "34:12:f9", // Huawei(华为)
+            "28:d1:27", // ZTE(中兴)
+            "64:13:6c", // ZTE(中兴)
+            "78:11:dc", // Xiaomi(小米)
+            "50:64:2b", // Xiaomi(小米)
+            "74:da:88", // Edimax
+            "c0:25:e9", // Netgear
+            "20:76:93", // ASUS(华硕)
+            "b4:fb:e4", // D-Link
+            "fc:d7:33", // H3C(新华三)
+            "3c:37:86"  // Ruijie(锐捷)
+        )
         return "${ouis.random()}:${
             String.format(
                 "%02x:%02x:%02x",
