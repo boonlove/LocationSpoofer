@@ -38,7 +38,7 @@ class LocationHooker : IXposedHookLoadPackage {
         val pkg = lpparam.packageName
 
         // 宿主App自报平安
-        if (pkg == "com.suseoaa.locationspoofer") {
+        if (pkg == "com.suseoaa.locationspoofer.fork") {
             try {
                 XposedHelpers.findAndHookMethod(
                     "com.suseoaa.locationspoofer.utils.LSPosedManager",

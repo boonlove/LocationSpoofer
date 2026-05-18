@@ -49,7 +49,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.suseoaa.locationspoofer"
+        applicationId = "com.suseoaa.locationspoofer.fork"
         minSdk = 26
         targetSdk = 34
         versionCode = appVersionCode

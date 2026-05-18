@@ -69,7 +69,7 @@
 
         <provider
             android:name=".provider.SpooferProvider"
-            android:authorities="com.suseoaa.locationspoofer.provider"
+            android:authorities="${applicationId}.provider"
             android:exported="true" />
     </application>
 
