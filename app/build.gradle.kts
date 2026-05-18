@@ -5,6 +5,9 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
 }
 
+val appVersionName: String by rootProject.extra
+val appVersionCode: Int by rootProject.extra
+
 android {
     namespace = "com.suseoaa.locationspoofer"
     compileSdk = 36
@@ -49,8 +52,8 @@ android {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
         targetSdk = 34
-        versionCode = 194
-        versionName = "1.9.4"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         vectorDrawables {
             useSupportLibrary = true
@@ -113,6 +116,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+base {
+    archivesName.set(
+        "LocationSpoofer_v${appVersionName}_${appVersionCode}"
+    )
 }
 
 dependencies {
