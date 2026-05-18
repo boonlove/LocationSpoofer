@@ -36,6 +36,15 @@ android {
         return null
     }
 
+    splits {
+        abi {
+            isEnable = true           // 启用 ABI 拆分
+            reset()                   // 清除默认配置
+            include("arm64-v8a")      // 只生成 arm64-v8a 架构
+            isUniversalApk = false    // 不生成通用 APK
+        }
+    }
+
     defaultConfig {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
