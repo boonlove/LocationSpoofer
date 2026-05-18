@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -20,6 +22,20 @@ android {
 
     val googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
 
+    fun getSigningConfig(key: String): String? {
+        val properties = Properties()
+        val keystorePropertiesFile = rootProject.file("keystore.properties")
+        if (keystorePropertiesFile.exists()) {
+            try {
+                properties.load(keystorePropertiesFile.inputStream())
+                return properties.getProperty(key)
+            } catch (e: Exception) {
+                println("Warning: 无法加载 keystore.properties 文件: ${e.message}")
+            }
+        }
+        return null
+    }
+
     defaultConfig {
         applicationId = "com.suseoaa.locationspoofer"
         minSdk = 26
@@ -33,22 +49,30 @@ android {
 
         manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
     }
+
     signingConfigs {
-        create("release") {
-            val keystorePath = System.getenv("KEYSTORE_FILE_PATH")
-                ?: "/Users/vincent/Desktop/SUSE-APP-Key/APP-Key.jks"
-            if (file(keystorePath).exists()) {
-                storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "LinuxisUbuntu18"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "suse-app-key"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "LinuxisUbuntu18"
+        val storeFilePath = getSigningConfig("storeFile").toString()
+        val storePassword = getSigningConfig("storePassword")
+        val keyAlias = getSigningConfig("keyAlias")
+        val keyPassword = getSigningConfig("keyPassword")
+        val hasSigning = rootProject.file(storeFilePath).exists() && storePassword != null && keyAlias != null && keyPassword != null
+        if (hasSigning) {
+            create("release") {
+                this.storeFile = rootProject.file(storeFilePath)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+				enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = false
             }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
             buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
         release {
@@ -57,7 +81,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
             buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
     }
