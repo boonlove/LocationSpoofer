@@ -1,0 +1,74 @@
+name: 编译 LocationSpoofer
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+      - 'master'
+    paths:
+      - 'app/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 编译 LocationSpoofer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: 配置 Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17' # Gradle 需要 Java 17 进行编译
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # 接受使用条款以抑制缓存许可警告。
+          build-scan-terms-of-use-url: 'https://gradle.com/terms-of-service'
+          build-scan-terms-of-use-agree: 'yes'
+          build-scan-publish: false
+
+      - name: 配置签名密钥
+        run: |
+          mkdir -p keystore
+          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > keystore/VirtualLocation.keystore
+          echo "storeFile=keystore/VirtualLocation.keystore" > keystore.properties
+          echo "keyAlias=${{ secrets.SIGNING_KEY_ALIAS }}" >> keystore.properties
+          echo "keyPassword=${{ secrets.SIGNING_KEY_PASSWORD }}" >> keystore.properties
+          echo "storePassword=${{ secrets.SIGNING_STORE_PASSWORD }}" >> keystore.properties
+
+      - name: 配置 API Key
+        run: |
+          echo "WIGLE_TOKEN: \"${{ secrets.WIGLE_TOKEN }}\"" > local.yml
+          echo "AMAP_API_KEY: \"${{ secrets.AMAP_API_KEY }}\"" >> local.yml
+          echo "GOOGLE_MAPS_API_KEY: \"${{ secrets.GOOGLE_MAPS_API_KEY }}\"" >> local.yml
+
+      - name: 授予 gradlew 执行权限
+        run: chmod +x ./gradlew
+
+      - name: 编译 APK
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: 上传 APK
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 10
+          archive: false
+          if-no-files-found: error

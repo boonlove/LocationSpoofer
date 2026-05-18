@@ -1,133 +1,98 @@
-name: Release on Version Update
+name: 创建 Release
 
 on:
   push:
-    branches:
-      - main
-      - master
-    paths:
-      - 'app/build.gradle.kts' # 只有当这个文件变动时才会检查并触发
+    tags:
+      - "v*"
 
 permissions:
   contents: write # 允许 GITHUB_TOKEN 创建 Release 和 Tag
 
 jobs:
-  build-and-release:
+  build:
+    name: 编译 LocationSpoofer
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  release:
+    name: 创建 GitHub Release
+    needs: build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: 检出仓库代码
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # 需要完整的提交历史来获取 tag 和并生成 changelog
 
-      - name: Check if Version Changed
-        id: check_version
-        run: |
-          # 提取 app/build.gradle.kts 中的 versionName
-          VERSION_NAME=$(grep 'versionName =' app/build.gradle.kts | head -n 1 | awk -F'"' '{print $2}')
-          echo "当前代码中的 versionName: $VERSION_NAME"
-          
-          if [ -z "$VERSION_NAME" ]; then
-            echo "未能提取到 versionName，退出。"
-            exit 1
-          fi
-          
-          TAG_NAME="v$VERSION_NAME"
-          
-          # 检查对应的 tag 是否已经存在
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
-            echo "Tag $TAG_NAME 已经存在，说明版本没有更新或已发版，跳过后续操作。"
-            echo "changed=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          
-          echo "检测到新版本，将构建并发布 $TAG_NAME。"
-          echo "changed=true" >> $GITHUB_OUTPUT
-          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Generate Changelog
-        if: steps.check_version.outputs.changed == 'true'
+      - name: 生成更新日志
         id: changelog
         run: |
           # 获取上一个 tag 的名字
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
+          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' 2>/dev/null || echo "")
+          CURR_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$CURR_TAG" ]; then
+            CURR_TAG="HEAD"
+          fi
+
           # 获取提交记录
           if [ -z "$PREV_TAG" ]; then
-            echo "没有找到上一个 tag，获取所有提交记录。"
-            COMMITS=$(git log --no-merges --pretty=format:"%s")
+            echo "没有找到上一个 tag，获取到 ${CURR_TAG} 的提交记录。"
+            COMMITS=$(git log $CURR_TAG --no-merges --pretty=format:"%s")
           else
-            echo "上一个 tag: $PREV_TAG"
-            COMMITS=$(git log $PREV_TAG..HEAD --no-merges --pretty=format:"%s")
+            echo "获取到 ${PREV_TAG}..${CURR_TAG} 的提交记录。"
+            COMMITS=$(git log $PREV_TAG..$CURR_TAG --no-merges --pretty=format:"%s")
           fi
-          
-          # 初始化 changelog 文件
-          echo "" > changelog.txt
-          
-          # 提取功能更新 (feat:)
-          FEATS=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat:[[:space:]]*/- /' || true)
-          if [ -n "$FEATS" ]; then
-            echo "## 功能" >> changelog.txt
-            echo "$FEATS" >> changelog.txt
-            echo "" >> changelog.txt
-          fi
-          
-          # 提取修复 (fix:)
-          FIXES=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix:[[:space:]]*/- /' || true)
-          if [ -n "$FIXES" ]; then
-            echo "## 修复" >> changelog.txt
-            echo "$FIXES" >> changelog.txt
-            echo "" >> changelog.txt
-          fi
-          
-          # 如果没有任何匹配的内容，至少留一行记录
-          if [ -z "$FEATS" ] && [ -z "$FIXES" ]; then
-            echo "常规更新与优化" >> changelog.txt
-          fi
-          
+
+          {
+            # 提取功能更新 (feat)
+            FEATS=$(echo "$COMMITS" | grep "^feat" | sed -E 's/^feat:?[[:space:]]*/- /' || true)
+            if [ -n "$FEATS" ]; then
+              echo "## 功能"
+              echo "$FEATS"
+              echo ""
+            fi
+
+            # 提取优化与改进 (refactor)
+            REFACTOR=$(echo "$COMMITS" | grep "^refactor" | sed -E 's/^refactor:?[[:space:]]*/- /' || true)
+            if [ -n "$REFACTOR" ]; then
+              echo "## 优化与改进"
+              echo "$REFACTOR"
+              echo ""
+            fi
+
+            # 提取修复 (fix)
+            FIXES=$(echo "$COMMITS" | grep "^fix:" | sed -E 's/^fix:?[[:space:]]*/- /' || true)
+            if [ -n "$FIXES" ]; then
+              echo "## 修复"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            # 如果没有任何匹配的内容，至少留一行记录
+            if [ -z "$FEATS" ] && [ -z "$FIXES" ] && [ -z "$REFACTOR" ]; then
+              echo "常规更新与优化"
+            fi
+          } > changelog.txt
+
           cat changelog.txt
-          
-      - name: Setup Java
-        if: steps.check_version.outputs.changed == 'true'
-        uses: actions/setup-java@v4
+
+      - name: 下载 APK
+        uses: actions/download-artifact@v8
         with:
-          distribution: 'temurin'
-          java-version: '17' # Gradle 需要 Java 17 进行编译
-          cache: 'gradle'
+          pattern: "*.apk"
+          path: app/release
+          merge-multiple: true
+          skip-decompress: true
 
-      - name: Decode Keystore
-        if: steps.check_version.outputs.changed == 'true'
-        env:
-          ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          echo $ENCODED_KEYSTORE | base64 -d > $RUNNER_TEMP/keystore.jks
-
-      - name: Build Release APK
-        if: steps.check_version.outputs.changed == 'true'
-        env:
-          KEYSTORE_FILE_PATH: ${{ runner.temp }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-        run: |
-          chmod +x ./gradlew
-          ./gradlew --no-daemon :app:assembleRelease
-
-          # 重命名打包好的 APK，准备发布
-          APK_DIR="app/build/outputs/apk/release"
-          # 寻找构建出来的 apk 并重命名
-          find $APK_DIR -name "*.apk" -print0 | while IFS= read -r -d '' file; do
-            mv "$file" "$APK_DIR/LocationSpoofer-${{ steps.check_version.outputs.tag }}.apk"
-          done
-
-      - name: Publish GitHub Release
-        if: steps.check_version.outputs.changed == 'true'
-        uses: softprops/action-gh-release@v2
+      - name: 创建 GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ steps.check_version.outputs.tag }}
-          name: LocationSpoofer ${{ steps.check_version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           body_path: changelog.txt
-          files: app/build/outputs/apk/release/LocationSpoofer-*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: app/release/*.apk
+          generate_release_notes: true
+          prerelease: false
