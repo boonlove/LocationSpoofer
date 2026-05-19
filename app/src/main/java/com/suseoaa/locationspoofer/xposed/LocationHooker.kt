@@ -71,10 +71,124 @@ class LocationHooker : IXposedHookLoadPackage {
 
         XposedBridge.log("[LocationSpoofer] Hooking package: $pkg")
 
+        // ★ 反检测: 必须在其他Hook之前安装,隐藏Xposed环境
+        hookAntiDetection(lpparam.classLoader)
+
         hookLocationAPIs(lpparam.classLoader)
         hookNetworkAndCellAPIs(lpparam.classLoader)
         hookBluetoothLE(lpparam.classLoader)
         hookGnssStatus(lpparam.classLoader)
+    }
+
+    /**
+     * ★ 反检测: 隐藏Xposed环境,防止反作弊SDK检测到Hook
+     *
+     * 设计原则:
+     * 1. 只使用精确匹配,绝不使用宽泛的contains/startsWith,避免误杀正常类
+     * 2. 不Hook ClassLoader.loadClass的宽泛模式(会导致App卡死)
+     * 3. 不Hook BufferedReader.readLine(开销巨大)
+     * 4. 不Hook File.exists/Runtime.exec(干扰正常功能)
+     */
+    private fun hookAntiDetection(classLoader: ClassLoader) {
+
+        // ── 1. 堆栈帧过滤 ──
+        // 反作弊SDK通过getStackTrace()检查调用链,发现Xposed帧即判定为Hook环境
+        // 只过滤精确匹配的Xposed类名,不影响正常堆栈
+        val xposedClassNames = setOf(
+            "de.robv.android.xposed.XposedBridge",
+            "de.robv.android.xposed.XC_MethodHook",
+            "de.robv.android.xposed.XC_MethodReplacement",
+            "de.robv.android.xposed.XposedHelpers",
+            "de.robv.android.xposed.XC_MethodHook\$MethodHookParam",
+            "org.lsposed.manager.MainApplication",
+            "io.github.lsposed.manager.App"
+        )
+
+        try {
+            XposedHelpers.findAndHookMethod(
+                "java.lang.Throwable", classLoader, "getStackTrace",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val stackTrace = param.result as? Array<StackTraceElement> ?: return
+                        val filtered = stackTrace.filter { elem ->
+                            elem.className !in xposedClassNames
+                        }.toTypedArray()
+                        if (filtered.size != stackTrace.size) {
+                            param.result = filtered
+                        }
+                    }
+                })
+        } catch (_: Throwable) {}
+
+        try {
+            XposedHelpers.findAndHookMethod(
+                "java.lang.Thread", classLoader, "getStackTrace",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val stackTrace = param.result as? Array<StackTraceElement> ?: return
+                        val filtered = stackTrace.filter { elem ->
+                            elem.className !in xposedClassNames
+                        }.toTypedArray()
+                        if (filtered.size != stackTrace.size) {
+                            param.result = filtered
+                        }
+                    }
+                })
+        } catch (_: Throwable) {}
+
+        // ── 2. Class.forName 精确匹配 ──
+        // 反作弊SDK通过Class.forName()尝试加载Xposed类,成功则判定为Hook环境
+        // 使用精确匹配(不是contains),只拦截已知Xposed类名
+        try {
+            XposedHelpers.findAndHookMethod(
+                "java.lang.Class", classLoader, "forName",
+                String::class.java,
+                Boolean::class.javaPrimitiveType,
+                ClassLoader::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val className = param.args[0] as? String ?: return
+                        if (className in xposedClassNames) {
+                            throw ClassNotFoundException()
+                        }
+                    }
+                })
+        } catch (_: Throwable) {
+            // 降级: 尝试2参数版本
+            try {
+                XposedHelpers.findAndHookMethod(
+                    "java.lang.Class", classLoader, "forName",
+                    String::class.java,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val className = param.args[0] as? String ?: return
+                            if (className in xposedClassNames) {
+                                throw ClassNotFoundException()
+                            }
+                        }
+                    })
+            } catch (_: Throwable) {}
+        }
+
+        // ── 3. ClassLoader.loadClass 精确匹配 ──
+        // 同样使用精确匹配,只拦截已知Xposed类名
+        // loadClass被调用频率很高,精确匹配确保零误杀
+        try {
+            XposedHelpers.findAndHookMethod(
+                "java.lang.ClassLoader", classLoader, "loadClass",
+                String::class.java,
+                Boolean::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val className = param.args[0] as? String ?: return
+                        if (className in xposedClassNames) {
+                            throw ClassNotFoundException()
+                        }
+                    }
+                })
+        } catch (_: Throwable) {}
+
+        XposedBridge.log("[LocationSpoofer] Anti-detection hooks installed")
     }
 
     private var startTimestamp = System.currentTimeMillis()
