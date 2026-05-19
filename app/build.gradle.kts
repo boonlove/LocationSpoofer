@@ -24,6 +24,7 @@ android {
     }
 
     val googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
+    val amapApiKey = System.getenv("AMAP_API_KEY") ?: getLocalConfig("AMAP_API_KEY") ?: ""
 
     fun getSigningConfig(key: String): String? {
         val properties = Properties()
@@ -60,6 +61,7 @@ android {
         }
 
         manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
+        manifestPlaceholders["amapApiKey"] = amapApiKey
     }
 
     signingConfigs {
