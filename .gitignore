@@ -3,6 +3,7 @@
 .idea/
 *.iml
 local.properties
+local.yml
 
 # ─── Gradle ──────────────────────────────────────────────
 .gradle/
@@ -10,6 +11,10 @@ build/
 app/build/
 **/build/
 gradle-wrapper.jar
+
+# ─── NDK ─────────────────────────────────────────────────
+.cxx/
+obj/
 
 # ─── Android / Kotlin ────────────────────────────────────
 *.apk
@@ -27,4 +32,3 @@ captures/
 *.keystore
 keystore.properties
 google-services.json
-local.yml
