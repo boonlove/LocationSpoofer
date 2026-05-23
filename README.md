@@ -111,6 +111,15 @@ git clone https://github.com/your-username/LocationSpoofer.git
   2. 选择“手动（摇杆）”或“自动循环”。
   3. 点击“开始模拟”。
 
+### 4. 自定义高德地图 API Key（可选）
+
+为避免默认的 API Key 达到调用上限，建议您申请并使用自己的高德 API Key：
+1. 打开应用点击右上角“设置”按钮，在“AMap 配置”一栏中点击**复制应用 SHA1 签名**。
+2. 前往 [高德开放平台控制台](https://console.amap.com/dev/key/app)，创建一个新应用，并添加 **Android 平台** 的 Key。
+3. 填写包名（默认为 `com.suseoaa.locationspoofer.fork`），并粘贴刚才复制的 **SHA1 签名**。
+4. 生成 Key 后，将其复制并填入应用的“自定义高德地图 API Key”输入框中，点击最下方的“确定”保存。
+5. **完全退出并重启应用**，新的 API Key 即可生效。
+
 ---
 
 ## 🛠️ 技术栈
@@ -134,6 +143,12 @@ git clone https://github.com/your-username/LocationSpoofer.git
 ## 📜 开源许可
 
 本项目采用 [GNU General Public License v3.0](LICENSE) 开源许可证。
+
+---
+
+## 🎁 鸣谢
+
+- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): 上游
 
 ```
 Copyright (C) 2026 SuseOAA

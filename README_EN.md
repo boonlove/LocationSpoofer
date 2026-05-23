@@ -110,6 +110,15 @@ git clone https://github.com/your-username/LocationSpoofer.git
   2. Choose "Manual (Joystick)" or "Auto Loop".
   3. Click "Start Simulation".
 
+### 4. Custom AMap API Key (Optional)
+
+To avoid reaching the default API key's quota limits, it is recommended to apply for and use your own AMap API Key:
+1. Open the app, click the "Settings" button in the top right corner, and click the copy icon under "AMap Configuration" to copy the **App SHA1 Signature**.
+2. Go to the [AMap Open Platform Console](https://console.amap.com/dev/key/app), create a new application, and add an **Android Platform** Key.
+3. Enter the package name (default is `com.suseoaa.locationspoofer.fork`) and paste the **SHA1 Signature** you just copied.
+4. After generating the Key, copy and paste it into the "Custom AMap API Key" input box in the app's settings, then click "Confirm" at the bottom to save.
+5. **Force close and restart the app** for the new API Key to take effect.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -133,6 +142,12 @@ Users should comply with local laws and regulations. The author is not responsib
 ## 📜 License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
+
+---
+
+## 🎁 Credit
+
+- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): upstream
 
 ```
 Copyright (C) 2026 SuseOAA
