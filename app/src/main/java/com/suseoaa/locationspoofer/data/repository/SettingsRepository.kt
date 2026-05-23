@@ -29,4 +29,10 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     fun setLanguage(value: String) {
         settingsManager.language = value
     }
+
+    fun getAmapApiKey(): String = settingsManager.amapApiKey
+
+    fun setAmapApiKey(value: String) {
+        settingsManager.amapApiKey = value
+    }
 }

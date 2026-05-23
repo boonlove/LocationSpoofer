@@ -65,7 +65,9 @@ class MainViewModel(
                     hasRootAccess = root,
                     isLSPosedActive = lsposed,
                     isSpoofingActive = false,
-                    routePlanStage = RoutePlanStage.IDLE
+                    routePlanStage = RoutePlanStage.IDLE,
+                    amapApiKey = settingsRepository.getAmapApiKey(),
+                    appSha1 = getAppSignatureSHA1()
                 )
             }
             fetchCurrentLocation(context)
@@ -506,5 +508,36 @@ class MainViewModel(
         val y = kotlin.math.cos(lat1) * kotlin.math.sin(lat2) -
             kotlin.math.sin(lat1) * kotlin.math.cos(lat2) * kotlin.math.cos(dLng)
         return (Math.toDegrees(kotlin.math.atan2(x, y)) + 360) % 360
+    }
+
+    fun setAmapApiKey(key: String) {
+        settingsRepository.setAmapApiKey(key)
+        _uiState.update { it.copy(amapApiKey = key) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getAppSignatureSHA1(): String {
+        try {
+            val info = context.packageManager.getPackageInfo(
+                context.packageName,
+                android.content.pm.PackageManager.GET_SIGNATURES
+            )
+            val signatures = info.signatures ?: return "Unknown"
+            if (signatures.isEmpty()) return "Unknown"
+            val cert = signatures[0].toByteArray()
+            val md = java.security.MessageDigest.getInstance("SHA1")
+            val publicKey = md.digest(cert)
+            val hexString = StringBuilder()
+            for (b in publicKey) {
+                val appendString = Integer.toHexString(0xFF and b.toInt())
+                if (appendString.length == 1) hexString.append("0")
+                hexString.append(appendString)
+                hexString.append(":")
+            }
+            return hexString.toString().dropLast(1).uppercase()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return "Unknown"
     }
 }

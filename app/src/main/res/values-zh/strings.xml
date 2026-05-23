@@ -71,4 +71,11 @@
     <string name="app_meituan">美团</string>
     <string name="app_dingtalk">钉钉</string>
     <string name="app_google">Google 服务</string>
+    <string name="amap_config">高德地图配置</string>
+    <string name="app_sha1">应用 SHA1 签名</string>
+    <string name="custom_amap_key">自定义高德地图 API Key</string>
+    <string name="custom_amap_key_hint">留空以使用默认 Key</string>
+    <string name="copy">复制</string>
+    <string name="copied_to_clipboard">已复制到剪贴板</string>
+    <string name="restart_required_hint">修改 API Key 后需重启应用才能完全生效。</string>
 </resources>

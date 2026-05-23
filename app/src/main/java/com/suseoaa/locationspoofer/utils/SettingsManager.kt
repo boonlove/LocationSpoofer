@@ -23,6 +23,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean("is_language_set", false)
         set(value) = prefs.edit().putBoolean("is_language_set", value).apply()
 
+    var amapApiKey: String
+        get() = prefs.getString("amap_api_key", "") ?: ""
+        set(value) = prefs.edit().putString("amap_api_key", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()
