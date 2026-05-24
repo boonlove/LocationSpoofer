@@ -15,19 +15,19 @@ class LocationApp : Application() {
         super.onCreate()
 
         val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
-        val customApiKey = prefs.getString("amap_api_key", "")
-        if (!customApiKey.isNullOrEmpty()) {
-            MapsInitializer.setApiKey(customApiKey)
-            AMapLocationClient.setApiKey(customApiKey)
-            ServiceSettings.getInstance().setApiKey(customApiKey)
-        }
-
         MapsInitializer.updatePrivacyShow(this, true, true)
         MapsInitializer.updatePrivacyAgree(this, true)
         ServiceSettings.updatePrivacyShow(this, true, true)
         ServiceSettings.updatePrivacyAgree(this, true)
         AMapLocationClient.updatePrivacyShow(this, true, true)
         AMapLocationClient.updatePrivacyAgree(this, true)
+
+        val customApiKey = prefs.getString("amap_api_key", "")
+        if (!customApiKey.isNullOrEmpty()) {
+            MapsInitializer.setApiKey(customApiKey)
+            AMapLocationClient.setApiKey(customApiKey)
+            ServiceSettings.getInstance().setApiKey(customApiKey)
+        }
 
         if (!Places.isInitialized()) {
             Places.initialize(this, BuildConfig.GOOGLE_MAPS_API_KEY)

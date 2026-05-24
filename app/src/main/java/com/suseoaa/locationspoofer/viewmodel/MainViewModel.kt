@@ -90,54 +90,110 @@ class MainViewModel(
     }
 
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
-        val isDomestic = isDomesticEnvironment()
-        if (isDomestic) {
-            val client = try {
-                AMapLocationClient(ctx.applicationContext)
-            } catch (e: Exception) {
-                return
-            }
-            client.setLocationOption(AMapLocationClientOption().apply {
-                locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                isOnceLocation = true
-            })
-            client.setLocationListener { loc ->
-                if (loc != null && loc.errorCode == 0) {
-                    if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
-                        _uiState.update {
-                            it.copy(
-                                latitudeInput = String.format("%.6f", loc.latitude),
-                                longitudeInput = String.format("%.6f", loc.longitude),
-                                showCoordinateError = false
-                            )
-                        }
-                        forceCallback?.invoke(loc.latitude, loc.longitude)
-                    }
+        viewModelScope.launch(Dispatchers.Main) {
+            val isDomestic = isDomesticEnvironment()
+            if (isDomestic) {
+                val client = try {
+                    AMapLocationClient(ctx.applicationContext)
+                } catch (e: Exception) {
+                    return@launch
                 }
-                client.stopLocation()
-                client.onDestroy()
-            }
-            client.startLocation()
-        } else {
-            try {
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(ctx)
-                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                    if (location != null) {
+                client.setLocationOption(AMapLocationClientOption().apply {
+                    locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                    isOnceLocation = true
+                    isNeedAddress = false // 禁用逆地理编码，防止因未开通Web服务导致 SERVICE_NOT_EXIST 鉴权错误
+                })
+                client.setLocationListener { loc ->
+                    if (loc != null && loc.errorCode == 0) {
                         if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
                             _uiState.update {
                                 it.copy(
-                                    latitudeInput = String.format("%.6f", location.latitude),
-                                    longitudeInput = String.format("%.6f", location.longitude),
+                                    latitudeInput = String.format("%.6f", loc.latitude),
+                                    longitudeInput = String.format("%.6f", loc.longitude),
                                     showCoordinateError = false
                                 )
                             }
-                            forceCallback?.invoke(location.latitude, location.longitude)
+                            forceCallback?.invoke(loc.latitude, loc.longitude)
                         }
+                    } else {
+                        // 如果鉴权失败(如 SERVICE_NOT_EXIST)或其他错误，回退到原生定位
+                        fallbackToNativeLocation(ctx, forceCallback, true)
                     }
+                    client.stopLocation()
+                    client.onDestroy()
                 }
-            } catch (e: SecurityException) {
-                // Ignore missing permissions
+                client.startLocation()
+            } else {
+                // 海外直接使用原生定位(WGS84)
+                fallbackToNativeLocation(ctx, forceCallback, false)
             }
+        }
+    }
+
+    private fun fallbackToNativeLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)?, convertToGcj: Boolean) {
+        try {
+            if (forceCallback != null) {
+                android.widget.Toast.makeText(ctx, "高德定位受限，正在尝试原生GPS/基站定位...", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+            val provider = if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                android.location.LocationManager.NETWORK_PROVIDER
+            } else {
+                android.location.LocationManager.GPS_PROVIDER
+            }
+
+            val lastLoc = locationManager.getLastKnownLocation(provider)
+            if (lastLoc != null) {
+                applyNativeLocation(ctx, lastLoc, forceCallback, convertToGcj)
+            } else if (forceCallback != null) {
+                android.widget.Toast.makeText(ctx, "系统未缓存位置，正在等待GPS信号(室内可能极慢或无信号)", android.widget.Toast.LENGTH_LONG).show()
+            }
+
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(location: android.location.Location) {
+                    if (forceCallback != null) {
+                        android.widget.Toast.makeText(ctx, "原生定位成功！", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                    applyNativeLocation(ctx, location, forceCallback, convertToGcj)
+                    locationManager.removeUpdates(this)
+                }
+                override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }
+            locationManager.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
+        } catch (e: SecurityException) {
+            if (forceCallback != null) {
+                android.widget.Toast.makeText(ctx, "未授予精准定位权限，无法获取位置", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun applyNativeLocation(ctx: Context, location: android.location.Location, forceCallback: ((Double, Double) -> Unit)?, convertToGcj: Boolean) {
+        var finalLat = location.latitude
+        var finalLng = location.longitude
+        
+        if (convertToGcj) {
+            val converter = com.amap.api.maps.CoordinateConverter(ctx).apply {
+                from(com.amap.api.maps.CoordinateConverter.CoordType.GPS)
+                coord(com.amap.api.maps.model.LatLng(location.latitude, location.longitude))
+            }
+            val gcj = converter.convert()
+            finalLat = gcj.latitude
+            finalLng = gcj.longitude
+        }
+
+        if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
+            _uiState.update {
+                it.copy(
+                    latitudeInput = String.format("%.6f", finalLat),
+                    longitudeInput = String.format("%.6f", finalLng),
+                    showCoordinateError = false
+                )
+            }
+            forceCallback?.invoke(finalLat, finalLng)
         }
     }
 
