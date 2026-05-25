@@ -35,4 +35,8 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     fun setAmapApiKey(value: String) {
         settingsManager.amapApiKey = value
     }
+
+    fun getAppCoordinateSystems(): Map<String, String> = settingsManager.getAppCoordinateSystems()
+
+    fun setAppCoordinateSystems(map: Map<String, String>) = settingsManager.setAppCoordinateSystems(map)
 }

@@ -17,7 +17,8 @@ class ConfigManager(private val rootManager: RootManager) {
         startTimestamp: Long = System.currentTimeMillis(),
         routePoints: List<RoutePoint> = emptyList(),
         isRouteMode: Boolean = false,
-        wifiJson: String = "[]"
+        wifiJson: String = "[]",
+        appCoordinateSystems: Map<String, String> = emptyMap()
     ) = withContext(Dispatchers.IO) {
         val routeArray = JSONArray()
         routePoints.forEach { p ->
@@ -37,6 +38,10 @@ class ConfigManager(private val rootManager: RootManager) {
             put("route_points", routeArray)
             put("is_route_mode", isRouteMode)
             put("wifi_json", JSONArray(wifiJson))
+            
+            val coordSysObj = JSONObject()
+            appCoordinateSystems.forEach { (pkg, sys) -> coordSysObj.put(pkg, sys) }
+            put("app_coordinate_systems", coordSysObj)
         }
 
         // 使用heredoc写入,避免JSON中的特殊字符(单引号等)被shell误解析

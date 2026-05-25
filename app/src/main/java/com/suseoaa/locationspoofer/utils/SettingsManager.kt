@@ -115,4 +115,24 @@ class SettingsManager(context: Context) {
         }
         prefs.edit().putString("saved_routes", jsonArray.toString()).apply()
     }
+
+    fun getAppCoordinateSystems(): Map<String, String> {
+        val jsonString = prefs.getString("app_coordinate_systems", "{}") ?: "{}"
+        val map = mutableMapOf<String, String>()
+        try {
+            val jsonObj = JSONObject(jsonString)
+            for (key in jsonObj.keys()) {
+                map[key] = jsonObj.getString(key)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return map
+    }
+
+    fun setAppCoordinateSystems(map: Map<String, String>) {
+        val jsonObj = JSONObject()
+        map.forEach { (k, v) -> jsonObj.put(k, v) }
+        prefs.edit().putString("app_coordinate_systems", jsonObj.toString()).apply()
+    }
 }

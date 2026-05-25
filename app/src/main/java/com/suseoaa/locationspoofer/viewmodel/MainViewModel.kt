@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 class MainViewModel(
     private val locationRepository: LocationRepository,
     private val settingsRepository: SettingsRepository,
+    private val lsposedManager: com.suseoaa.locationspoofer.utils.LSPosedManager,
     private val context: Context
 ) : ViewModel() {
 
@@ -36,7 +37,8 @@ class MainViewModel(
         AppState(
             savedLocations = settingsRepository.getSavedLocations(),
             currentLanguage = settingsRepository.getLanguage(),
-            isLanguageSet = settingsRepository.isLanguageSet()
+            isLanguageSet = settingsRepository.isLanguageSet(),
+            appCoordinateSystems = settingsRepository.getAppCoordinateSystems()
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -73,7 +75,12 @@ class MainViewModel(
 
         viewModelScope.launch {
             com.suseoaa.locationspoofer.LocationApp.isModuleActive.collect { active ->
-                _uiState.update { it.copy(isLSPosedActive = active) }
+                _uiState.update { 
+                    it.copy(
+                        isLSPosedActive = active,
+                        hookedApps = if (active) lsposedManager.getHookedApps(context) else emptyList()
+                    )
+                }
             }
         }
     }
@@ -231,7 +238,8 @@ class MainViewModel(
             locationRepository.startSpoofing(
                 context, lat, lng,
                 "STILL", 0f, now,
-                emptyList(), false
+                emptyList(), false,
+                state.appCoordinateSystems
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -400,7 +408,7 @@ class MainViewModel(
             locationRepository.startSpoofing(
                 context, startPoint.lat, startPoint.lng,
                 if (isLoop) state.routeSimMode.name else "STILL",
-                0f, now, routePoints, isLoop
+                0f, now, routePoints, isLoop, state.appCoordinateSystems
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -599,5 +607,62 @@ class MainViewModel(
             e.printStackTrace()
         }
         return "Unknown"
+    }
+
+    fun setAppCoordinateSystem(pkg: String, sys: String) {
+        val currentMap = _uiState.value.appCoordinateSystems.toMutableMap()
+        currentMap[pkg] = sys
+        settingsRepository.setAppCoordinateSystems(currentMap)
+        _uiState.update { it.copy(appCoordinateSystems = currentMap) }
+        
+        // If spoofing is active, update config
+        if (_uiState.value.isSpoofingActive) {
+            viewModelScope.launch {
+                locationRepository.updateConfig(
+                    SpooferProvider.latitude,
+                    SpooferProvider.longitude,
+                    SpooferProvider.simMode,
+                    SpooferProvider.simBearing,
+                    SpooferProvider.startTimestamp,
+                    if (SpooferProvider.isRouteMode) parseRoutePoints(SpooferProvider.routeJson) else emptyList(),
+                    SpooferProvider.isRouteMode,
+                    currentMap
+                )
+            }
+        }
+    }
+
+    fun removeAppCoordinateSystem(pkg: String) {
+        val currentMap = _uiState.value.appCoordinateSystems.toMutableMap()
+        currentMap.remove(pkg)
+        settingsRepository.setAppCoordinateSystems(currentMap)
+        _uiState.update { it.copy(appCoordinateSystems = currentMap) }
+
+        if (_uiState.value.isSpoofingActive) {
+            viewModelScope.launch {
+                locationRepository.updateConfig(
+                    SpooferProvider.latitude,
+                    SpooferProvider.longitude,
+                    SpooferProvider.simMode,
+                    SpooferProvider.simBearing,
+                    SpooferProvider.startTimestamp,
+                    if (SpooferProvider.isRouteMode) parseRoutePoints(SpooferProvider.routeJson) else emptyList(),
+                    SpooferProvider.isRouteMode,
+                    currentMap
+                )
+            }
+        }
+    }
+    
+    private fun parseRoutePoints(json: String): List<RoutePoint> {
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                RoutePoint(obj.getDouble("lat"), obj.getDouble("lng"))
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 }

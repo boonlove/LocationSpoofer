@@ -60,5 +60,13 @@ data class AppState(
     /** 首页地图已确认的选点（点击地图后出现确认按钮，确认后填充坐标） */
     val mapConfirmedPoint: Pair<Double, Double>? = null,
     val amapApiKey: String = "",
-    val appSha1: String = ""
+    val appSha1: String = "",
+    val appCoordinateSystems: Map<String, String> = emptyMap(),
+    val hookedApps: List<AppInfoItem> = emptyList()
+)
+
+data class AppInfoItem(
+    val packageName: String,
+    val appName: String,
+    val isSystem: Boolean
 )

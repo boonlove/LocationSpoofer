@@ -28,7 +28,8 @@ class LocationRepository(
         simBearing: Float,
         startTime: Long,
         routePoints: List<RoutePoint>,
-        isRouteMode: Boolean
+        isRouteMode: Boolean,
+        appCoordinateSystems: Map<String, String>
     ) {
         SpooferProvider.isActive = true
         SpooferProvider.latitude = lat
@@ -40,7 +41,7 @@ class LocationRepository(
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -71,7 +72,8 @@ class LocationRepository(
         simBearing: Float,
         startTime: Long,
         routePoints: List<RoutePoint>,
-        isRouteMode: Boolean
+        isRouteMode: Boolean,
+        appCoordinateSystems: Map<String, String>
     ) {
         SpooferProvider.latitude = lat
         SpooferProvider.longitude = lng
@@ -80,10 +82,10 @@ class LocationRepository(
         SpooferProvider.simBearing = simBearing
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems)
     }
 
-    suspend fun updateWifiJson(wifiJson: String) {
+    suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {
         SpooferProvider.wifiJson = wifiJson
         // 同步写入配置文件,确保Xposed端能读取到WiFi数据
         configManager.saveConfig(
@@ -92,8 +94,9 @@ class LocationRepository(
             SpooferProvider.isActive,
             SpooferProvider.simMode,
             SpooferProvider.simBearing,
-            SpooferProvider.startTimestamp,
-            wifiJson = wifiJson
+            startTimestamp = SpooferProvider.startTimestamp,
+            wifiJson = wifiJson,
+            appCoordinateSystems = appCoordinateSystems
         )
     }
 

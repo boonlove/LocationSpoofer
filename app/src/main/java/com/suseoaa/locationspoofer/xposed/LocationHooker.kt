@@ -237,7 +237,10 @@ class LocationHooker : XposedModule() {
         val SYSTEM_PACKAGES = setOf("android", "system", "com.android.phone")
     }
 
+    private var currentPackageName: String = ""
+
     fun handleLoadPackage(pkg: String, classLoader: ClassLoader) {
+        currentPackageName = pkg
         
 
         // 宿主App自报平安
@@ -508,9 +511,19 @@ class LocationHooker : XposedModule() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        val gcjLat = config.optDouble("lat", param.result as Double)
-                        val gcjLng = config.optDouble("lng", 0.0)
-                        param.result = getJitteredLocation(gcjLat, gcjLng).first
+                        val appSystems = config.optJSONObject("app_coordinate_systems")
+                        val targetSys = appSystems?.optString(currentPackageName) ?: "GCJ-02"
+                        val baseLat = when (targetSys) {
+                            "WGS-84" -> config.optDouble("wgs84_lat", param.result as Double)
+                            "BD-09" -> config.optDouble("bd09_lat", param.result as Double)
+                            else -> config.optDouble("lat", param.result as Double)
+                        }
+                        val baseLng = when (targetSys) {
+                            "WGS-84" -> config.optDouble("wgs84_lng", 0.0)
+                            "BD-09" -> config.optDouble("bd09_lng", 0.0)
+                            else -> config.optDouble("lng", 0.0)
+                        }
+                        param.result = getJitteredLocation(baseLat, baseLng).first
                     }
                 }
             }
@@ -519,9 +532,19 @@ class LocationHooker : XposedModule() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        val gcjLat = config.optDouble("lat", 0.0)
-                        val gcjLng = config.optDouble("lng", param.result as Double)
-                        param.result = getJitteredLocation(gcjLat, gcjLng).second
+                        val appSystems = config.optJSONObject("app_coordinate_systems")
+                        val targetSys = appSystems?.optString(currentPackageName) ?: "GCJ-02"
+                        val baseLat = when (targetSys) {
+                            "WGS-84" -> config.optDouble("wgs84_lat", 0.0)
+                            "BD-09" -> config.optDouble("bd09_lat", 0.0)
+                            else -> config.optDouble("lat", 0.0)
+                        }
+                        val baseLng = when (targetSys) {
+                            "WGS-84" -> config.optDouble("wgs84_lng", param.result as Double)
+                            "BD-09" -> config.optDouble("bd09_lng", param.result as Double)
+                            else -> config.optDouble("lng", param.result as Double)
+                        }
+                        param.result = getJitteredLocation(baseLat, baseLng).second
                     }
                 }
             }

@@ -95,6 +95,7 @@ fun SpoofingScreen(
     var showSavedLocations by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -338,6 +339,35 @@ fun SpoofingScreen(
                 updateViewModel.fetchReleases()
                 showUpdateDialog = true 
             })
+            Spacer(Modifier.height(16.dp))
+
+            SectionHeader(Icons.Rounded.Extension, "自定义坐标算法", isDark)
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.clickable { showAppCoordinateScreen = true }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(AccentBlue.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Extension, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("配置应用坐标系", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("解决固定偏移，为独立软件定制底层坐标系", color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                    }
+                    Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+                }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -483,6 +513,19 @@ fun SpoofingScreen(
                     }
                 }
             }
+        }
+    }
+    
+    if (showAppCoordinateScreen) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showAppCoordinateScreen = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            AppCoordinateScreen(
+                viewModel = viewModel,
+                uiState = uiState,
+                onBack = { showAppCoordinateScreen = false }
+            )
         }
     }
 }

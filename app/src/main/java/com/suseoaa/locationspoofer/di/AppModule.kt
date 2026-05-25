@@ -20,6 +20,6 @@ val appModule = module {
     single { LocationRepository(get(), get(), get()) }
     single { SettingsRepository(get()) }
 
-    viewModel { MainViewModel(get(), get(), androidContext()) }
+    viewModel { MainViewModel(get(), get(), get(), androidContext()) }
     viewModel { com.suseoaa.locationspoofer.viewmodel.UpdateViewModel(androidContext()) }
 }
