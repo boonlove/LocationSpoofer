@@ -88,12 +88,15 @@ fun SpoofingScreen(
     viewModel: MainViewModel,
     uiState: AppState,
     isDark: Boolean,
-    onExpandMap: () -> Unit
+    onExpandMap: () -> Unit,
+    updateViewModel: com.suseoaa.locationspoofer.viewmodel.UpdateViewModel = org.koin.androidx.compose.koinViewModel()
 ) {
     val scrollState = rememberScrollState()
     var showSavedLocations by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    val updateUiState by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val topBarBg = AppColors.surface(isDark)
     val isDomestic = viewModel.isDomesticEnvironment()
@@ -329,9 +332,12 @@ fun SpoofingScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            SectionHeader(Icons.Outlined.AppRegistration, stringResource(R.string.lsposed_scope), isDark)
+            SectionHeader(Icons.Outlined.SystemUpdateAlt, stringResource(R.string.check_updates), isDark)
             Spacer(Modifier.height(8.dp))
-            AppScopeCard(isDark)
+            UpdateCheckCard(isDark, onCheckClick = { 
+                updateViewModel.fetchReleases()
+                showUpdateDialog = true 
+            })
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -357,6 +363,16 @@ fun SpoofingScreen(
                 showSavedLocations = false
             },
             onDelete = { loc -> viewModel.removeSavedLocation(loc) }
+        )
+    }
+
+    if (showUpdateDialog) {
+        UpdateDialog(
+            uiState = updateUiState,
+            onDismiss = { showUpdateDialog = false },
+            onDownload = { url, version -> updateViewModel.startDownload(url, version) },
+            onCancel = { updateViewModel.cancelDownload() },
+            onInstall = { updateViewModel.installApk() }
         )
     }
 
@@ -645,44 +661,115 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
     }
 }
 
-// 应用作用域卡片
+// 检查更新卡片
 
 @Composable
-fun AppScopeCard(isDark: Boolean) {
+fun UpdateCheckCard(isDark: Boolean, onCheckClick: () -> Unit) {
     val textSecondary = AppColors.textSecondary(isDark)
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(0.dp)
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.clickable { onCheckClick() }
     ) {
-        Column {
-            RECOMMENDED_APPS.forEachIndexed { index, app ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
-                            .background(AccentBlue.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(app.icon, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                    .background(AccentBlue.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Rounded.SystemUpdateAlt, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.check_updates), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.check_updates_desc), color = textSecondary, fontSize = 11.sp)
+            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = textSecondary, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+// 检查更新弹窗
+@Composable
+fun UpdateDialog(
+    uiState: com.suseoaa.locationspoofer.viewmodel.UpdateUiState,
+    onDismiss: () -> Unit,
+    onDownload: (String, String) -> Unit,
+    onCancel: () -> Unit,
+    onInstall: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                Text(stringResource(R.string.update_dialog_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(Modifier.height(12.dp))
+
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else if (uiState.error != null) {
+                    Text(uiState.error, color = MaterialTheme.colorScheme.error)
+                } else if (uiState.releases.isEmpty()) {
+                    Text(stringResource(R.string.no_updates_available))
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        items(uiState.releases) { release ->
+                            val isCurrentVersion = release.versionName.contains(BuildConfig.VERSION_NAME) || 
+                                                   BuildConfig.VERSION_NAME.contains(release.versionName)
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(stringResource(R.string.version, release.versionName), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                    if (isCurrentVersion) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(AccentGreen.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(stringResource(R.string.current_version), fontSize = 10.sp, color = AccentGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(release.body, fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                Spacer(Modifier.height(8.dp))
+                                if (release.downloadUrl != null) {
+                                    if (uiState.activeDownloadId != null && uiState.activeDownloadUrl == release.downloadUrl) {
+                                        if (uiState.downloadStatus == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                                            Button(onClick = onInstall, colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)) { 
+                                                Text(stringResource(R.string.install)) 
+                                            }
+                                        } else {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(stringResource(R.string.downloading, uiState.downloadProgress), color = MaterialTheme.colorScheme.onBackground, fontSize = 12.sp)
+                                                    Spacer(Modifier.height(4.dp))
+                                                    LinearProgressIndicator(progress = uiState.downloadProgress / 100f, modifier = Modifier.fillMaxWidth(), color = AccentBlue)
+                                                }
+                                                Spacer(Modifier.width(12.dp))
+                                                IconButton(onClick = onCancel, modifier = Modifier.size(32.dp)) {
+                                                    Icon(Icons.Rounded.Cancel, stringResource(R.string.cancel), tint = MaterialTheme.colorScheme.error)
+                                                }
+                                            }
+                                        }
+                                    } else if (uiState.activeDownloadId == null) {
+                                        Button(onClick = { onDownload(release.downloadUrl, release.versionName) }, colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)) {
+                                            Text(stringResource(R.string.download))
+                                        }
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        }
                     }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(app.nameRes), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text(app.packageName, color = textSecondary, fontSize = 11.sp)
-                    }
-                    Icon(Icons.Outlined.ChevronRight, null, tint = textSecondary, modifier = Modifier.size(16.dp))
                 }
-                if (index < RECOMMENDED_APPS.lastIndex) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outline,
-                        thickness = 0.5.dp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.close)) }
             }
         }
     }
