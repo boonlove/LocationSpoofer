@@ -39,4 +39,16 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     fun getAppCoordinateSystems(): Map<String, String> = settingsManager.getAppCoordinateSystems()
 
     fun setAppCoordinateSystems(map: Map<String, String>) = settingsManager.setAppCoordinateSystems(map)
+
+    var isSpoofingActive: Boolean
+        get() = settingsManager.isSpoofingActive
+        set(value) { settingsManager.isSpoofingActive = value }
+
+    var lastSpoofedLat: String
+        get() = settingsManager.lastSpoofedLat
+        set(value) { settingsManager.lastSpoofedLat = value }
+
+    var lastSpoofedLng: String
+        get() = settingsManager.lastSpoofedLng
+        set(value) { settingsManager.lastSpoofedLng = value }
 }

@@ -27,6 +27,18 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("amap_api_key", "") ?: ""
         set(value) = prefs.edit().putString("amap_api_key", value).apply()
 
+    var isSpoofingActive: Boolean
+        get() = prefs.getBoolean("is_spoofing_active", false)
+        set(value) = prefs.edit().putBoolean("is_spoofing_active", value).apply()
+
+    var lastSpoofedLat: String
+        get() = prefs.getString("last_spoofed_lat", "0") ?: "0"
+        set(value) = prefs.edit().putString("last_spoofed_lat", value).apply()
+
+    var lastSpoofedLng: String
+        get() = prefs.getString("last_spoofed_lng", "0") ?: "0"
+        set(value) = prefs.edit().putString("last_spoofed_lng", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()

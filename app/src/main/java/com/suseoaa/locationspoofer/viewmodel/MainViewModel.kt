@@ -56,7 +56,18 @@ class MainViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val root = locationRepository.checkRootAccess()
 
-            if (SpoofingService.isRunning) {
+            if (settingsRepository.isSpoofingActive) {
+                val lastLat = settingsRepository.lastSpoofedLat.toDoubleOrNull() ?: 0.0
+                val lastLng = settingsRepository.lastSpoofedLng.toDoubleOrNull() ?: 0.0
+                if (lastLat != 0.0 && lastLng != 0.0) {
+                    locationRepository.startSpoofing(
+                        context, lastLat, lastLng,
+                        "STILL", 0f, System.currentTimeMillis(),
+                        emptyList(), false,
+                        settingsRepository.getAppCoordinateSystems()
+                    )
+                }
+            } else if (SpoofingService.isRunning) {
                 locationRepository.stopSpoofing(context)
             }
 
@@ -64,13 +75,17 @@ class MainViewModel(
                 it.copy(
                     isInitializing = false,
                     hasRootAccess = root,
-                    isSpoofingActive = false,
+                    isSpoofingActive = settingsRepository.isSpoofingActive,
+                    latitudeInput = if (settingsRepository.isSpoofingActive) settingsRepository.lastSpoofedLat else it.latitudeInput,
+                    longitudeInput = if (settingsRepository.isSpoofingActive) settingsRepository.lastSpoofedLng else it.longitudeInput,
                     routePlanStage = RoutePlanStage.IDLE,
                     amapApiKey = settingsRepository.getAmapApiKey(),
                     appSha1 = getAppSignatureSHA1()
                 )
             }
-            fetchCurrentLocation(context)
+            if (!settingsRepository.isSpoofingActive) {
+                fetchCurrentLocation(context)
+            }
         }
 
         viewModelScope.launch {
@@ -233,6 +248,11 @@ class MainViewModel(
             _uiState.update { it.copy(showCoordinateError = true) }
             return
         }
+        
+        settingsRepository.isSpoofingActive = true
+        settingsRepository.lastSpoofedLat = lat.toString()
+        settingsRepository.lastSpoofedLng = lng.toString()
+        
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             locationRepository.startSpoofing(
@@ -248,6 +268,7 @@ class MainViewModel(
     }
 
     fun stopSpoofing() {
+        settingsRepository.isSpoofingActive = false
         locationSyncJob?.cancel()
         locationSyncJob = null
         autoRouteJob?.cancel()

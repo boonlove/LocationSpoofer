@@ -219,28 +219,12 @@ class LocationHooker : XposedModule() {
 
 
     companion object {
-        // 需要注入的目标应用包名（含前缀匹配，覆盖所有子进程如 :appbrand0, :tools 等）
-        val TARGET_PACKAGES = setOf(
-            "com.tencent.mm",           // 微信（含所有 :appbrand 小程序子进程）
-            "com.chaoxing.mobile",      // 超星学习通
-            "cn.chaoxing.lemon",        // 学习通备用包名
-            "com.alibaba.android.rimet",// 钉钉
-            "com.sankuai.meituan",      // 美团
-            "com.baidu.BaiduMap",       // 百度地图
-            "com.autonavi.minimap",     // 高德地图
-            "com.tencent.map",          // 腾讯地图
-            "com.android.systemui",     // 系统UI（覆盖系统级定位弹窗）
-            "com.google.android.gms",   // Google Play 服务（覆盖 Fused Location Provider）
-        )
 
         // 系统进程同样需要覆盖（android进程持有LocationManagerService）
         val SYSTEM_PACKAGES = setOf("android", "system", "com.android.phone")
     }
 
-    private var currentPackageName: String = ""
-
     fun handleLoadPackage(pkg: String, classLoader: ClassLoader) {
-        currentPackageName = pkg
         
 
         // 宿主App自报平安
@@ -250,23 +234,17 @@ class LocationHooker : XposedModule() {
 
         // 系统进程：只Hook Location API，不动Wi-Fi（避免系统崩溃）
         if (SYSTEM_PACKAGES.contains(pkg)) {
-            hookLocationAPIs(classLoader)
+            hookLocationAPIs(classLoader, pkg)
             return
         }
 
-        // 精确包名匹配 + 子进程前缀匹配（如 com.tencent.mm:appbrand0）
-        val isTarget = TARGET_PACKAGES.any { target ->
-            pkg == target || pkg.startsWith("$target:")
-        }
-
-        if (!isTarget) return
 
         XposedBridge.log("[LocationSpoofer] Hooking package: $pkg")
 
         // ★ 反检测: 必须在其他Hook之前安装,隐藏Xposed环境
         hookAntiDetection(classLoader)
 
-        hookLocationAPIs(classLoader)
+        hookLocationAPIs(classLoader, pkg)
         hookNetworkAndCellAPIs(classLoader)
         hookBluetoothLE(classLoader)
         hookGnssStatus(classLoader)
@@ -494,7 +472,7 @@ class LocationHooker : XposedModule() {
     }
 
 
-    private fun hookLocationAPIs(classLoader: ClassLoader) {
+    private fun hookLocationAPIs(classLoader: ClassLoader, currentPkg: String) {
         try {
             // android.location.Location 标准接口: 返回GCJ-02坐标
             //
@@ -512,7 +490,8 @@ class LocationHooker : XposedModule() {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
-                        val targetSys = appSystems?.optString(currentPackageName) ?: "GCJ-02"
+                        val basePkg = currentPkg.substringBefore(":")
+                        val targetSys = appSystems?.optString(basePkg) ?: "GCJ-02"
                         val baseLat = when (targetSys) {
                             "WGS-84" -> config.optDouble("wgs84_lat", param.result as Double)
                             "BD-09" -> config.optDouble("bd09_lat", param.result as Double)
@@ -533,7 +512,8 @@ class LocationHooker : XposedModule() {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
-                        val targetSys = appSystems?.optString(currentPackageName) ?: "GCJ-02"
+                        val basePkg = currentPkg.substringBefore(":")
+                        val targetSys = appSystems?.optString(basePkg) ?: "GCJ-02"
                         val baseLat = when (targetSys) {
                             "WGS-84" -> config.optDouble("wgs84_lat", 0.0)
                             "BD-09" -> config.optDouble("bd09_lat", 0.0)
