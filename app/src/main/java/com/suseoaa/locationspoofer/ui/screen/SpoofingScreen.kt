@@ -97,6 +97,7 @@ fun SpoofingScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    var showCustomCoordDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val topBarBg = AppColors.surface(isDark)
@@ -312,7 +313,13 @@ fun SpoofingScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            CoordinateInputCard(viewModel, uiState, isDark) { showSaveDialog = true }
+            CoordinateInputCard(
+                viewModel = viewModel,
+                uiState = uiState,
+                isDark = isDark,
+                onSaveClick = { showSaveDialog = true },
+                onCustomClick = { showCustomCoordDialog = true }
+            )
             Spacer(Modifier.height(12.dp))
 
             ActionButtons(viewModel, uiState, onExpandMap)
@@ -528,6 +535,20 @@ fun SpoofingScreen(
             )
         }
     }
+
+    if (showCustomCoordDialog) {
+        CustomCoordinateDialog(
+            initialLat = uiState.latitudeInput,
+            initialLng = uiState.longitudeInput,
+            isDark = isDark,
+            onDismiss = { showCustomCoordDialog = false },
+            onConfirm = { lat, lng ->
+                viewModel.updateLatitude(lat)
+                viewModel.updateLongitude(lng)
+                showCustomCoordDialog = false
+            }
+        )
+    }
 }
 
 
@@ -579,7 +600,8 @@ fun CoordinateInputCard(
     viewModel: MainViewModel,
     uiState: AppState,
     isDark: Boolean,
-    onSaveClick: () -> Unit
+    onSaveClick: () -> Unit,
+    onCustomClick: () -> Unit
 ) {
     val textSecondary = AppColors.textSecondary(isDark)
 
@@ -592,44 +614,40 @@ fun CoordinateInputCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SectionHeader(Icons.Outlined.PinDrop, stringResource(R.string.target_coordinates), isDark)
                 Spacer(Modifier.weight(1f))
+                TextButton(onClick = onCustomClick) {
+                    Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("自定义")
+                }
                 TextButton(onClick = onSaveClick) {
                     Icon(Icons.Rounded.StarBorder, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(stringResource(R.string.save))
                 }
             }
-            Spacer(Modifier.height(4.dp))
-
-            OutlinedTextField(
-                value = uiState.longitudeInput,
-                onValueChange = { viewModel.updateLongitude(it) },
-                label = { Text(stringResource(R.string.longitude)) },
-                placeholder = { Text(stringResource(R.string.coordinate_hint), color = textSecondary) },
-                leadingIcon = { Icon(Icons.Outlined.East, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-                isError = uiState.showCoordinateError,
-                enabled = !uiState.isSpoofingActive,
-                singleLine = true,
-                colors = coordinateFieldColors()
-            )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = uiState.latitudeInput,
-                onValueChange = { viewModel.updateLatitude(it) },
-                label = { Text(stringResource(R.string.latitude)) },
-                placeholder = { Text(stringResource(R.string.coordinate_hint), color = textSecondary) },
-                leadingIcon = { Icon(Icons.Outlined.North, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.fillMaxWidth(),
-                isError = uiState.showCoordinateError,
-                enabled = !uiState.isSpoofingActive,
-                singleLine = true,
-                colors = coordinateFieldColors()
-            )
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "经度: ${uiState.longitudeInput.ifEmpty { "0.0" }}",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "纬度: ${uiState.latitudeInput.ifEmpty { "0.0" }}",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
 
             if (uiState.showCoordinateError) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
@@ -1087,4 +1105,64 @@ fun performPoiSearch(
             onResult(emptyList())
         }
     }
+}
+
+@Composable
+fun CustomCoordinateDialog(
+    initialLat: String,
+    initialLng: String,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var lat by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initialLat) }
+    var lng by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initialLng) }
+    val textSecondary = AppColors.textSecondary(isDark)
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+        title = {
+            androidx.compose.material3.Text("自定义坐标", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        },
+        text = {
+            Column {
+                androidx.compose.material3.Text("手动输入经纬度坐标，修改后地图位置也会同步更新。", color = textSecondary, fontSize = 14.sp)
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = lng,
+                    onValueChange = { lng = it },
+                    label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.longitude)) },
+                    placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
+                    leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.East, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = coordinateFieldColors()
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = lat,
+                    onValueChange = { lat = it },
+                    label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.latitude)) },
+                    placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
+                    leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.North, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = coordinateFieldColors()
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onConfirm(lat, lng) }) {
+                androidx.compose.material3.Text("确认", color = AccentBlue)
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                androidx.compose.material3.Text("取消", color = textSecondary)
+            }
+        }
+    )
 }
