@@ -1,10 +1,8 @@
 package com.suseoaa.locationspoofer.xposed
 
-import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
-import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam
+import io.github.libxposed.api.XposedInterface
+import io.github.libxposed.api.XposedModule
+import io.github.libxposed.api.XposedModuleInterface
 import org.json.JSONObject
 import java.io.File
 import java.util.Random
@@ -12,8 +10,213 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import java.lang.reflect.Member
 
-class LocationHooker : IXposedHookLoadPackage {
+// --- Legacy Compatibility Layer ---
+abstract class XC_MethodHook {
+    open fun beforeHookedMethod(param: MethodHookParam) {}
+    open fun afterHookedMethod(param: MethodHookParam) {}
+
+    class MethodHookParam {
+        var method: Member? = null
+        var thisObject: Any? = null
+        var args: Array<Any?> = emptyArray()
+        var returnEarly = false
+        var result: Any? = null
+            set(value) {
+                field = value
+                returnEarly = true
+            }
+        var throwable: Throwable? = null
+            set(value) {
+                field = value
+                returnEarly = true
+            }
+    }
+}
+
+object XposedHelpers {
+    lateinit var module: XposedModule
+
+    fun findClass(className: String, classLoader: ClassLoader?): Class<*> {
+        return Class.forName(className, false, classLoader ?: ClassLoader.getSystemClassLoader())
+    }
+
+    fun findClassIfExists(className: String, classLoader: ClassLoader?): Class<*>? {
+        return try { findClass(className, classLoader) } catch (e: Throwable) { null }
+    }
+
+    fun getObjectField(obj: Any, fieldName: String): Any? {
+        var clazz: Class<*>? = obj.javaClass
+        while (clazz != null) {
+            try {
+                val f = clazz.getDeclaredField(fieldName)
+                f.isAccessible = true
+                return f.get(obj)
+            } catch (e: NoSuchFieldException) {
+                clazz = clazz.superclass
+            }
+        }
+        throw NoSuchFieldException(fieldName)
+    }
+
+    fun setObjectField(obj: Any, fieldName: String, value: Any?) {
+        var clazz: Class<*>? = obj.javaClass
+        while (clazz != null) {
+            try {
+                val f = clazz.getDeclaredField(fieldName)
+                f.isAccessible = true
+                f.set(obj, value)
+                return
+            } catch (e: NoSuchFieldException) {
+                clazz = clazz.superclass
+            }
+        }
+        throw NoSuchFieldException(fieldName)
+    }
+
+    fun setIntField(obj: Any, fieldName: String, value: Int) { setObjectField(obj, fieldName, value) }
+    fun setDoubleField(obj: Any, fieldName: String, value: Double) { setObjectField(obj, fieldName, value) }
+    fun setBooleanField(obj: Any, fieldName: String, value: Boolean) { setObjectField(obj, fieldName, value) }
+    fun setLongField(obj: Any, fieldName: String, value: Long) { setObjectField(obj, fieldName, value) }
+
+    fun callMethod(obj: Any, methodName: String, vararg args: Any?): Any? {
+        val argTypes = args.map { it?.javaClass ?: Any::class.java }
+        var clazz: Class<*>? = obj.javaClass
+        while (clazz != null) {
+            for (m in clazz.declaredMethods) {
+                if (m.name == methodName && m.parameterCount == args.size) {
+                    m.isAccessible = true
+                    return m.invoke(obj, *args)
+                }
+            }
+            clazz = clazz.superclass
+        }
+        throw NoSuchMethodException(methodName)
+    }
+
+    fun findMethodExact(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): java.lang.reflect.Method {
+        var c: Class<*>? = clazz
+        while (c != null) {
+            try {
+                val m = c.getDeclaredMethod(methodName, *parameterTypes)
+                m.isAccessible = true
+                return m
+            } catch (e: NoSuchMethodException) {
+                c = c.superclass
+            }
+        }
+        throw NoSuchMethodException(methodName)
+    }
+
+    fun newInstance(clazz: Class<*>, vararg args: Any?): Any {
+        for (c in clazz.declaredConstructors) {
+            if (c.parameterCount == args.size) {
+                c.isAccessible = true
+                return c.newInstance(*args)
+            }
+        }
+        throw NoSuchMethodException("Constructor for " + clazz.name + " not found")
+    }
+
+    fun findAndHookMethod(className: String, classLoader: ClassLoader?, methodName: String, vararg args: Any?) {
+        try {
+            val clazz = findClass(className, classLoader)
+            findAndHookMethod(clazz, methodName, *args)
+        } catch (e: Throwable) {
+            // log
+        }
+    }
+
+    fun findAndHookMethod(clazz: Class<*>, methodName: String, vararg args: Any?) {
+        val hookIndex = args.indexOfLast { it is XC_MethodHook }
+        if (hookIndex == -1) return
+        val callback = args[hookIndex] as XC_MethodHook
+        val paramTypes = args.slice(0 until hookIndex).map {
+            when (it) {
+                is Class<*> -> it
+                is String -> findClass(it, clazz.classLoader)
+                else -> throw IllegalArgumentException("Invalid argument type")
+            }
+        }.toTypedArray()
+
+        val method = findMethodExact(clazz, methodName, *paramTypes)
+        hookMethod(method, callback)
+    }
+
+    fun hookMethod(executable: java.lang.reflect.Executable, callback: XC_MethodHook) {
+        module.hook(executable).intercept(object : io.github.libxposed.api.XposedInterface.Hooker {
+            override fun intercept(chain: io.github.libxposed.api.XposedInterface.Chain): Any? {
+                val param = XC_MethodHook.MethodHookParam().apply {
+                    this.method = executable
+                    this.thisObject = chain.thisObject
+                    this.args = chain.args.toTypedArray()
+                }
+
+                try {
+                    callback.beforeHookedMethod(param)
+                } catch (e: Throwable) {
+                    param.throwable = e
+                }
+
+                if (!param.returnEarly) {
+                    try {
+                        param.result = chain.proceed(param.args)
+                    } catch (e: Throwable) {
+                        param.throwable = e
+                    }
+                }
+
+                try {
+                    callback.afterHookedMethod(param)
+                } catch (e: Throwable) {
+                    param.throwable = e
+                }
+
+                if (param.throwable != null) throw param.throwable!!
+                return param.result
+            }
+        })
+    }
+}
+
+object XposedBridge {
+    fun log(msg: String) {
+        android.util.Log.i("LocationSpoofer_Xposed", msg)
+        try { XposedHelpers.module.log(android.util.Log.INFO, "LocationSpoofer", msg) } catch (e: Throwable) {}
+    }
+    fun log(t: Throwable) {
+        android.util.Log.e("LocationSpoofer_Xposed", "Error", t)
+        try { XposedHelpers.module.log(android.util.Log.ERROR, "LocationSpoofer", "Error", t) } catch (e: Throwable) {}
+    }
+    fun hookAllMethods(clazz: Class<*>, methodName: String, callback: XC_MethodHook) {
+        var hooked = false
+        for (m in clazz.declaredMethods) {
+            if (m.name == methodName) {
+                XposedHelpers.hookMethod(m, callback)
+                hooked = true
+            }
+        }
+    }
+}
+
+class LocationHooker : XposedModule() {
+    init {
+        XposedHelpers.module = this
+    }
+
+    override fun onPackageLoaded(param: XposedModuleInterface.PackageLoadedParam) {
+        // Nothing here for now
+    }
+
+    override fun onPackageReady(param: XposedModuleInterface.PackageReadyParam) {
+        val pkg = param.packageName
+        val classLoader = param.classLoader
+        handleLoadPackage(pkg, classLoader)
+    }
+    
+    // --- Original Logic ---
+
 
     companion object {
         // 需要注入的目标应用包名（含前缀匹配，覆盖所有子进程如 :appbrand0, :tools 等）
@@ -34,31 +237,17 @@ class LocationHooker : IXposedHookLoadPackage {
         val SYSTEM_PACKAGES = setOf("android", "system", "com.android.phone")
     }
 
-    override fun handleLoadPackage(lpparam: LoadPackageParam) {
-        val pkg = lpparam.packageName
+    fun handleLoadPackage(pkg: String, classLoader: ClassLoader) {
+        
 
         // 宿主App自报平安
         if (pkg == "com.suseoaa.locationspoofer.fork") {
-            try {
-                XposedHelpers.findAndHookMethod(
-                    "com.suseoaa.locationspoofer.utils.LSPosedManager",
-                    lpparam.classLoader,
-                    "isModuleActive",
-                    object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            param.result = true
-                        }
-                    }
-                )
-            } catch (e: Throwable) {
-                XposedBridge.log(e)
-            }
             return // 宿主App不需要注入定位Hook
         }
 
         // 系统进程：只Hook Location API，不动Wi-Fi（避免系统崩溃）
         if (SYSTEM_PACKAGES.contains(pkg)) {
-            hookLocationAPIs(lpparam.classLoader)
+            hookLocationAPIs(classLoader)
             return
         }
 
@@ -72,12 +261,12 @@ class LocationHooker : IXposedHookLoadPackage {
         XposedBridge.log("[LocationSpoofer] Hooking package: $pkg")
 
         // ★ 反检测: 必须在其他Hook之前安装,隐藏Xposed环境
-        hookAntiDetection(lpparam.classLoader)
+        hookAntiDetection(classLoader)
 
-        hookLocationAPIs(lpparam.classLoader)
-        hookNetworkAndCellAPIs(lpparam.classLoader)
-        hookBluetoothLE(lpparam.classLoader)
-        hookGnssStatus(lpparam.classLoader)
+        hookLocationAPIs(classLoader)
+        hookNetworkAndCellAPIs(classLoader)
+        hookBluetoothLE(classLoader)
+        hookGnssStatus(classLoader)
     }
 
     /**
@@ -100,6 +289,9 @@ class LocationHooker : IXposedHookLoadPackage {
             "de.robv.android.xposed.XC_MethodReplacement",
             "de.robv.android.xposed.XposedHelpers",
             "de.robv.android.xposed.XC_MethodHook\$MethodHookParam",
+            "io.github.libxposed.api.XposedModule",
+            "io.github.libxposed.api.XposedInterface",
+            "io.github.libxposed.api.XposedModuleInterface",
             "org.lsposed.manager.MainApplication",
             "io.github.lsposed.manager.App"
         )
@@ -522,7 +714,7 @@ class LocationHooker : IXposedHookLoadPackage {
                             val baseLat = config.optDouble("lat", 0.0)
                             val baseLng = config.optDouble("lng", 0.0)
                             val jittered = getJitteredLocation(baseLat, baseLng)
-                            when (param.method.name) {
+                            when (param.method!!.name) {
                                 "getLatitude" -> param.result = jittered.first
                                 "getLongitude" -> param.result = jittered.second
                             }
@@ -724,7 +916,7 @@ class LocationHooker : IXposedHookLoadPackage {
                     val baseLat = config.optDouble("lat", 0.0)
                     val baseLng = config.optDouble("lng", 0.0)
                     val jittered = getJitteredLocation(baseLat, baseLng)
-                    when (param.method.name) {
+                    when (param.method!!.name) {
                         "getLatitude" -> param.result = jittered.first
                         "getLongitude" -> param.result = jittered.second
                     }
@@ -863,7 +1055,7 @@ class LocationHooker : IXposedHookLoadPackage {
                 if (config != null && config.optBoolean("active", false)) {
                     // 动态获取当前BDLocation期望的坐标系(App可通过LocationClientOption.setCoorType设置)
                     val coorType = try {
-                        XposedHelpers.callMethod(param.thisObject, "getCoorType") as? String
+                        XposedHelpers.callMethod(param.thisObject!!, "getCoorType") as? String
                     } catch (e: Throwable) { null }
 
                     val targetLat: Double
@@ -885,7 +1077,7 @@ class LocationHooker : IXposedHookLoadPackage {
                     }
 
                     val jittered = getJitteredLocation(targetLat, targetLng)
-                    when (param.method.name) {
+                    when (param.method!!.name) {
                         "getLatitude" -> param.result = jittered.first
                         "getLongitude" -> param.result = jittered.second
                     }
@@ -1017,7 +1209,7 @@ class LocationHooker : IXposedHookLoadPackage {
                     val wifiArray = config.optJSONArray("wifi_json")
                     val firstWifi =
                         if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
-                    when (param.method.name) {
+                    when (param.method!!.name) {
                         "getBSSID", "getMacAddress" -> param.result =
                             firstWifi?.optString("bssid") ?: "ac:22:0b:f4:11:33"
 
@@ -1247,7 +1439,7 @@ class LocationHooker : IXposedHookLoadPackage {
                     val lat = config.optDouble("lat", 0.0)
                     val lng = config.optDouble("lng", 0.0)
 
-                    when (param.method.name) {
+                    when (param.method!!.name) {
                         "getCellLocation" -> {
                             try {
                                 val gsmCellLocationClass = XposedHelpers.findClass(
@@ -1634,7 +1826,7 @@ class LocationHooker : IXposedHookLoadPackage {
      * 设计决策 -- 为何彻底废弃ContentProvider:
      *
      * 1. Android11+(API30)的包可见性(PackageVisibility)机制:
-     *    目标App进程通过contentResolver.query()访问com.suseoaa.locationspoofer.provider时,
+     *    目标App进程通过contentResolver.query()访问com.suseoaa.locationspoofer.fork.provider时,
      *    如果目标App的AndroidManifest.xml未声明<queries>对本App的可见性,
      *    系统会返回null并在ActivityThread中打印"Failed to find provider info"错误,
      *    此错误无法被try-catch捕获(发生在系统框架层),导致Logcat被疯狂刷屏。
@@ -1695,4 +1887,5 @@ class LocationHooker : IXposedHookLoadPackage {
             null
         }
     }
+
 }

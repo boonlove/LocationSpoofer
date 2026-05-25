@@ -6,7 +6,8 @@ lifecycleRuntimeKtx = "2.7.0"
 activityCompose = "1.9.0"
 composeBom = "2024.05.00"
 koin = "3.5.3"
-xposed = "82"
+libxposed = "101.0.1"
+libxposedService = "101.0.0"
 amap = "10.0.600"
 amapLocation = "6.4.9"
 amapSearch = "9.7.0"
@@ -20,7 +21,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 amap-map = { module = "com.amap.api:3dmap", version.ref = "amap" }
 amap-location = { module = "com.amap.api:location", version.ref = "amapLocation" }
 amap-search = { module = "com.amap.api:search", version.ref = "amapSearch" }
-xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposed" }
+xposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
+xposed-service = { group = "io.github.libxposed", name = "service", version.ref = "libxposedService" }
 google-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "googleMaps" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 google-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "places" }

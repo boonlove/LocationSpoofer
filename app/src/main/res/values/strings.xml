@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">LocationSpoofer</string>
+    <string name="app_description">Location Spoofer Module</string>
     <string name="current_location">Current Location</string>
     <string name="search_location_hint">Search location</string>
     <string name="locate_to_current">Locate to current position</string>

@@ -9,10 +9,26 @@ import com.suseoaa.locationspoofer.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
+import io.github.libxposed.service.XposedService
+import io.github.libxposed.service.XposedServiceHelper
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
-class LocationApp : Application() {
+class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
+    companion object {
+        private val _isModuleActive = MutableStateFlow(false)
+        val isModuleActive: StateFlow<Boolean> = _isModuleActive
+        var mService: XposedService? = null
+    }
+
     override fun onCreate() {
         super.onCreate()
+
+        try {
+            XposedServiceHelper.registerListener(this)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
 
         val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
         MapsInitializer.updatePrivacyShow(this, true, true)
@@ -38,5 +54,15 @@ class LocationApp : Application() {
             androidContext(this@LocationApp)
             modules(appModule)
         }
+    }
+
+    override fun onServiceBind(service: XposedService) {
+        mService = service
+        _isModuleActive.value = true
+    }
+
+    override fun onServiceDied(service: XposedService) {
+        mService = null
+        _isModuleActive.value = false
     }
 }

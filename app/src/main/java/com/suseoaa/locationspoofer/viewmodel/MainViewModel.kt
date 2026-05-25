@@ -53,7 +53,6 @@ class MainViewModel(
     private fun initialize() {
         viewModelScope.launch(Dispatchers.IO) {
             val root = locationRepository.checkRootAccess()
-            val lsposed = locationRepository.isModuleActive()
 
             if (SpoofingService.isRunning) {
                 locationRepository.stopSpoofing(context)
@@ -63,7 +62,6 @@ class MainViewModel(
                 it.copy(
                     isInitializing = false,
                     hasRootAccess = root,
-                    isLSPosedActive = lsposed,
                     isSpoofingActive = false,
                     routePlanStage = RoutePlanStage.IDLE,
                     amapApiKey = settingsRepository.getAmapApiKey(),
@@ -71,6 +69,12 @@ class MainViewModel(
                 )
             }
             fetchCurrentLocation(context)
+        }
+
+        viewModelScope.launch {
+            com.suseoaa.locationspoofer.LocationApp.isModuleActive.collect { active ->
+                _uiState.update { it.copy(isLSPosedActive = active) }
+            }
         }
     }
 

@@ -24,6 +24,7 @@
         android:roundIcon="@android:drawable/ic_menu_mylocation"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
+        android:description="@string/app_description"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         
         <meta-data
@@ -53,19 +54,6 @@
             android:name=".service.FloatingJoystickService"
             android:enabled="true"
             android:exported="false" />
-
-        <meta-data
-            android:name="xposedmodule"
-            android:value="true" />
-        <meta-data
-            android:name="xposeddescription"
-            android:value="Location Spoofer Module" />
-        <meta-data
-            android:name="xposedminversion"
-            android:value="93" />
-        <meta-data
-            android:name="xposedscope"
-            android:resource="@array/xposed_scope" />
 
         <provider
             android:name=".provider.SpooferProvider"

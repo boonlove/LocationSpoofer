@@ -106,6 +106,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
     buildFeatures {
         compose = true
@@ -129,6 +130,7 @@ base {
 
 dependencies {
     compileOnly(libs.xposed.api)
+    implementation(libs.xposed.service)
     implementation(libs.koin.androidx.compose)
     implementation(libs.amap.map)
     implementation(libs.amap.search)
