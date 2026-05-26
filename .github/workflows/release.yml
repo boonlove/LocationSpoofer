@@ -94,5 +94,5 @@ jobs:
           name: ${{ github.ref_name }}
           body_path: changelog.txt
           files: app/release/*.apk
-          generate_release_notes: true
+          generate_release_notes: false
           prerelease: false
