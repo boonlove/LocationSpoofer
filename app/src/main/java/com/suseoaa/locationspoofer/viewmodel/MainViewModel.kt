@@ -717,8 +717,9 @@ class MainViewModel(
             lastDbQueryLat = lat
             lastDbQueryLng = lng
             viewModelScope.launch(Dispatchers.IO) {
-                val record = environmentDao.getNearestLocation(lat, lng)
-                if (record != null) {
+                val records = environmentDao.getNearestLocations(lat, lng, 3)
+                if (records.isNotEmpty()) {
+                    val record = records[0]
                     // Check if the closest record is actually within ~50 meters
                     val rLat = Math.toRadians(record.location.lat - lat)
                     val rLng = Math.toRadians(record.location.lng - lng)
@@ -726,7 +727,7 @@ class MainViewModel(
                     val rDist = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(rA), kotlin.math.sqrt(1 - rA))
                     
                     if (rDist <= 50.0) {
-                        val jsons = locationToJson(record)
+                        val jsons = locationToJson(records, lat, lng)
                         SpooferProvider.cellJson = jsons.second
                         // Save config file with new cell_json and wifi_json and bluetoothJson
                         locationRepository.updateConfig(
@@ -867,6 +868,10 @@ class MainViewModel(
         }
     }
 
+    suspend fun getAllLocations(): List<com.suseoaa.locationspoofer.data.db.LocationRecord> {
+        return environmentDao.getAllLocations()
+    }
+
     fun setAmapApiKey(key: String) {
         settingsRepository.setAmapApiKey(key)
         _uiState.update { it.copy(amapApiKey = key) }
@@ -999,20 +1004,61 @@ class MainViewModel(
         } catch (e: Exception) {}
     }
 
-    private fun locationToJson(record: com.suseoaa.locationspoofer.data.db.CompleteLocation): Triple<String, String, String> {
+    private fun locationToJson(records: List<com.suseoaa.locationspoofer.data.db.CompleteLocation>, targetLat: Double, targetLng: Double): Triple<String, String, String> {
+        if (records.isEmpty()) return Triple("[]", "[]", "[]")
+
+        val weights = records.map {
+            val rLat = Math.toRadians(it.location.lat - targetLat)
+            val rLng = Math.toRadians(it.location.lng - targetLng)
+            val rA = kotlin.math.sin(rLat / 2).let { v -> v * v } + kotlin.math.cos(Math.toRadians(targetLat)) * kotlin.math.cos(Math.toRadians(it.location.lat)) * kotlin.math.sin(rLng / 2).let { v -> v * v }
+            val dist = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(rA), kotlin.math.sqrt(1 - rA))
+            val safeDist = kotlin.math.max(dist, 1.0)
+            1.0 / (safeDist * safeDist)
+        }
+
+        val wifiMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithWifi>()
+        val wifiLevels = mutableMapOf<String, Double>()
+        val wifiWeights = mutableMapOf<String, Double>()
+        
+        records.forEachIndexed { i, rec ->
+            rec.wifis.forEach { rw ->
+                val bssid = rw.device.bssid
+                if (!wifiMap.containsKey(bssid)) wifiMap[bssid] = rw
+                wifiLevels[bssid] = (wifiLevels[bssid] ?: 0.0) + rw.locationWifi.level * weights[i]
+                wifiWeights[bssid] = (wifiWeights[bssid] ?: 0.0) + weights[i]
+            }
+        }
+        
         val wifiArr = org.json.JSONArray()
-        record.wifis.forEach { rw ->
+        wifiMap.forEach { (bssid, rw) ->
+            val w = wifiWeights[bssid]!!
+            val interpolatedLevel = (wifiLevels[bssid]!! / w).toInt()
             val obj = org.json.JSONObject()
-            obj.put("bssid", rw.device.bssid)
+            obj.put("bssid", bssid)
             obj.put("ssid", rw.device.ssid)
             obj.put("frequency", rw.device.frequency)
             obj.put("capabilities", rw.device.capabilities)
-            obj.put("level", rw.locationWifi.level)
+            obj.put("level", interpolatedLevel)
             wifiArr.put(obj)
         }
         
+        val cellMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithCell>()
+        val cellDbms = mutableMapOf<String, Double>()
+        val cellWeights = mutableMapOf<String, Double>()
+        
+        records.forEachIndexed { i, rec ->
+            rec.cells.forEach { rc ->
+                val cellKey = rc.device.cellKey
+                if (!cellMap.containsKey(cellKey)) cellMap[cellKey] = rc
+                cellDbms[cellKey] = (cellDbms[cellKey] ?: 0.0) + rc.locationCell.dbm * weights[i]
+                cellWeights[cellKey] = (cellWeights[cellKey] ?: 0.0) + weights[i]
+            }
+        }
+        
         val cellArr = org.json.JSONArray()
-        record.cells.forEach { rc ->
+        cellMap.forEach { (cellKey, rc) ->
+            val w = cellWeights[cellKey]!!
+            val interpolatedDbm = (cellDbms[cellKey]!! / w).toInt()
             val obj = org.json.JSONObject()
             obj.put("type", rc.device.type)
             obj.put("mcc", rc.device.mcc)
@@ -1027,18 +1073,33 @@ class MainViewModel(
             obj.put("networkId", rc.device.networkId)
             obj.put("systemId", rc.device.systemId)
             obj.put("basestationId", rc.device.basestationId)
-            obj.put("dbm", rc.locationCell.dbm)
+            obj.put("dbm", interpolatedDbm)
             obj.put("isRegistered", rc.locationCell.isRegistered)
             cellArr.put(obj)
         }
         
+        val btMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithBluetooth>()
+        val btRssis = mutableMapOf<String, Double>()
+        val btWeights = mutableMapOf<String, Double>()
+        
+        records.forEachIndexed { i, rec ->
+            rec.bluetooths.forEach { rb ->
+                val address = rb.device.address
+                if (!btMap.containsKey(address)) btMap[address] = rb
+                btRssis[address] = (btRssis[address] ?: 0.0) + rb.locationBluetooth.rssi * weights[i]
+                btWeights[address] = (btWeights[address] ?: 0.0) + weights[i]
+            }
+        }
+        
         val btArr = org.json.JSONArray()
-        record.bluetooths.forEach { rb ->
+        btMap.forEach { (address, rb) ->
+            val w = btWeights[address]!!
+            val interpolatedRssi = (btRssis[address]!! / w).toInt()
             val obj = org.json.JSONObject()
-            obj.put("address", rb.device.address)
+            obj.put("address", address)
             obj.put("name", rb.device.name)
             obj.put("scanRecordHex", rb.device.scanRecordHex)
-            obj.put("rssi", rb.locationBluetooth.rssi)
+            obj.put("rssi", interpolatedRssi)
             btArr.put(obj)
         }
         

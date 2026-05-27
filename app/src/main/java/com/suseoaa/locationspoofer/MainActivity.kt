@@ -148,6 +148,7 @@ fun MainScreen(
     isDark: Boolean
 ) {
     var isFullScreenMap by remember { mutableStateOf(false) }
+    var isScannerMap by remember { mutableStateOf(false) }
 
     val closeMapAndResetRouteIfNeeded = {
         if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
@@ -157,23 +158,30 @@ fun MainScreen(
         isFullScreenMap = false
     }
 
-    BackHandler(enabled = isFullScreenMap) {
-        closeMapAndResetRouteIfNeeded()
+    BackHandler(enabled = isFullScreenMap || isScannerMap) {
+        if (isScannerMap) isScannerMap = false else closeMapAndResetRouteIfNeeded()
     }
 
     AnimatedContent(
-        targetState = isFullScreenMap,
+        targetState = Pair(isFullScreenMap, isScannerMap),
         transitionSpec = {
             slideInVertically(tween(400)) { it } togetherWith slideOutVertically(tween(400)) { -it }
         },
         label = "fullscreen_transition"
-    ) { fullScreen ->
+    ) { (fullScreen, scannerMap) ->
         if (fullScreen) {
             FullScreenMapPage(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
                 onClose = { closeMapAndResetRouteIfNeeded() }
+            )
+        } else if (scannerMap) {
+            com.suseoaa.locationspoofer.ui.screen.ScannerMapScreen(
+                viewModel = viewModel,
+                uiState = uiState,
+                isDark = isDark,
+                onClose = { isScannerMap = false }
             )
         } else {
             when {
@@ -195,7 +203,8 @@ fun MainScreen(
                     viewModel = viewModel,
                     uiState = uiState,
                     isDark = isDark,
-                    onExpandMap = { isFullScreenMap = true }
+                    onExpandMap = { isFullScreenMap = true },
+                    onExpandScannerMap = { isScannerMap = true }
                 )
             }
         }

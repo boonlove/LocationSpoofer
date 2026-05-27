@@ -29,9 +29,12 @@ interface EnvironmentDao {
     @Query("""
         SELECT * FROM location_records 
         ORDER BY ((lat - :targetLat)*(lat - :targetLat) + (lng - :targetLng)*(lng - :targetLng)) ASC 
-        LIMIT 1
+        LIMIT :limit
     """)
-    suspend fun getNearestLocation(targetLat: Double, targetLng: Double): CompleteLocation?
+    suspend fun getNearestLocations(targetLat: Double, targetLng: Double, limit: Int = 3): List<CompleteLocation>
+
+    @Query("SELECT * FROM location_records")
+    suspend fun getAllLocations(): List<LocationRecord>
 
     @Query("SELECT COUNT(*) FROM location_records")
     suspend fun getRecordCount(): Int

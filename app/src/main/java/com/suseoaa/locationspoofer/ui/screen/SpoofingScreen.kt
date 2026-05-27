@@ -90,6 +90,7 @@ fun SpoofingScreen(
     uiState: AppState,
     isDark: Boolean,
     onExpandMap: () -> Unit,
+    onExpandScannerMap: () -> Unit,
     updateViewModel: com.suseoaa.locationspoofer.viewmodel.UpdateViewModel = org.koin.androidx.compose.koinViewModel()
 ) {
     val scrollState = rememberScrollState()
@@ -384,44 +385,15 @@ fun SpoofingScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            SectionHeader(Icons.Rounded.WifiTethering, "本地环境采集", isDark)
+
+            SectionHeader(Icons.Rounded.Radar, "空间环境采集", isDark)
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { 
-                    viewModel.scanLocalEnvironment()
-                    showEnvironmentDialog = true 
-                }
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
-                            .background(AccentOrange.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Rounded.CellTower, null, tint = AccentOrange, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("采集当前真实环境", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        val text = if (uiState.collectedWifiJson.length > 5) "已采集 ${uiState.wifiApCount} 个热点" else "使用本机周围的真实基站和Wi-Fi"
-                        Text(text, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
-                    }
-                    Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(0.dp),
-                modifier = Modifier.clickable { 
-                    viewModel.toggleContinuousScanning()
+                    onExpandScannerMap()
                 }
             ) {
                 Row(
@@ -433,19 +405,21 @@ fun SpoofingScreen(
                             .background(AccentGreen.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Rounded.Radar, null, tint = AccentGreen, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Rounded.Map, null, tint = AccentGreen, modifier = Modifier.size(18.dp))
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("大面积“扫街”模式", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        val statusText = if (uiState.isContinuousScanning) "采集中... 当前数据库有 ${uiState.environmentRecordCount} 条记录" else "开启后边走边自动录入沿途指纹"
+                        Text("环境图谱与扫街", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        val statusText = if (uiState.isContinuousScanning) "采集中... 已有 ${uiState.environmentRecordCount} 个参考点" else "查看环境热力图并开启连续扫描"
                         Text(statusText, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
                     }
-                    Switch(
-                        checked = uiState.isContinuousScanning,
-                        onCheckedChange = { viewModel.toggleContinuousScanning() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = AccentGreen, checkedTrackColor = AccentGreen.copy(alpha = 0.3f))
-                    )
+                    if (uiState.isContinuousScanning) {
+                        Box(
+                            modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AccentGreen)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
                 }
             }
             Spacer(Modifier.height(24.dp))

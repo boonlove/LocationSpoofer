@@ -33,6 +33,7 @@ enum class MarkerType { GREEN, RED, ORANGE, DEFAULT }
 interface AppMapController {
     fun clear()
     fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float)
+    fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float)
     fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker
     fun animateCamera(lat: Double, lng: Double, zoom: Float? = null)
     fun moveCamera(lat: Double, lng: Double, zoom: Float? = null)
@@ -49,6 +50,16 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
             AMapPolylineOptions().color(colorInt).width(width).apply {
                 points.forEach { add(AMapLatLng(it.first, it.second)) }
             }
+        )
+    }
+    override fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float) {
+        map.addCircle(
+            com.amap.api.maps.model.CircleOptions()
+                .center(AMapLatLng(lat, lng))
+                .radius(radius)
+                .fillColor(fillColorInt)
+                .strokeColor(strokeColorInt)
+                .strokeWidth(strokeWidth)
         )
     }
     override fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker {
@@ -104,6 +115,16 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
             GPolylineOptions().color(colorInt).width(width).apply {
                 points.forEach { add(GLatLng(it.first, it.second)) }
             }
+        )
+    }
+    override fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float) {
+        map.addCircle(
+            com.google.android.gms.maps.model.CircleOptions()
+                .center(GLatLng(lat, lng))
+                .radius(radius)
+                .fillColor(fillColorInt)
+                .strokeColor(strokeColorInt)
+                .strokeWidth(strokeWidth)
         )
     }
     override fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker {
