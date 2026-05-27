@@ -1,29 +1,41 @@
 package com.suseoaa.locationspoofer.data.db
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 
 @Dao
 interface EnvironmentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(record: EnvironmentRecord)
+    suspend fun insertLocation(record: LocationRecord): Long
 
-    @Query("SELECT * FROM environment_records")
-    suspend fun getAllRecords(): List<EnvironmentRecord>
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertWifiDevice(device: WifiDevice)
 
-    @Query("SELECT COUNT(*) FROM environment_records")
-    suspend fun getRecordCount(): Int
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLocationWifi(record: LocationWifi)
 
-    @Query("DELETE FROM environment_records")
-    suspend fun clearAll()
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertBluetoothDevice(device: BluetoothDevice)
 
-    // 粗略查找距离最近的记录 (SQLite 无法使用复杂的地理计算，这里使用欧氏距离近似)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLocationBluetooth(record: LocationBluetooth)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCellDevice(device: CellDevice)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLocationCell(record: LocationCell)
+
+    @Transaction
     @Query("""
-        SELECT * FROM environment_records 
+        SELECT * FROM location_records 
         ORDER BY ((lat - :targetLat)*(lat - :targetLat) + (lng - :targetLng)*(lng - :targetLng)) ASC 
         LIMIT 1
     """)
-    suspend fun getNearestRecord(targetLat: Double, targetLng: Double): EnvironmentRecord?
+    suspend fun getNearestLocation(targetLat: Double, targetLng: Double): CompleteLocation?
+
+    @Query("SELECT COUNT(*) FROM location_records")
+    suspend fun getRecordCount(): Int
+
+    @Query("DELETE FROM location_records")
+    suspend fun clearAll()
 }

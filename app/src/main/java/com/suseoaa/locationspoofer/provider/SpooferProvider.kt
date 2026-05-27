@@ -14,6 +14,7 @@ class SpooferProvider : ContentProvider() {
         var longitude = 0.0     // GCJ-02
         var wifiJson = "[]"
         var cellJson = "[]"
+        var bluetoothJson = "[]"
         var simMode = "STILL"
         var simBearing = 0f
         var startTimestamp = 0L
@@ -29,7 +30,7 @@ class SpooferProvider : ContentProvider() {
     ): Cursor {
         val cursor = MatrixCursor(
             arrayOf(
-                "active", "lat", "lng", "wifi_json", "cell_json",
+                "active", "lat", "lng", "wifi_json", "cell_json", "bluetooth_json",
                 "sim_mode", "sim_bearing", "start_timestamp",
                 "route_json", "is_route_mode"
             )
@@ -41,6 +42,7 @@ class SpooferProvider : ContentProvider() {
                 longitude,
                 wifiJson,
                 cellJson,
+                bluetoothJson,
                 simMode,
                 simBearing,
                 startTimestamp,

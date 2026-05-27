@@ -96,6 +96,20 @@ object XposedHelpers {
         throw NoSuchMethodException(methodName)
     }
 
+    fun callStaticMethod(clazz: Class<*>, methodName: String, vararg args: Any?): Any? {
+        var c: Class<*>? = clazz
+        while (c != null) {
+            for (m in c.declaredMethods) {
+                if (m.name == methodName && m.parameterCount == args.size && java.lang.reflect.Modifier.isStatic(m.modifiers)) {
+                    m.isAccessible = true
+                    return m.invoke(null, *args)
+                }
+            }
+            c = c.superclass
+        }
+        throw NoSuchMethodException(methodName)
+    }
+
     fun findMethodExact(clazz: Class<*>, methodName: String, vararg parameterTypes: Class<*>): java.lang.reflect.Method {
         var c: Class<*>? = clazz
         while (c != null) {
@@ -1515,15 +1529,6 @@ class LocationHooker : XposedModule() {
      * 当模拟激活时，返回空列表，屏蔽所有 iBeacon / Eddystone 信标探测。
      */
     private fun hookBluetoothLE(classLoader: ClassLoader) {
-        val bleEmptyResultHook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val config = readConfig()
-                if (config != null && config.optBoolean("active", false)) {
-                    param.result = java.util.ArrayList<Any>()
-                }
-            }
-        }
-
         try {
             // Android 5.0+ BLE Scanner
             XposedHelpers.findAndHookMethod(
@@ -1537,8 +1542,92 @@ class LocationHooker : XposedModule() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
-                            // 替换 callback 为无操作版本，阻止真实扫描结果传递
-                            param.result = null // startScan 返回 void，直接短路执行
+                            // 短路原始扫描，防止目标应用获取真实基站
+                            param.result = null
+                            
+                            val bluetoothArray = config.optJSONArray("bluetooth_json")
+                            if (bluetoothArray != null && bluetoothArray.length() > 0) {
+                                val callback = param.args[2] ?: return
+                                val results = java.util.ArrayList<Any>()
+                                
+                                val scanResultClass = XposedHelpers.findClass("android.bluetooth.le.ScanResult", classLoader)
+                                val bluetoothDeviceClass = XposedHelpers.findClass("android.bluetooth.BluetoothDevice", classLoader)
+                                val scanRecordClass = XposedHelpers.findClass("android.bluetooth.le.ScanRecord", classLoader)
+                                
+                                for (i in 0 until bluetoothArray.length()) {
+                                    try {
+                                        val obj = bluetoothArray.getJSONObject(i)
+                                        val address = obj.optString("address", "00:11:22:33:44:55")
+                                        val name = obj.optString("name", "")
+                                        val rssi = obj.optInt("rssi", -60)
+                                        val hexRecord = obj.optString("scanRecordHex", "")
+                                        
+                                        // 1. 构造 BluetoothDevice (Hidden constructor: BluetoothDevice(String))
+                                        val device = XposedHelpers.newInstance(bluetoothDeviceClass, address)
+                                        
+                                        // 2. 构造 ScanRecord
+                                        var scanRecord: Any? = null
+                                        if (hexRecord.isNotEmpty()) {
+                                            try {
+                                                val bytes = hexStringToByteArray(hexRecord)
+                                                // ScanRecord.parseFromBytes(byte[])
+                                                scanRecord = XposedHelpers.callStaticMethod(scanRecordClass, "parseFromBytes", bytes)
+                                            } catch (e: Throwable) {}
+                                        }
+                                        
+                                        // 3. 构造 ScanResult
+                                        // 签名: ScanResult(BluetoothDevice device, int eventType, int primaryPhy, int secondaryPhy, int advertisingSid, int txPower, int rssi, int periodicAdvertisingInterval, ScanRecord scanRecord, long timestampNanos) -> API 26+
+                                        // 或者老签名: ScanResult(BluetoothDevice device, ScanRecord scanRecord, int rssi, long timestampNanos)
+                                        val timestampNanos = android.os.SystemClock.elapsedRealtimeNanos()
+                                        
+                                        var scanResultObj: Any? = null
+                                        try {
+                                            // 尝试 Android 8.0+ 构造器 (包含 eventType)
+                                            scanResultObj = XposedHelpers.newInstance(
+                                                scanResultClass,
+                                                device,
+                                                0x001B, // Data Complete
+                                                1, // PHY_LE_1M
+                                                0, // Secondary PHY
+                                                255, // SID not present
+                                                127, // TX Power not present
+                                                rssi,
+                                                0, // PA interval
+                                                scanRecord,
+                                                timestampNanos
+                                            )
+                                        } catch (e: Throwable) {
+                                            try {
+                                                // 尝试老版本构造器
+                                                scanResultObj = XposedHelpers.newInstance(
+                                                    scanResultClass,
+                                                    device,
+                                                    scanRecord,
+                                                    rssi,
+                                                    timestampNanos
+                                                )
+                                            } catch (e2: Throwable) {}
+                                        }
+                                        
+                                        if (scanResultObj != null) {
+                                            results.add(scanResultObj)
+                                            // 逐个触发回调
+                                            try {
+                                                XposedHelpers.callMethod(callback, "onScanResult", 1, scanResultObj)
+                                            } catch (e: Throwable) {}
+                                        }
+                                    } catch (e: Throwable) {
+                                        XposedBridge.log("[LocationSpoofer] 构建虚拟BLE失败: $e")
+                                    }
+                                }
+                                
+                                // 批量触发回调
+                                if (results.isNotEmpty()) {
+                                    try {
+                                        XposedHelpers.callMethod(callback, "onBatchScanResults", results)
+                                    } catch (e: Throwable) {}
+                                }
+                            }
                         }
                     }
                 }
@@ -1558,7 +1647,8 @@ class LocationHooker : XposedModule() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
-                            param.result = false // 假装开启失败，不返回任何扫描结果
+                            // 老接口不具备很好的伪造性(需直接传递byte[]给应用)，为防穿帮直接返回启动失败
+                            param.result = false
                         }
                     }
                 }
@@ -1566,6 +1656,17 @@ class LocationHooker : XposedModule() {
         } catch (e: Throwable) {
             XposedBridge.log(e)
         }
+    }
+    
+    private fun hexStringToByteArray(s: String): ByteArray {
+        val len = s.length
+        val data = ByteArray(len / 2)
+        var i = 0
+        while (i < len) {
+            data[i / 2] = ((Character.digit(s[i], 16) shl 4) + Character.digit(s[i + 1], 16)).toByte()
+            i += 2
+        }
+        return data
     }
 
     /**

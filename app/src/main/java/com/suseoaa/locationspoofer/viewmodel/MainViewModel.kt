@@ -363,7 +363,8 @@ class MainViewModel(
                 emptyList(), false,
                 state.appCoordinateSystems,
                 state.collectedWifiJson,
-                state.collectedCellJson
+                state.collectedCellJson,
+                state.collectedBluetoothJson
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -716,17 +717,18 @@ class MainViewModel(
             lastDbQueryLat = lat
             lastDbQueryLng = lng
             viewModelScope.launch(Dispatchers.IO) {
-                val record = environmentDao.getNearestRecord(lat, lng)
+                val record = environmentDao.getNearestLocation(lat, lng)
                 if (record != null) {
                     // Check if the closest record is actually within ~50 meters
-                    val rLat = Math.toRadians(record.lat - lat)
-                    val rLng = Math.toRadians(record.lng - lng)
-                    val rA = kotlin.math.sin(rLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.cos(Math.toRadians(record.lat)) * kotlin.math.sin(rLng / 2).let { it * it }
+                    val rLat = Math.toRadians(record.location.lat - lat)
+                    val rLng = Math.toRadians(record.location.lng - lng)
+                    val rA = kotlin.math.sin(rLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.cos(Math.toRadians(record.location.lat)) * kotlin.math.sin(rLng / 2).let { it * it }
                     val rDist = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(rA), kotlin.math.sqrt(1 - rA))
                     
                     if (rDist <= 50.0) {
-                        SpooferProvider.cellJson = record.cellJson
-                        // Save config file with new cell_json and wifi_json
+                        val jsons = locationToJson(record)
+                        SpooferProvider.cellJson = jsons.second
+                        // Save config file with new cell_json and wifi_json and bluetoothJson
                         locationRepository.updateConfig(
                             lat = lat,
                             lng = lng,
@@ -736,8 +738,9 @@ class MainViewModel(
                             routePoints = _uiState.value.routePoints,
                             isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
                             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
-                            wifiJson = record.wifiJson,
-                            cellJson = record.cellJson
+                            wifiJson = jsons.first,
+                            cellJson = jsons.second,
+                            bluetoothJson = jsons.third
                         )
                     } else {
                         // Fallback to random cell generation
@@ -752,7 +755,8 @@ class MainViewModel(
                             isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
                             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
                             wifiJson = "[]",
-                            cellJson = "[]"
+                            cellJson = "[]",
+                            bluetoothJson = "[]"
                         )
                     }
                 } else {
@@ -767,7 +771,8 @@ class MainViewModel(
                         isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
                         appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
                         wifiJson = "[]",
-                        cellJson = "[]"
+                        cellJson = "[]",
+                        bluetoothJson = "[]"
                     )
                 }
             }
@@ -802,11 +807,13 @@ class MainViewModel(
             _uiState.update { it.copy(wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) }
             val wifiJson = environmentScanner.scanWifi()
             val cellJson = environmentScanner.scanCell()
+            val bluetoothJson = environmentScanner.scanBluetooth()
             val wifiCount = try { org.json.JSONArray(wifiJson).length() } catch(e: Exception) { 0 }
             _uiState.update {
                 it.copy(
                     collectedWifiJson = wifiJson,
                     collectedCellJson = cellJson,
+                    collectedBluetoothJson = bluetoothJson,
                     wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE,
                     wifiApCount = wifiCount
                 )
@@ -834,14 +841,10 @@ class MainViewModel(
                         
                         val wifiJson = environmentScanner.scanWifi()
                         val cellJson = environmentScanner.scanCell()
+                        val bluetoothJson = environmentScanner.scanBluetooth()
                         
-                        val record = com.suseoaa.locationspoofer.data.db.EnvironmentRecord(
-                            lat = lat,
-                            lng = lng,
-                            wifiJson = wifiJson,
-                            cellJson = cellJson
-                        )
-                        environmentDao.insert(record)
+                        saveEnvironmentData(lat, lng, wifiJson, cellJson, bluetoothJson)
+                        
                         val count = environmentDao.getRecordCount()
                         _uiState.update { it.copy(environmentRecordCount = count) }
                     }
@@ -950,5 +953,95 @@ class MainViewModel(
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    private suspend fun saveEnvironmentData(lat: Double, lng: Double, wifiJson: String, cellJson: String, bluetoothJson: String) {
+        val locId = environmentDao.insertLocation(com.suseoaa.locationspoofer.data.db.LocationRecord(lat = lat, lng = lng))
+        
+        try {
+            val wifiArr = org.json.JSONArray(wifiJson)
+            for (i in 0 until wifiArr.length()) {
+                val obj = wifiArr.getJSONObject(i)
+                val bssid = obj.optString("bssid")
+                if (bssid.isEmpty()) continue
+                environmentDao.insertWifiDevice(com.suseoaa.locationspoofer.data.db.WifiDevice(bssid, obj.optString("ssid", ""), obj.optInt("frequency", 0), obj.optString("capabilities", "")))
+                environmentDao.insertLocationWifi(com.suseoaa.locationspoofer.data.db.LocationWifi(locId, bssid, obj.optInt("level", 0)))
+            }
+        } catch (e: Exception) {}
+
+        try {
+            val cellArr = org.json.JSONArray(cellJson)
+            for (i in 0 until cellArr.length()) {
+                val obj = cellArr.getJSONObject(i)
+                val type = obj.optString("type", "UNKNOWN")
+                val cellKey = "${type}_${obj.optInt("mcc")}_${obj.optInt("mnc")}_${obj.optInt("tac", 0)}_${obj.optInt("ci", 0)}_${obj.optInt("cid", 0)}_${obj.optInt("basestationId", 0)}"
+                val device = com.suseoaa.locationspoofer.data.db.CellDevice(
+                    cellKey = cellKey, type = type, mcc = obj.optInt("mcc", 460), mnc = obj.optInt("mnc", 0),
+                    tac = obj.optInt("tac", 0), ci = obj.optInt("ci", 0), pci = obj.optInt("pci", 0),
+                    lac = obj.optInt("lac", 0), cid = obj.optInt("cid", 0), psc = obj.optInt("psc", 0),
+                    nci = obj.optLong("nci", 0L), networkId = obj.optInt("networkId", 0), systemId = obj.optInt("systemId", 0),
+                    basestationId = obj.optInt("basestationId", 0)
+                )
+                environmentDao.insertCellDevice(device)
+                environmentDao.insertLocationCell(com.suseoaa.locationspoofer.data.db.LocationCell(locId, cellKey, obj.optInt("dbm", -80), obj.optBoolean("isRegistered", false)))
+            }
+        } catch (e: Exception) {}
+
+        try {
+            val btArr = org.json.JSONArray(bluetoothJson)
+            for (i in 0 until btArr.length()) {
+                val obj = btArr.getJSONObject(i)
+                val address = obj.optString("address")
+                if (address.isEmpty()) continue
+                environmentDao.insertBluetoothDevice(com.suseoaa.locationspoofer.data.db.BluetoothDevice(address, obj.optString("name", ""), obj.optString("scanRecordHex", "")))
+                environmentDao.insertLocationBluetooth(com.suseoaa.locationspoofer.data.db.LocationBluetooth(locId, address, obj.optInt("rssi", -60)))
+            }
+        } catch (e: Exception) {}
+    }
+
+    private fun locationToJson(record: com.suseoaa.locationspoofer.data.db.CompleteLocation): Triple<String, String, String> {
+        val wifiArr = org.json.JSONArray()
+        record.wifis.forEach { rw ->
+            val obj = org.json.JSONObject()
+            obj.put("bssid", rw.device.bssid)
+            obj.put("ssid", rw.device.ssid)
+            obj.put("frequency", rw.device.frequency)
+            obj.put("capabilities", rw.device.capabilities)
+            obj.put("level", rw.locationWifi.level)
+            wifiArr.put(obj)
+        }
+        
+        val cellArr = org.json.JSONArray()
+        record.cells.forEach { rc ->
+            val obj = org.json.JSONObject()
+            obj.put("type", rc.device.type)
+            obj.put("mcc", rc.device.mcc)
+            obj.put("mnc", rc.device.mnc)
+            obj.put("tac", rc.device.tac)
+            obj.put("ci", rc.device.ci)
+            obj.put("pci", rc.device.pci)
+            obj.put("lac", rc.device.lac)
+            obj.put("cid", rc.device.cid)
+            obj.put("psc", rc.device.psc)
+            obj.put("nci", rc.device.nci)
+            obj.put("networkId", rc.device.networkId)
+            obj.put("systemId", rc.device.systemId)
+            obj.put("basestationId", rc.device.basestationId)
+            obj.put("dbm", rc.locationCell.dbm)
+            obj.put("isRegistered", rc.locationCell.isRegistered)
+            cellArr.put(obj)
+        }
+        
+        val btArr = org.json.JSONArray()
+        record.bluetooths.forEach { rb ->
+            val obj = org.json.JSONObject()
+            obj.put("address", rb.device.address)
+            obj.put("name", rb.device.name)
+            obj.put("scanRecordHex", rb.device.scanRecordHex)
+            obj.put("rssi", rb.locationBluetooth.rssi)
+            btArr.put(obj)
+        }
+        
+        return Triple(wifiArr.toString(), cellArr.toString(), btArr.toString())
     }
 }

@@ -67,7 +67,8 @@ data class AppState(
     val hookedApps: List<AppInfoItem> = emptyList(),
     // 采集到的本地环境数据
     val collectedWifiJson: String = "[]",
-    val collectedCellJson: String = "[]"
+    val collectedCellJson: String = "[]",
+    val collectedBluetoothJson: String = "[]"
 )
 
 data class AppInfoItem(

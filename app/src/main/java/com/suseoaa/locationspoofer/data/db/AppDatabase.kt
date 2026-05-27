@@ -4,8 +4,16 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-
-@Database(entities = [EnvironmentRecord::class], version = 1, exportSchema = false)
+@Database(
+    entities = [
+        LocationRecord::class,
+        WifiDevice::class, LocationWifi::class,
+        BluetoothDevice::class, LocationBluetooth::class,
+        CellDevice::class, LocationCell::class
+    ],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun environmentDao(): EnvironmentDao
 
@@ -19,7 +27,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "environment_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
