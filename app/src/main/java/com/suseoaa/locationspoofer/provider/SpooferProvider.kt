@@ -13,6 +13,7 @@ class SpooferProvider : ContentProvider() {
         var latitude = 0.0      // GCJ-02（高德坐标系，存入即为GCJ-02）
         var longitude = 0.0     // GCJ-02
         var wifiJson = "[]"
+        var cellJson = "[]"
         var simMode = "STILL"
         var simBearing = 0f
         var startTimestamp = 0L
@@ -28,7 +29,7 @@ class SpooferProvider : ContentProvider() {
     ): Cursor {
         val cursor = MatrixCursor(
             arrayOf(
-                "active", "lat", "lng", "wifi_json",
+                "active", "lat", "lng", "wifi_json", "cell_json",
                 "sim_mode", "sim_bearing", "start_timestamp",
                 "route_json", "is_route_mode"
             )
@@ -39,6 +40,7 @@ class SpooferProvider : ContentProvider() {
                 latitude,
                 longitude,
                 wifiJson,
+                cellJson,
                 simMode,
                 simBearing,
                 startTimestamp,

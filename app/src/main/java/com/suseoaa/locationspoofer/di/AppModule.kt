@@ -16,10 +16,14 @@ val appModule = module {
     single { ConfigManager(get()) }
     single { LSPosedManager() }
     single { SettingsManager(androidContext()) }
+    single { com.suseoaa.locationspoofer.utils.EnvironmentScanner(androidContext()) }
 
     single { LocationRepository(get(), get(), get()) }
     single { SettingsRepository(get()) }
 
-    viewModel { MainViewModel(get(), get(), get(), androidContext()) }
+    single { com.suseoaa.locationspoofer.data.db.AppDatabase.getDatabase(androidContext()) }
+    single { get<com.suseoaa.locationspoofer.data.db.AppDatabase>().environmentDao() }
+
+    viewModel { MainViewModel(get(), get(), get(), get(), get(), androidContext()) }
     viewModel { com.suseoaa.locationspoofer.viewmodel.UpdateViewModel(androidContext()) }
 }

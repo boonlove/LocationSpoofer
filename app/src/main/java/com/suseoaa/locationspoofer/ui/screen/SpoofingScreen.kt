@@ -97,6 +97,7 @@ fun SpoofingScreen(
     var showSaveDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
+    var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showCustomCoordDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
@@ -339,8 +340,7 @@ fun SpoofingScreen(
                 SavedLocationsCard(
                     savedLocations = uiState.savedLocations,
                     onSelect = { loc ->
-                        viewModel.updateLatitude(loc.lat.toString())
-                        viewModel.updateLongitude(loc.lng.toString())
+                        viewModel.loadSavedLocation(loc)
                     },
                     onDelete = { loc -> viewModel.removeSavedLocation(loc) }
                 )
@@ -382,6 +382,72 @@ fun SpoofingScreen(
                     Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
                 }
             }
+            Spacer(Modifier.height(16.dp))
+
+            SectionHeader(Icons.Rounded.WifiTethering, "本地环境采集", isDark)
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.clickable { 
+                    viewModel.scanLocalEnvironment()
+                    showEnvironmentDialog = true 
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(AccentOrange.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.CellTower, null, tint = AccentOrange, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("采集当前真实环境", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        val text = if (uiState.collectedWifiJson.length > 5) "已采集 ${uiState.wifiApCount} 个热点" else "使用本机周围的真实基站和Wi-Fi"
+                        Text(text, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                    }
+                    Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.clickable { 
+                    viewModel.toggleContinuousScanning()
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(AccentGreen.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Radar, null, tint = AccentGreen, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("大面积“扫街”模式", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        val statusText = if (uiState.isContinuousScanning) "采集中... 当前数据库有 ${uiState.environmentRecordCount} 条记录" else "开启后边走边自动录入沿途指纹"
+                        Text(statusText, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                    }
+                    Switch(
+                        checked = uiState.isContinuousScanning,
+                        onCheckedChange = { viewModel.toggleContinuousScanning() },
+                        colors = SwitchDefaults.colors(checkedThumbColor = AccentGreen, checkedTrackColor = AccentGreen.copy(alpha = 0.3f))
+                    )
+                }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -402,8 +468,7 @@ fun SpoofingScreen(
             savedLocations = uiState.savedLocations,
             onDismiss = { showSavedLocations = false },
             onSelect = { loc ->
-                viewModel.updateLatitude(loc.lat.toString())
-                viewModel.updateLongitude(loc.lng.toString())
+                viewModel.loadSavedLocation(loc)
                 showSavedLocations = false
             },
             onDelete = { loc -> viewModel.removeSavedLocation(loc) }
@@ -555,6 +620,79 @@ fun SpoofingScreen(
                 showCustomCoordDialog = false
             }
         )
+    }
+
+    if (showEnvironmentDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showEnvironmentDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("本地环境数据", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Spacer(Modifier.height(16.dp))
+                    
+                    if (uiState.wifiLoadStatus == com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = AccentBlue)
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            item {
+                                Text("Wi-Fi 热点 (${uiState.wifiApCount}个)", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentBlue)
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            
+                            val wifiArray = try { org.json.JSONArray(uiState.collectedWifiJson) } catch (e: Exception) { org.json.JSONArray() }
+                            for (i in 0 until Math.min(wifiArray.length(), 10)) {
+                                val obj = wifiArray.optJSONObject(i)
+                                item {
+                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(obj?.optString("ssid", "Unknown") ?: "Unknown", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+                                        Text("${obj?.optInt("level", 0)} dBm", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f))
+                                    }
+                                }
+                            }
+                            if (wifiArray.length() > 10) {
+                                item {
+                                    Text("...等 ${wifiArray.length()} 个", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
+                                }
+                            }
+                            
+                            item {
+                                Spacer(Modifier.height(16.dp))
+                                Text("基站信息", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentOrange)
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            
+                            val cellArray = try { org.json.JSONArray(uiState.collectedCellJson) } catch (e: Exception) { org.json.JSONArray() }
+                            for (i in 0 until cellArray.length()) {
+                                val obj = cellArray.optJSONObject(i)
+                                item {
+                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("类型: ${obj?.optString("type", "Unknown")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+                                        Text("${obj?.optInt("dbm", 0)} dBm", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f))
+                                    }
+                                }
+                            }
+                            if (cellArray.length() == 0) {
+                                item {
+                                    Text("未采集到基站数据", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showEnvironmentDialog = false }) {
+                            Text("确定", color = AccentBlue)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

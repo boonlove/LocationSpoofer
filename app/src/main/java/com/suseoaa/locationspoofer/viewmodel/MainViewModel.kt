@@ -25,11 +25,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class MainViewModel(
     private val locationRepository: LocationRepository,
     private val settingsRepository: SettingsRepository,
     private val lsposedManager: com.suseoaa.locationspoofer.utils.LSPosedManager,
+    private val environmentScanner: com.suseoaa.locationspoofer.utils.EnvironmentScanner,
+    private val environmentDao: com.suseoaa.locationspoofer.data.db.EnvironmentDao,
     private val context: Context
 ) : ViewModel() {
 
@@ -45,6 +49,7 @@ class MainViewModel(
 
     private var locationSyncJob: Job? = null
     private var autoRouteJob: Job? = null
+    private var continuousScanJob: Job? = null
 
     init {
         initialize()
@@ -86,6 +91,7 @@ class MainViewModel(
             if (!settingsRepository.isSpoofingActive) {
                 fetchCurrentLocation(context)
             }
+            refreshRecordCount()
         }
 
         viewModelScope.launch {
@@ -223,6 +229,96 @@ class MainViewModel(
         }
     }
 
+    private suspend fun fetchRealLocationSilent(ctx: Context): Pair<Double, Double>? = suspendCoroutine { cont ->
+        val isDomestic = isDomesticEnvironment()
+        if (isDomestic) {
+            val client = try {
+                com.amap.api.location.AMapLocationClient(ctx.applicationContext)
+            } catch (e: Exception) {
+                cont.resume(null)
+                return@suspendCoroutine
+            }
+            client.setLocationOption(com.amap.api.location.AMapLocationClientOption().apply {
+                locationMode = com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                isOnceLocation = true
+                isNeedAddress = false
+            })
+            client.setLocationListener { loc ->
+                if (loc != null && loc.errorCode == 0) {
+                    cont.resume(Pair(loc.latitude, loc.longitude))
+                } else {
+                    fallbackToNativeLocationSilent(ctx, true, cont)
+                }
+                client.stopLocation()
+                client.onDestroy()
+            }
+            client.startLocation()
+        } else {
+            fallbackToNativeLocationSilent(ctx, false, cont)
+        }
+    }
+
+    private fun fallbackToNativeLocationSilent(ctx: Context, convertToGcj: Boolean, cont: kotlin.coroutines.Continuation<Pair<Double, Double>?>) {
+        try {
+            val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+            val provider = if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
+                android.location.LocationManager.NETWORK_PROVIDER
+            } else if (locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)) {
+                android.location.LocationManager.GPS_PROVIDER
+            } else {
+                cont.resume(null)
+                return
+            }
+
+            // try last known first
+            val lastLoc = locationManager.getLastKnownLocation(provider)
+            if (lastLoc != null) {
+                val res = getNativeConverted(ctx, lastLoc, convertToGcj)
+                cont.resume(res)
+                return
+            }
+
+            val listener = object : android.location.LocationListener {
+                override fun onLocationChanged(location: android.location.Location) {
+                    val res = getNativeConverted(ctx, location, convertToGcj)
+                    cont.resume(res)
+                    locationManager.removeUpdates(this)
+                }
+                override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+                override fun onProviderEnabled(provider: String) {}
+                override fun onProviderDisabled(provider: String) {}
+            }
+            // Use main looper for listener
+            locationManager.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
+            
+            // Timeout after 5 seconds to avoid suspending forever
+            kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
+                delay(5000)
+                locationManager.removeUpdates(listener)
+                if (cont.context.isActive) {
+                    try { cont.resume(null) } catch(e: Exception) {}
+                }
+            }
+        } catch (e: Exception) {
+            try { cont.resume(null) } catch(e: Exception) {}
+        }
+    }
+    
+    private fun getNativeConverted(ctx: Context, location: android.location.Location, convertToGcj: Boolean): Pair<Double, Double> {
+        var finalLat = location.latitude
+        var finalLng = location.longitude
+        if (convertToGcj) {
+            val converter = com.amap.api.maps.CoordinateConverter(ctx).apply {
+                from(com.amap.api.maps.CoordinateConverter.CoordType.GPS)
+                coord(com.amap.api.maps.model.LatLng(location.latitude, location.longitude))
+            }
+            val gcj = converter.convert()
+            finalLat = gcj.latitude
+            finalLng = gcj.longitude
+        }
+        return Pair(finalLat, finalLng)
+    }
+
     // 坐标输入
 
     fun updateLongitude(value: String) {
@@ -242,6 +338,12 @@ class MainViewModel(
 
     fun startSpoofing() {
         val state = _uiState.value
+        
+        if (state.isContinuousScanning) {
+            android.widget.Toast.makeText(context, "请先关闭“大面积扫街模式”再开启模拟定位", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         val lng = state.longitudeInput.toDoubleOrNull()
         val lat = state.latitudeInput.toDoubleOrNull()
         if (lng == null || lat == null || lng !in -180.0..180.0 || lat !in -90.0..90.0) {
@@ -259,7 +361,9 @@ class MainViewModel(
                 context, lat, lng,
                 "STILL", 0f, now,
                 emptyList(), false,
-                state.appCoordinateSystems
+                state.appCoordinateSystems,
+                state.collectedWifiJson,
+                state.collectedCellJson
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -404,6 +508,10 @@ class MainViewModel(
      */
     fun startRoutePlanning() {
         val state = _uiState.value
+        if (state.isContinuousScanning) {
+            android.widget.Toast.makeText(context, "请先关闭“大面积扫街模式”再开启路线模拟", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         if (state.routePoints.size < 2) return
         val startPoint = state.routePoints.first()
 
@@ -429,7 +537,8 @@ class MainViewModel(
             locationRepository.startSpoofing(
                 context, startPoint.lat, startPoint.lng,
                 if (isLoop) state.routeSimMode.name else "STILL",
-                0f, now, routePoints, isLoop, state.appCoordinateSystems
+                0f, now, routePoints, isLoop, state.appCoordinateSystems,
+                state.collectedWifiJson, state.collectedCellJson
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -476,8 +585,23 @@ class MainViewModel(
     fun saveCurrentLocation(name: String) {
         val lng = _uiState.value.longitudeInput.toDoubleOrNull() ?: return
         val lat = _uiState.value.latitudeInput.toDoubleOrNull() ?: return
-        settingsRepository.addSavedLocation(SavedLocation(name, lat, lng))
+        val state = _uiState.value
+        settingsRepository.addSavedLocation(SavedLocation(name, lat, lng, state.collectedWifiJson, state.collectedCellJson))
         _uiState.update { it.copy(savedLocations = settingsRepository.getSavedLocations()) }
+    }
+
+    fun loadSavedLocation(loc: SavedLocation) {
+        val wifiCount = try { org.json.JSONArray(loc.wifiJson).length() } catch(e: Exception) { 0 }
+        _uiState.update { 
+            it.copy(
+                latitudeInput = String.format("%.6f", loc.lat),
+                longitudeInput = String.format("%.6f", loc.lng),
+                collectedWifiJson = loc.wifiJson,
+                collectedCellJson = loc.cellJson,
+                wifiApCount = wifiCount,
+                wifiLoadStatus = if (wifiCount > 0) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
+            ) 
+        }
     }
 
     fun removeSavedLocation(loc: SavedLocation) {
@@ -564,6 +688,9 @@ class MainViewModel(
         }
     }
 
+    private var lastDbQueryLat: Double = 0.0
+    private var lastDbQueryLng: Double = 0.0
+
     /** 更新当前模拟位置到 UI 和 SpooferProvider */
     private fun updatePosition(lat: Double, lng: Double, bearing: Float) {
         _uiState.update {
@@ -578,6 +705,73 @@ class MainViewModel(
         SpooferProvider.longitude = lng
         SpooferProvider.simBearing = bearing
         SpooferProvider.startTimestamp = System.currentTimeMillis()
+        
+        // Check if we need to query the database (e.g. moved more than 20 meters since last query)
+        val dLat = Math.toRadians(lat - lastDbQueryLat)
+        val dLng = Math.toRadians(lng - lastDbQueryLng)
+        val a = kotlin.math.sin(dLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lastDbQueryLat)) * kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.sin(dLng / 2).let { it * it }
+        val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        
+        if (distance > 20.0) {
+            lastDbQueryLat = lat
+            lastDbQueryLng = lng
+            viewModelScope.launch(Dispatchers.IO) {
+                val record = environmentDao.getNearestRecord(lat, lng)
+                if (record != null) {
+                    // Check if the closest record is actually within ~50 meters
+                    val rLat = Math.toRadians(record.lat - lat)
+                    val rLng = Math.toRadians(record.lng - lng)
+                    val rA = kotlin.math.sin(rLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.cos(Math.toRadians(record.lat)) * kotlin.math.sin(rLng / 2).let { it * it }
+                    val rDist = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(rA), kotlin.math.sqrt(1 - rA))
+                    
+                    if (rDist <= 50.0) {
+                        SpooferProvider.cellJson = record.cellJson
+                        // Save config file with new cell_json and wifi_json
+                        locationRepository.updateConfig(
+                            lat = lat,
+                            lng = lng,
+                            simMode = "STILL",
+                            simBearing = bearing,
+                            startTime = SpooferProvider.startTimestamp,
+                            routePoints = _uiState.value.routePoints,
+                            isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
+                            appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
+                            wifiJson = record.wifiJson,
+                            cellJson = record.cellJson
+                        )
+                    } else {
+                        // Fallback to random cell generation
+                        SpooferProvider.cellJson = "[]"
+                        locationRepository.updateConfig(
+                            lat = lat,
+                            lng = lng,
+                            simMode = "STILL",
+                            simBearing = bearing,
+                            startTime = SpooferProvider.startTimestamp,
+                            routePoints = _uiState.value.routePoints,
+                            isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
+                            appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
+                            wifiJson = "[]",
+                            cellJson = "[]"
+                        )
+                    }
+                } else {
+                    SpooferProvider.cellJson = "[]"
+                    locationRepository.updateConfig(
+                        lat = lat,
+                        lng = lng,
+                        simMode = "STILL",
+                        simBearing = bearing,
+                        startTime = SpooferProvider.startTimestamp,
+                        routePoints = _uiState.value.routePoints,
+                        isRouteMode = _uiState.value.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
+                        appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
+                        wifiJson = "[]",
+                        cellJson = "[]"
+                    )
+                }
+            }
+        }
     }
 
     private fun haversineMeters(a: RoutePoint, b: RoutePoint): Double {
@@ -597,6 +791,77 @@ class MainViewModel(
         val y = kotlin.math.cos(lat1) * kotlin.math.sin(lat2) -
             kotlin.math.sin(lat1) * kotlin.math.cos(lat2) * kotlin.math.cos(dLng)
         return (Math.toDegrees(kotlin.math.atan2(x, y)) + 360) % 360
+    }
+
+    fun scanLocalEnvironment() {
+        if (_uiState.value.isSpoofingActive) {
+            android.widget.Toast.makeText(context, "模拟定位已开启，无法采集真实物理环境", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) }
+            val wifiJson = environmentScanner.scanWifi()
+            val cellJson = environmentScanner.scanCell()
+            val wifiCount = try { org.json.JSONArray(wifiJson).length() } catch(e: Exception) { 0 }
+            _uiState.update {
+                it.copy(
+                    collectedWifiJson = wifiJson,
+                    collectedCellJson = cellJson,
+                    wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE,
+                    wifiApCount = wifiCount
+                )
+            }
+        }
+    }
+
+    fun toggleContinuousScanning() {
+        if (_uiState.value.isSpoofingActive) {
+            android.widget.Toast.makeText(context, "请先停止模拟定位再开启扫街模式", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val currentState = _uiState.value.isContinuousScanning
+        _uiState.update { it.copy(isContinuousScanning = !currentState) }
+        
+        if (!currentState) {
+            // Start scanning
+            continuousScanJob = viewModelScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    val realLoc = fetchRealLocationSilent(context)
+                    if (realLoc != null) {
+                        val lat = realLoc.first
+                        val lng = realLoc.second
+                        
+                        val wifiJson = environmentScanner.scanWifi()
+                        val cellJson = environmentScanner.scanCell()
+                        
+                        val record = com.suseoaa.locationspoofer.data.db.EnvironmentRecord(
+                            lat = lat,
+                            lng = lng,
+                            wifiJson = wifiJson,
+                            cellJson = cellJson
+                        )
+                        environmentDao.insert(record)
+                        val count = environmentDao.getRecordCount()
+                        _uiState.update { it.copy(environmentRecordCount = count) }
+                    }
+                    
+                    // Delay 10 seconds between scans
+                    delay(10000)
+                }
+            }
+        } else {
+            // Stop scanning
+            continuousScanJob?.cancel()
+            continuousScanJob = null
+        }
+    }
+
+    fun refreshRecordCount() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val count = environmentDao.getRecordCount()
+            _uiState.update { it.copy(environmentRecordCount = count) }
+        }
     }
 
     fun setAmapApiKey(key: String) {

@@ -62,7 +62,12 @@ data class AppState(
     val amapApiKey: String = "",
     val appSha1: String = "",
     val appCoordinateSystems: Map<String, String> = emptyMap(),
-    val hookedApps: List<AppInfoItem> = emptyList()
+    val isContinuousScanning: Boolean = false,
+    val environmentRecordCount: Int = 0,
+    val hookedApps: List<AppInfoItem> = emptyList(),
+    // 采集到的本地环境数据
+    val collectedWifiJson: String = "[]",
+    val collectedCellJson: String = "[]"
 )
 
 data class AppInfoItem(

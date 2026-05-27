@@ -29,7 +29,9 @@ class LocationRepository(
         startTime: Long,
         routePoints: List<RoutePoint>,
         isRouteMode: Boolean,
-        appCoordinateSystems: Map<String, String>
+        appCoordinateSystems: Map<String, String>,
+        wifiJson: String = "[]",
+        cellJson: String = "[]"
     ) {
         SpooferProvider.isActive = true
         SpooferProvider.latitude = lat
@@ -37,11 +39,12 @@ class LocationRepository(
         SpooferProvider.startTimestamp = startTime
         SpooferProvider.simMode = simMode
         SpooferProvider.simBearing = simBearing
-        SpooferProvider.wifiJson = "[]"
+        SpooferProvider.wifiJson = wifiJson
+        SpooferProvider.cellJson = cellJson
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -56,6 +59,7 @@ class LocationRepository(
     suspend fun stopSpoofing(context: Context) {
         SpooferProvider.isActive = false
         SpooferProvider.wifiJson = "[]"
+        SpooferProvider.cellJson = "[]"
         SpooferProvider.routeJson = "[]"
         SpooferProvider.isRouteMode = false
         configManager.saveConfig(0.0, 0.0, false)
@@ -73,7 +77,9 @@ class LocationRepository(
         startTime: Long,
         routePoints: List<RoutePoint>,
         isRouteMode: Boolean,
-        appCoordinateSystems: Map<String, String>
+        appCoordinateSystems: Map<String, String>,
+        wifiJson: String = SpooferProvider.wifiJson,
+        cellJson: String = SpooferProvider.cellJson
     ) {
         SpooferProvider.latitude = lat
         SpooferProvider.longitude = lng
@@ -82,7 +88,9 @@ class LocationRepository(
         SpooferProvider.simBearing = simBearing
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems)
+        SpooferProvider.wifiJson = wifiJson
+        SpooferProvider.cellJson = cellJson
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson)
     }
 
     suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {
@@ -96,7 +104,8 @@ class LocationRepository(
             SpooferProvider.simBearing,
             startTimestamp = SpooferProvider.startTimestamp,
             wifiJson = wifiJson,
-            appCoordinateSystems = appCoordinateSystems
+            appCoordinateSystems = appCoordinateSystems,
+            cellJson = SpooferProvider.cellJson
         )
     }
 

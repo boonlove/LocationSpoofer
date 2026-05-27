@@ -457,11 +457,15 @@ class LocationHooker : XposedModule() {
         } else 1.0
         hookLastCallTime = now
 
-        // sigma=0.000005度(约0.5米), alpha=0.05(均值回归防止无限漂移)
-        val sigma = 0.000005
+        // sigma=0.000002度(约0.2米步长), alpha=0.05(均值回归)
+        val sigma = 0.000002
         val alpha = 0.05
-        hookDriftLat += sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLat * dt
-        hookDriftLng += sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLng * dt
+        
+        // 使用 Ornstein-Uhlenbeck 过程生成自然偏移，并硬性限制在 4 米以内 (约 0.00004 度)
+        hookDriftLat = (hookDriftLat + sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLat * dt)
+            .coerceIn(-0.00004, 0.00004)
+        hookDriftLng = (hookDriftLng + sigma * sqrt(dt) * rng.nextGaussian() - alpha * hookDriftLng * dt)
+            .coerceIn(-0.00004, 0.00004)
 
         return Pair(baseLat + hookDriftLat, baseLng + hookDriftLng)
     }
@@ -1465,9 +1469,10 @@ class LocationHooker : XposedModule() {
                         }
 
                         "getAllCellInfo" -> {
-                            // 构造2-3个CellInfoLte对象,模拟服务小区+邻区
+                            // 构造CellInfo对象,优先使用cell_json中的真实采集数据,否则模拟服务小区+邻区
                             try {
-                                param.result = buildFakeCellInfoList(classLoader, lat, lng)
+                                val config = readConfig()
+                                param.result = buildFakeCellInfoList(classLoader, lat, lng, config)
                             } catch (e: Throwable) {
                                 XposedBridge.log("[LocationSpoofer] CellInfo构造失败: $e")
                                 param.result = java.util.ArrayList<Any>()
@@ -1582,9 +1587,62 @@ class LocationHooker : XposedModule() {
      * @return 包含2-3个CellInfoLte对象的ArrayList
      */
     private fun buildFakeCellInfoList(
-        classLoader: ClassLoader, lat: Double, lng: Double
+        classLoader: ClassLoader, lat: Double, lng: Double, config: org.json.JSONObject?
     ): java.util.ArrayList<Any> {
         val result = java.util.ArrayList<Any>()
+        
+        val cellArray = config?.optJSONArray("cell_json")
+        if (cellArray != null && cellArray.length() > 0) {
+            for (i in 0 until cellArray.length()) {
+                try {
+                    val obj = cellArray.getJSONObject(i)
+                    // 为简化跨版本兼容，统一构造CellInfoLte
+                    val cellInfoLteClass = XposedHelpers.findClass("android.telephony.CellInfoLte", classLoader)
+                    val cellInfo = XposedHelpers.newInstance(cellInfoLteClass)
+                    val isRegistered = obj.optBoolean("isRegistered", i == 0)
+                    
+                    try { XposedHelpers.setBooleanField(cellInfo, "mRegistered", isRegistered) } 
+                    catch (e: Throwable) { try { XposedHelpers.callMethod(cellInfo, "setRegistered", isRegistered) } catch (e2: Throwable) {} }
+                    
+                    try { XposedHelpers.setLongField(cellInfo, "mTimeStamp", android.os.SystemClock.elapsedRealtimeNanos()) } catch (e: Throwable) {}
+                    
+                    val mcc = obj.optInt("mcc", 460)
+                    val mnc = obj.optInt("mnc", 0)
+                    val tac = obj.optInt("tac", 10000)
+                    val pci = obj.optInt("pci", 0)
+                    val dbm = obj.optInt("dbm", -80)
+                    val ci = if (obj.has("ci")) obj.optInt("ci") else if (obj.has("cid")) obj.optInt("cid") else 100000
+                    
+                    val cellIdentityLteClass = XposedHelpers.findClass("android.telephony.CellIdentityLte", classLoader)
+                    val cellIdentity = try {
+                        XposedHelpers.newInstance(cellIdentityLteClass, mcc, mnc, ci, pci, tac)
+                    } catch (e: Throwable) {
+                        val identity = XposedHelpers.newInstance(cellIdentityLteClass)
+                        try { XposedHelpers.setIntField(identity, "mMcc", mcc) } catch (e2: Throwable) {}
+                        try { XposedHelpers.setIntField(identity, "mMnc", mnc) } catch (e2: Throwable) {}
+                        try { XposedHelpers.setIntField(identity, "mCi", ci) } catch (e2: Throwable) {}
+                        try { XposedHelpers.setIntField(identity, "mPci", pci) } catch (e2: Throwable) {}
+                        try { XposedHelpers.setIntField(identity, "mTac", tac) } catch (e2: Throwable) {}
+                        identity
+                    }
+                    try { XposedHelpers.setObjectField(cellInfo, "mCellIdentityLte", cellIdentity) } catch (e: Throwable) {}
+                    
+                    try {
+                        val cssClass = XposedHelpers.findClass("android.telephony.CellSignalStrengthLte", classLoader)
+                        val css = XposedHelpers.newInstance(cssClass)
+                        try { XposedHelpers.setIntField(css, "mRsrp", dbm) } catch (e2: Throwable) {}
+                        try { XposedHelpers.setIntField(css, "mSignalStrength", dbm + 113) } catch (e2: Throwable) {}
+                        XposedHelpers.setObjectField(cellInfo, "mCellSignalStrengthLte", css)
+                    } catch (e: Throwable) {}
+                    
+                    result.add(cellInfo)
+                } catch (e: Throwable) {
+                    XposedBridge.log("[LocationSpoofer] 解析cell_json失败: $e")
+                }
+            }
+            return result
+        }
+
         val coordSeed = ((lat * 1e5).toLong() xor (lng * 1e5).toLong())
 
         // 中国运营商MCC/MNC组合

@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.ksp)
 }
 
 val androidMinSdkVersion: Int by rootProject.extra
@@ -21,13 +22,15 @@ android {
         if (localYml.exists()) {
             val line = localYml.readLines().find { it.startsWith("$key:") }
             if (line != null) {
-                return line.substringAfter(":").trim().removeSurrounding("\"").removeSurrounding("'")
+                return line.substringAfter(":").trim().removeSurrounding("\"")
+                    .removeSurrounding("'")
             }
         }
         return null
     }
 
-    val googleMapsApiKey = System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
+    val googleMapsApiKey =
+        System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
     val amapApiKey = System.getenv("AMAP_API_KEY") ?: getLocalConfig("AMAP_API_KEY") ?: ""
 
     fun getSigningConfig(key: String): String? {
@@ -153,5 +156,11 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
     debugImplementation(libs.androidx.ui.tooling)
 }
