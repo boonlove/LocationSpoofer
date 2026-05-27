@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -67,29 +68,33 @@ class MainActivity : ComponentActivity() {
         checkAndRequestPermissions()
 
         setContent {
-            val uiState by viewModel.uiState.collectAsState()
-            val isDark = isSystemInDarkTheme()
-            val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
-
-            // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新
-            // 使用 remember(uiState.currentLanguage) 确保语言切换时重新计算 Context
-            val context = LocalContext.current
-            val wrappedContext = remember(uiState.currentLanguage) {
-                if (uiState.currentLanguage.isNotEmpty()) {
-                    LocaleUtils.wrap(context, uiState.currentLanguage)
-                } else {
-                    context
-                }
-            }
-            val configuration = wrappedContext.resources.configuration
-
             CompositionLocalProvider(
-                LocalContext provides wrappedContext,
-                LocalConfiguration provides configuration
+                LocalActivityResultRegistryOwner provides this@MainActivity
             ) {
-                MaterialTheme(colorScheme = colorScheme) {
-                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark)
+                val uiState by viewModel.uiState.collectAsState()
+                val isDark = isSystemInDarkTheme()
+                val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
+
+                // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新
+                // 使用 remember(uiState.currentLanguage) 确保语言切换时重新计算 Context
+                val context = LocalContext.current
+                val wrappedContext = remember(uiState.currentLanguage) {
+                    if (uiState.currentLanguage.isNotEmpty()) {
+                        LocaleUtils.wrap(context, uiState.currentLanguage)
+                    } else {
+                        context
+                    }
+                }
+                val configuration = wrappedContext.resources.configuration
+
+                CompositionLocalProvider(
+                    LocalContext provides wrappedContext,
+                    LocalConfiguration provides configuration
+                ) {
+                    MaterialTheme(colorScheme = colorScheme) {
+                        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                            MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark)
+                        }
                     }
                 }
             }

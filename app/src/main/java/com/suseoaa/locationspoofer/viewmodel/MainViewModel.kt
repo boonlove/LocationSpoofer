@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -1104,5 +1106,55 @@ class MainViewModel(
         }
         
         return Triple(wifiArr.toString(), cellArr.toString(), btArr.toString())
+    }
+
+    fun exportEnvironmentData(uri: android.net.Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val locations = environmentDao.getAllCompleteLocations()
+                val jsonStr = kotlinx.serialization.json.Json.encodeToString(locations)
+                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                    outputStream.write(jsonStr.toByteArray())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun importEnvironmentData(uri: android.net.Uri, onComplete: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonStr = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    inputStream.bufferedReader().use { it.readText() }
+                }
+                if (jsonStr != null) {
+                    val locations: List<com.suseoaa.locationspoofer.data.db.CompleteLocation> = kotlinx.serialization.json.Json.decodeFromString(jsonStr)
+                    locations.forEach { cl ->
+                        val locId = environmentDao.insertLocation(cl.location)
+                        cl.wifis.forEach { w ->
+                            environmentDao.insertWifiDevice(w.device)
+                            val lw = w.locationWifi.copy(locationId = locId)
+                            environmentDao.insertLocationWifi(lw)
+                        }
+                        cl.cells.forEach { c ->
+                            environmentDao.insertCellDevice(c.device)
+                            val lc = c.locationCell.copy(locationId = locId)
+                            environmentDao.insertLocationCell(lc)
+                        }
+                        cl.bluetooths.forEach { b ->
+                            environmentDao.insertBluetoothDevice(b.device)
+                            val lb = b.locationBluetooth.copy(locationId = locId)
+                            environmentDao.insertLocationBluetooth(lb)
+                        }
+                    }
+                    val count = environmentDao.getRecordCount()
+                    _uiState.update { it.copy(environmentRecordCount = count) }
+                    launch(Dispatchers.Main) { onComplete() }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }

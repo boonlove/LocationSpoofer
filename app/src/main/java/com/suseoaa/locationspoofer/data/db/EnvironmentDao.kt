@@ -36,6 +36,10 @@ interface EnvironmentDao {
     @Query("SELECT * FROM location_records")
     suspend fun getAllLocations(): List<LocationRecord>
 
+    @Transaction
+    @Query("SELECT * FROM location_records")
+    suspend fun getAllCompleteLocations(): List<CompleteLocation>
+
     @Query("SELECT COUNT(*) FROM location_records")
     suspend fun getRecordCount(): Int
 

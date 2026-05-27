@@ -24,9 +24,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,10 +103,29 @@ fun SpoofingScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showEnvironmentDialog by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { 
+            viewModel.exportEnvironmentData(it)
+            Toast.makeText(context, "导出成功", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { 
+            viewModel.importEnvironmentData(it) {
+                Toast.makeText(context, "导入合并成功", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showCustomCoordDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val topBarBg = AppColors.surface(isDark)
     val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
@@ -420,6 +443,38 @@ fun SpoofingScreen(
                         Spacer(Modifier.width(8.dp))
                     }
                     Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(AccentBlue.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.ImportExport, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("环境数据分享", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("导出图谱或导入合并他人数据", color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }) {
+                            Text("导入", color = AccentBlue)
+                        }
+                        TextButton(onClick = { exportLauncher.launch("environment_data.json") }) {
+                            Text("导出", color = AccentBlue)
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))

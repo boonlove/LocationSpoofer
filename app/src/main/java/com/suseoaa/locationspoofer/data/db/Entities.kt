@@ -6,7 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Embedded
 import androidx.room.Relation
+import kotlinx.serialization.Serializable
 
+@Serializable
 @Entity(tableName = "location_records")
 data class LocationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -16,6 +18,7 @@ data class LocationRecord(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+@Serializable
 @Entity(tableName = "wifi_devices")
 data class WifiDevice(
     @PrimaryKey val bssid: String,
@@ -33,12 +36,14 @@ data class WifiDevice(
     ],
     indices = [Index("bssid")]
 )
+@Serializable
 data class LocationWifi(
     val locationId: Long,
     val bssid: String,
     val level: Int
 )
 
+@Serializable
 @Entity(tableName = "bluetooth_devices")
 data class BluetoothDevice(
     @PrimaryKey val address: String,
@@ -55,12 +60,14 @@ data class BluetoothDevice(
     ],
     indices = [Index("address")]
 )
+@Serializable
 data class LocationBluetooth(
     val locationId: Long,
     val address: String,
     val rssi: Int
 )
 
+@Serializable
 @Entity(tableName = "cell_devices")
 data class CellDevice(
     @PrimaryKey val cellKey: String,
@@ -93,6 +100,7 @@ data class CellDevice(
     ],
     indices = [Index("cellKey")]
 )
+@Serializable
 data class LocationCell(
     val locationId: Long,
     val cellKey: String,
@@ -100,24 +108,28 @@ data class LocationCell(
     val isRegistered: Boolean
 )
 
+@Serializable
 data class LocationWithWifi(
     @Embedded val locationWifi: LocationWifi,
     @Relation(parentColumn = "bssid", entityColumn = "bssid")
     val device: WifiDevice
 )
 
+@Serializable
 data class LocationWithBluetooth(
     @Embedded val locationBluetooth: LocationBluetooth,
     @Relation(parentColumn = "address", entityColumn = "address")
     val device: BluetoothDevice
 )
 
+@Serializable
 data class LocationWithCell(
     @Embedded val locationCell: LocationCell,
     @Relation(parentColumn = "cellKey", entityColumn = "cellKey")
     val device: CellDevice
 )
 
+@Serializable
 data class CompleteLocation(
     @Embedded val location: LocationRecord,
     @Relation(entity = LocationWifi::class, parentColumn = "id", entityColumn = "locationId")

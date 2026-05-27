@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.ksp)
+    kotlin("plugin.serialization") version "1.9.22"
 }
 
 val androidMinSdkVersion: Int by rootProject.extra
@@ -143,6 +144,8 @@ dependencies {
     implementation(libs.amap.search)
     implementation(libs.google.maps)
     implementation(libs.google.places)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation(libs.play.services.location)
     implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
