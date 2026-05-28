@@ -260,7 +260,9 @@ class LocationHooker : XposedModule() {
         hookAntiDetection(classLoader)
 
         hookLocationAPIs(classLoader, pkg)
-        hookNetworkAndCellAPIs(classLoader)
+        hookWifiEnvironment(classLoader)
+        hookCellEnvironment(classLoader)
+        hookConnectivityLayer(classLoader)
         hookBluetoothLE(classLoader)
         hookGnssStatus(classLoader)
     }
@@ -510,7 +512,13 @@ class LocationHooker : XposedModule() {
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
                         val basePkg = currentPkg.substringBefore(":")
-                        val targetSys = appSystems?.optString(basePkg) ?: "GCJ-02"
+                        // optString 在 key 不存在时返回 ""（空字符串），不是 null！
+                        // 必须用 has() 先检查，否则会错误匹配到空字符串分支
+                        val targetSys = if (appSystems?.has(basePkg) == true) {
+                            appSystems.optString(basePkg, "GCJ-02")
+                        } else {
+                            "GCJ-02"
+                        }
                         val baseLat = when (targetSys) {
                             "WGS-84" -> config.optDouble("wgs84_lat", param.result as Double)
                             "BD-09" -> config.optDouble("bd09_lat", param.result as Double)
@@ -532,7 +540,12 @@ class LocationHooker : XposedModule() {
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
                         val basePkg = currentPkg.substringBefore(":")
-                        val targetSys = appSystems?.optString(basePkg) ?: "GCJ-02"
+                        // optString 在 key 不存在时返回 ""（空字符串），不是 null！
+                        val targetSys = if (appSystems?.has(basePkg) == true) {
+                            appSystems.optString(basePkg, "GCJ-02")
+                        } else {
+                            "GCJ-02"
+                        }
                         val baseLat = when (targetSys) {
                             "WGS-84" -> config.optDouble("wgs84_lat", 0.0)
                             "BD-09" -> config.optDouble("bd09_lat", 0.0)
@@ -1222,440 +1235,614 @@ class LocationHooker : XposedModule() {
         }
     }
 
-    private fun hookNetworkAndCellAPIs(classLoader: ClassLoader) {
-        // 1. 伪造 WifiInfo Getter（getBSSID / getSSID / getMacAddress）
+    // ══════════════════════════════════════════════════════════════════════════
+    // Wi-Fi 环境伪造 — 覆盖 WifiInfo / WifiManager / NetworkInfo
+    // ══════════════════════════════════════════════════════════════════════════
+    private fun hookWifiEnvironment(classLoader: ClassLoader) {
+
+        // ── 1. WifiInfo getter Hook ──
+        // 拦截所有 WifiInfo 属性读取，返回数据库中第一个 AP 的信息
+        // 无数据时返回伪造的断开状态值，避免泄漏真实 Wi-Fi 指纹
         val wifiInfoHook = object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                val config = readConfig()
-                if (config != null && config.optBoolean("active", false)) {
-                    val wifiArray = config.optJSONArray("wifi_json")
-                    val firstWifi =
-                        if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
-                    when (param.method!!.name) {
-                        "getBSSID", "getMacAddress" -> param.result =
-                            firstWifi?.optString("bssid") ?: "ac:22:0b:f4:11:33"
-
-                        "getSSID" -> param.result =
-                            "\"${firstWifi?.optString("ssid") ?: "HOME_WIFI"}\""
-
-                        "getNetworkId" -> param.result = 1
-                    }
+                val config = readConfig() ?: return
+                if (!config.optBoolean("active", false)) return
+                val wifiArray = config.optJSONArray("wifi_json")
+                val firstWifi =
+                    if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
+                when (param.method!!.name) {
+                    "getBSSID" -> param.result =
+                        firstWifi?.optString("bssid") ?: "02:00:00:00:00:00"
+                    "getMacAddress" -> param.result =
+                        firstWifi?.optString("bssid") ?: "02:00:00:00:00:00"
+                    "getSSID" -> param.result =
+                        if (firstWifi != null) "\"${firstWifi.optString("ssid", "HOME_WIFI")}\"" else "<unknown ssid>"
+                    "getNetworkId" -> param.result =
+                        if (firstWifi != null) 1 else -1
+                    "getRssi" -> param.result = -65
+                    "getLinkSpeed" -> param.result = 65
+                    "getFrequency" -> param.result =
+                        firstWifi?.optInt("frequency", 2412) ?: 2412
+                    "getIpAddress" -> param.result = 0x6401A8C0 // 192.168.1.100 小端序
                 }
             }
         }
 
         try {
-            XposedHelpers.findAndHookMethod(
-                "android.net.wifi.WifiInfo",
-                classLoader,
-                "getBSSID",
-                wifiInfoHook
+            val wifiInfoMethods = listOf(
+                "getBSSID", "getMacAddress", "getSSID", "getNetworkId",
+                "getRssi", "getLinkSpeed", "getFrequency", "getIpAddress"
             )
-            XposedHelpers.findAndHookMethod(
-                "android.net.wifi.WifiInfo",
-                classLoader,
-                "getMacAddress",
-                wifiInfoHook
-            )
-            XposedHelpers.findAndHookMethod(
-                "android.net.wifi.WifiInfo",
-                classLoader,
-                "getSSID",
-                wifiInfoHook
-            )
-            XposedHelpers.findAndHookMethod(
-                "android.net.wifi.WifiInfo",
-                classLoader,
-                "getNetworkId",
-                wifiInfoHook
-            )
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
-        }
+            for (method in wifiInfoMethods) {
+                try {
+                    XposedHelpers.findAndHookMethod(
+                        "android.net.wifi.WifiInfo", classLoader, method, wifiInfoHook
+                    )
+                } catch (e: Throwable) { /* 部分方法在低版本可能不存在 */ }
+            }
+        } catch (e: Throwable) { XposedBridge.log(e) }
 
-        // 2. 伪造Wi-Fi扫描列表(getScanResults) -- 多维度拟真
-        // 真实扫描周期约4-5秒,timestamp字段必须接近SystemClock.elapsedRealtimeNanos()
-        // 缺失timestamp是反作弊SDK最常用的检测维度之一
-        val wifiScanHook = object : XC_MethodHook() {
-            // 真实设备常见的加密协议组合(从真机抓包统计)
-            // 单一的[WPA2-PSK-CCMP][ESS]会被标记为批量生成特征
-            val realCapabilities = listOf(
-                "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS]",
-                "[WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP][ESS]",
-                "[WPA2-PSK-CCMP][ESS][WPS]",
-                "[WPA-PSK-TKIP+CCMP][WPA2-PSK-TKIP+CCMP][ESS]",
-                "[RSN-PSK-CCMP][ESS]",
-                "[WPA2-EAP-CCMP][RSN-EAP-CCMP][ESS]",
-                "[ESS]",
-                "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS][WPS]",
-                "[WPA2-SAE-CCMP][RSN-SAE-CCMP][ESS]",
-                "[WPA2-PSK+SAE-CCMP][RSN-PSK+SAE-CCMP][ESS]"
-            )
-
-            override fun afterHookedMethod(param: MethodHookParam) {
-                val config = readConfig()
-                if (config != null && config.optBoolean("active", false)) {
-                    val fakeList = java.util.ArrayList<Any>()
-                    val wifiArray = config.optJSONArray("wifi_json")
-                    if (wifiArray != null && wifiArray.length() > 0) {
+        // ── 1b. WifiInfo.getSupplicantState() → COMPLETED ──
+        // 表示 Wi-Fi 已完成四次握手，处于正常连接状态
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.net.wifi.WifiInfo", classLoader, "getSupplicantState",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
                         try {
-                            val scanResultClass =
-                                XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
-                            // 基准时间戳: 当前系统单调时钟(纳秒)
-                            val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
-                            for (i in 0 until wifiArray.length()) {
-                                val wifi = wifiArray.getJSONObject(i)
-                                val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
-                                XposedHelpers.setObjectField(
-                                    fakeScanResult, "SSID", wifi.optString("ssid")
-                                )
-                                XposedHelpers.setObjectField(
-                                    fakeScanResult, "BSSID", wifi.optString("bssid")
-                                )
-                                // 信号强度: 高斯分布(均值-65dBm, 标准差10dBm)
-                                // 真实环境中AP信号受多径衰落影响呈正态分布
-                                val level = (-65 + (rng.nextGaussian() * 10).toInt())
-                                    .coerceIn(-90, -30)
-                                XposedHelpers.setIntField(fakeScanResult, "level", level)
-                                XposedHelpers.setIntField(
-                                    fakeScanResult, "frequency",
+                            val enumClass = XposedHelpers.findClass(
+                                "android.net.wifi.SupplicantState", classLoader
+                            )
+                            param.result = enumClass.getField("COMPLETED").get(null)
+                        } catch (e: Throwable) { /* 忽略 */ }
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        // ── 2. Wi-Fi 扫描结果伪造 (getScanResults) ──
+        // 真实扫描周期约4-5秒，timestamp 字段必须接近 SystemClock.elapsedRealtimeNanos()
+        // 缺失 timestamp 是反作弊 SDK 最常用的检测维度之一
+        val realCapabilities = listOf(
+            "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS]",
+            "[WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP][ESS]",
+            "[WPA2-PSK-CCMP][ESS][WPS]",
+            "[WPA-PSK-TKIP+CCMP][WPA2-PSK-TKIP+CCMP][ESS]",
+            "[RSN-PSK-CCMP][ESS]",
+            "[WPA2-EAP-CCMP][RSN-EAP-CCMP][ESS]",
+            "[ESS]",
+            "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS][WPS]",
+            "[WPA2-SAE-CCMP][RSN-SAE-CCMP][ESS]",
+            "[WPA2-PSK+SAE-CCMP][RSN-PSK+SAE-CCMP][ESS]"
+        )
+
+        val wifiScanHook = object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                val config = readConfig() ?: return
+                if (!config.optBoolean("active", false)) return
+                val fakeList = java.util.ArrayList<Any>()
+                val wifiArray = config.optJSONArray("wifi_json")
+                if (wifiArray != null && wifiArray.length() > 0) {
+                    try {
+                        val scanResultClass =
+                            XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
+                        val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
+                        for (i in 0 until wifiArray.length()) {
+                            val wifi = wifiArray.getJSONObject(i)
+                            val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
+                            XposedHelpers.setObjectField(fakeScanResult, "SSID", wifi.optString("ssid"))
+                            XposedHelpers.setObjectField(fakeScanResult, "BSSID", wifi.optString("bssid"))
+                            // 信号强度: 高斯分布(均值-65dBm, 标准差10dBm)
+                            val level = (-65 + (rng.nextGaussian() * 10).toInt()).coerceIn(-90, -30)
+                            XposedHelpers.setIntField(fakeScanResult, "level", level)
+                            XposedHelpers.setIntField(
+                                fakeScanResult, "frequency",
+                                wifi.optInt("frequency",
                                     listOf(2412, 2417, 2422, 2427, 2432, 2437, 2442,
                                         2447, 2452, 2457, 2462, 5180, 5200, 5220, 5240,
                                         5260, 5280, 5300, 5320, 5745, 5765, 5785, 5805).random()
                                 )
-                                // 加密协议: 从真实常见组合中随机抽取
-                                XposedHelpers.setObjectField(
-                                    fakeScanResult, "capabilities",
-                                    realCapabilities.random()
+                            )
+                            XposedHelpers.setObjectField(
+                                fakeScanResult, "capabilities",
+                                wifi.optString("capabilities", realCapabilities.random())
+                            )
+                            // 时间戳: 基准时间 - 随机微秒偏移(模拟各 AP 被扫描到的先后差异)
+                            try {
+                                val offsetNanos = (rng.nextInt(200_000) * 1000L)
+                                XposedHelpers.setLongField(
+                                    fakeScanResult, "timestamp",
+                                    (baseTimestamp - offsetNanos) / 1000 // timestamp 字段单位为微秒
                                 )
-                                // 时间戳: 基准时间 - 随机微秒偏移(模拟各AP被扫描到的先后差异)
-                                // 每个AP的扫描时间差约在0-200毫秒(200_000微秒)之间
-                                try {
-                                    val offsetNanos = (rng.nextInt(200_000) * 1000L)
-                                    XposedHelpers.setLongField(
-                                        fakeScanResult, "timestamp",
-                                        (baseTimestamp - offsetNanos) / 1000 // timestamp字段单位为微秒
-                                    )
-                                } catch (e: Throwable) { /* 部分ROM该字段可能不存在 */ }
-                                fakeList.add(fakeScanResult)
-                            }
-                        } catch (e: Throwable) { // 忽略
+                            } catch (e: Throwable) { /* 部分 ROM 该字段可能不存在 */ }
+                            fakeList.add(fakeScanResult)
                         }
-                    }
-                    param.result = fakeList
+                    } catch (e: Throwable) { /* 忽略 */ }
                 }
+                // 无论有无数据，都替换结果（空列表 = 周围没有 AP，不泄漏真实数据）
+                param.result = fakeList
             }
         }
 
-        // 3. 完整的 WifiManager Hook 组合
+        // ── 3. WifiManager 整体 Hook ──
         try {
             XposedHelpers.findAndHookMethod(
-                "android.net.wifi.WifiManager",
-                classLoader,
-                "getScanResults",
-                wifiScanHook
+                "android.net.wifi.WifiManager", classLoader, "getScanResults", wifiScanHook
             )
 
+            // getWifiState() → 3 (WIFI_STATE_ENABLED)
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getWifiState",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result =
-                            3 // WIFI_STATE_ENABLED
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = 3
                     }
                 })
 
+            // isWifiEnabled() → true
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "isWifiEnabled",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result =
-                            true
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = true
                     }
                 })
 
-            // 4. 拦截 getConnectionInfo：返回伪造的 WifiInfo 对象（包含当地真实 BSSID）
+            // getConnectionInfo() — 返回伪造的 WifiInfo 对象（包含目标地点的 BSSID/SSID）
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getConnectionInfo",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val wifiArray = config.optJSONArray("wifi_json")
-                            if (wifiArray != null && wifiArray.length() > 0) {
-                                val firstWifi = wifiArray.getJSONObject(0)
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        val wifiArray = config.optJSONArray("wifi_json")
+                        if (wifiArray != null && wifiArray.length() > 0) {
+                            val firstWifi = wifiArray.getJSONObject(0)
+                            try {
+                                val wifiInfoClass = XposedHelpers.findClass(
+                                    "android.net.wifi.WifiInfo", classLoader
+                                )
+                                val fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mBSSID", firstWifi.optString("bssid")) } catch (e: Throwable) {}
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mMacAddress", firstWifi.optString("bssid")) } catch (e: Throwable) {}
+                                // 设置 SSID（优先使用 WifiSsid 对象，降级为字符串）
                                 try {
-                                    val wifiInfoClass = XposedHelpers.findClass(
-                                        "android.net.wifi.WifiInfo",
-                                        classLoader
-                                    )
-                                    val fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
-                                    try {
-                                        XposedHelpers.setObjectField(
-                                            fakeWifiInfo,
-                                            "mBSSID",
-                                            firstWifi.optString("bssid")
-                                        )
-                                    } catch (e: Throwable) {
-                                    }
-                                    try {
-                                        XposedHelpers.setObjectField(
-                                            fakeWifiInfo,
-                                            "mMacAddress",
-                                            firstWifi.optString("bssid")
-                                        )
-                                    } catch (e: Throwable) {
-                                    }
-                                    try {
-                                        val wifiSsidClass = XposedHelpers.findClass(
-                                            "android.net.wifi.WifiSsid",
-                                            classLoader
-                                        )
-                                        val createMethod = XposedHelpers.findMethodExact(
-                                            wifiSsidClass,
-                                            "createFromAsciiEncoded",
-                                            String::class.java
-                                        )
-                                        val wifiSsid =
-                                            createMethod.invoke(null, firstWifi.optString("ssid"))
-                                        XposedHelpers.setObjectField(
-                                            fakeWifiInfo,
-                                            "mWifiSsid",
-                                            wifiSsid
-                                        )
-                                    } catch (e: Throwable) {
-                                        try {
-                                            XposedHelpers.setObjectField(
-                                                fakeWifiInfo,
-                                                "mSSID",
-                                                "\"${firstWifi.optString("ssid")}\""
-                                            )
-                                        } catch (e2: Throwable) {
-                                        }
-                                    }
-                                    try {
-                                        XposedHelpers.setIntField(fakeWifiInfo, "mNetworkId", 1)
-                                    } catch (e: Throwable) {
-                                    }
-                                    param.result = fakeWifiInfo
-                                } catch (e: Throwable) { // 忽略
+                                    val wifiSsidClass = XposedHelpers.findClass("android.net.wifi.WifiSsid", classLoader)
+                                    val createMethod = XposedHelpers.findMethodExact(wifiSsidClass, "createFromAsciiEncoded", String::class.java)
+                                    val wifiSsid = createMethod.invoke(null, firstWifi.optString("ssid"))
+                                    XposedHelpers.setObjectField(fakeWifiInfo, "mWifiSsid", wifiSsid)
+                                } catch (e: Throwable) {
+                                    try { XposedHelpers.setObjectField(fakeWifiInfo, "mSSID", "\"${firstWifi.optString("ssid")}\"") } catch (e2: Throwable) {}
                                 }
-                            }
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mNetworkId", 1) } catch (e: Throwable) {}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mRssi", -65) } catch (e: Throwable) {}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mLinkSpeed", 65) } catch (e: Throwable) {}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mFrequency", firstWifi.optInt("frequency", 2412)) } catch (e: Throwable) {}
+                                param.result = fakeWifiInfo
+                            } catch (e: Throwable) { /* 忽略 */ }
                         }
                     }
                 })
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
-        }
 
-        // 5. 基站信息伪造(CellLocation/AllCellInfo/NeighboringCellInfo) -- 动态构造
-        // 旧实现问题: 硬编码LAC=1234/CID=5678,且getAllCellInfo返回空列表
-        // 反作弊SDK会检查: 1)基站参数是否与GPS坐标地理一致 2)CellInfo列表是否为空
-        // 新方案: 基于目标坐标的hash值生成伪随机但确定性的TAC/CI,确保同一位置始终返回相同基站
+            // getConfiguredNetworks() → 空列表（防止已保存 Wi-Fi 配置泄漏）
+            XposedHelpers.findAndHookMethod(
+                "android.net.wifi.WifiManager", classLoader, "getConfiguredNetworks",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = java.util.ArrayList<Any>()
+                    }
+                })
+
+            // getDhcpInfo() → 伪造的 DHCP 信息（192.168.1.x 网段）
+            XposedHelpers.findAndHookMethod(
+                "android.net.wifi.WifiManager", classLoader, "getDhcpInfo",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        try {
+                            val dhcpClass = XposedHelpers.findClass("android.net.DhcpInfo", classLoader)
+                            val dhcp = XposedHelpers.newInstance(dhcpClass)
+                            // IP 地址采用小端序: 192.168.1.100 → 0x6401A8C0
+                            XposedHelpers.setIntField(dhcp, "ipAddress", 0x6401A8C0.toInt())
+                            XposedHelpers.setIntField(dhcp, "gateway", 0x0101A8C0)     // 192.168.1.1
+                            XposedHelpers.setIntField(dhcp, "netmask", 0x00FFFFFF)     // 255.255.255.0
+                            XposedHelpers.setIntField(dhcp, "dns1", 0x0101A8C0)        // 192.168.1.1
+                            XposedHelpers.setIntField(dhcp, "dns2", 0x08080808)        // 8.8.8.8
+                            XposedHelpers.setIntField(dhcp, "serverAddress", 0x0101A8C0)
+                            param.result = dhcp
+                        } catch (e: Throwable) { /* 忽略 */ }
+                    }
+                })
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        // ── 4. NetworkInfo.getExtraInfo() ──
+        // 这是高德/抖音用来交叉验证 Wi-Fi 身份的核心 API 之一
+        // 直接返回当前连接的真实 SSID，必须拦截！
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.net.NetworkInfo", classLoader, "getExtraInfo",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        val wifiArray = config.optJSONArray("wifi_json")
+                        if (wifiArray != null && wifiArray.length() > 0) {
+                            param.result = "\"${wifiArray.getJSONObject(0).optString("ssid", "HOME_WIFI")}\""
+                        } else {
+                            param.result = null
+                        }
+                    }
+                }
+            )
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        XposedBridge.log("[LocationSpoofer] Wi-Fi environment hooks installed")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 基站/蜂窝网络环境伪造 — 覆盖 TelephonyManager / PhoneStateListener
+    // ══════════════════════════════════════════════════════════════════════════
+    private fun hookCellEnvironment(classLoader: ClassLoader) {
+
+        // ── 1. 基站信息伪造（CellLocation / AllCellInfo / NeighboringCellInfo）──
         val cellHook = object : XC_MethodHook() {
             override fun afterHookedMethod(param: MethodHookParam) {
-                val config = readConfig()
-                if (config != null && config.optBoolean("active", false)) {
-                    val lat = config.optDouble("lat", 0.0)
-                    val lng = config.optDouble("lng", 0.0)
+                val config = readConfig() ?: return
+                if (!config.optBoolean("active", false)) return
+                val lat = config.optDouble("lat", 0.0)
+                val lng = config.optDouble("lng", 0.0)
 
-                    when (param.method!!.name) {
-                        "getCellLocation" -> {
-                            try {
+                when (param.method!!.name) {
+                    "getCellLocation" -> {
+                        try {
+                            val cellArray = config.optJSONArray("cell_json")
+                            if (cellArray != null && cellArray.length() > 0) {
+                                // 有采集数据时，使用数据库中的 LAC/CID
+                                val cell = cellArray.getJSONObject(0)
                                 val gsmCellLocationClass = XposedHelpers.findClass(
-                                    "android.telephony.gsm.GsmCellLocation",
-                                    classLoader
+                                    "android.telephony.gsm.GsmCellLocation", classLoader
                                 )
                                 val fakeLocation = XposedHelpers.newInstance(gsmCellLocationClass)
-                                // 基于坐标生成确定性的LAC/CID(同一位置始终相同)
-                                val coordSeed = ((lat * 1e5).toLong() xor (lng * 1e5).toLong())
-                                val lac = (10000 + (coordSeed and 0xFFFF).toInt() % 50000)
-                                    .coerceIn(1, 65534)
-                                val cid = (100000 + ((coordSeed shr 16) and 0xFFFFFF).toInt() % 900000)
-                                    .coerceIn(1, 268435455)
+                                val lac = cell.optInt("tac", 10000)
+                                val cid = if (cell.has("ci")) cell.optInt("ci") else cell.optInt("cid", 100000)
                                 XposedHelpers.callMethod(fakeLocation, "setLacAndCid", lac, cid)
                                 param.result = fakeLocation
-                            } catch (e: Throwable) {
+                            } else {
+                                // 无数据时返回 null，不生成伪随机数据
                                 param.result = null
                             }
+                        } catch (e: Throwable) {
+                            param.result = null
                         }
-
-                        "getAllCellInfo" -> {
-                            // 构造CellInfo对象,优先使用cell_json中的真实采集数据,否则模拟服务小区+邻区
-                            try {
-                                val config = readConfig()
-                                param.result = buildFakeCellInfoList(classLoader, lat, lng, config)
-                            } catch (e: Throwable) {
-                                XposedBridge.log("[LocationSpoofer] CellInfo构造失败: $e")
-                                param.result = java.util.ArrayList<Any>()
-                            }
-                        }
-
-                        "getNeighboringCellInfo" -> param.result =
-                            java.util.ArrayList<Any>()
                     }
+
+                    "getAllCellInfo" -> {
+                        try {
+                            param.result = buildFakeCellInfoList(classLoader, lat, lng, config)
+                        } catch (e: Throwable) {
+                            XposedBridge.log("[LocationSpoofer] CellInfo构造失败: $e")
+                            param.result = java.util.ArrayList<Any>()
+                        }
+                    }
+
+                    "getNeighboringCellInfo" -> param.result = java.util.ArrayList<Any>()
                 }
             }
         }
 
         try {
-            XposedHelpers.findAndHookMethod(
-                "android.telephony.TelephonyManager",
-                classLoader,
-                "getAllCellInfo",
-                cellHook
-            )
-            XposedHelpers.findAndHookMethod(
-                "android.telephony.TelephonyManager",
-                classLoader,
-                "getCellLocation",
-                cellHook
-            )
-            XposedHelpers.findAndHookMethod(
-                "android.telephony.TelephonyManager",
-                classLoader,
-                "getNeighboringCellInfo",
-                cellHook
-            )
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
+            XposedHelpers.findAndHookMethod("android.telephony.TelephonyManager", classLoader, "getAllCellInfo", cellHook)
+            XposedHelpers.findAndHookMethod("android.telephony.TelephonyManager", classLoader, "getCellLocation", cellHook)
+            XposedHelpers.findAndHookMethod("android.telephony.TelephonyManager", classLoader, "getNeighboringCellInfo", cellHook)
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        // ── 2. TelephonyManager 元数据 Hook ──
+        // 防止 MCC/MNC/运营商名称/网络类型泄漏真实地理位置
+        // 高德用 getNetworkOperator() 验证基站数据是否与 GPS 位置地理一致
+        val telephonyMetaHook = object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                val config = readConfig() ?: return
+                if (!config.optBoolean("active", false)) return
+                val cellArray = config.optJSONArray("cell_json")
+                when (param.method!!.name) {
+                    "getNetworkOperator" -> {
+                        // 返回 MCC+MNC 字符串（如 "46000"），必须与基站数据一致
+                        if (cellArray != null && cellArray.length() > 0) {
+                            val cell = cellArray.getJSONObject(0)
+                            val mcc = cell.optInt("mcc", 460)
+                            val mnc = cell.optInt("mnc", 0)
+                            param.result = String.format("%d%02d", mcc, mnc)
+                        }
+                        // 无数据时不修改，保留真实值（避免因空值触发异常）
+                    }
+                    "getNetworkOperatorName" -> {
+                        if (cellArray != null && cellArray.length() > 0) {
+                            val mnc = cellArray.getJSONObject(0).optInt("mnc", 0)
+                            param.result = when (mnc) {
+                                0, 2, 7 -> "中国移动"
+                                1, 6, 9 -> "中国联通"
+                                3, 5, 11 -> "中国电信"
+                                else -> "中国移动"
+                            }
+                        }
+                    }
+                    // SIM 卡运营商编码/名称 — 不修改（SIM 是物理的，修改反而可疑）
+                    "getSimOperator" -> { /* 保留真实值 */ }
+                    "getSimOperatorName" -> { /* 保留真实值 */ }
+                    "getNetworkType" -> param.result = 13   // NETWORK_TYPE_LTE
+                    "getDataNetworkType" -> param.result = 13
+                    "getPhoneType" -> param.result = 1      // PHONE_TYPE_GSM
+                }
+            }
         }
+
+        val telephonyMetaMethods = listOf(
+            "getNetworkOperator", "getNetworkOperatorName",
+            "getNetworkType", "getDataNetworkType", "getPhoneType"
+        )
+        for (method in telephonyMetaMethods) {
+            try {
+                XposedHelpers.findAndHookMethod(
+                    "android.telephony.TelephonyManager", classLoader, method, telephonyMetaHook
+                )
+            } catch (e: Throwable) { /* 部分方法在低版本可能不存在 */ }
+        }
+
+        // ── 3. PhoneStateListener 回调拦截 ──
+        // 防止应用通过 TelephonyManager.listen() 的 LISTEN_CELL_INFO 回调
+        // 绕过 getAllCellInfo() 的 Hook 获取真实基站数据
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.telephony.TelephonyManager", classLoader, "listen",
+                "android.telephony.PhoneStateListener",
+                Int::class.javaPrimitiveType!!,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        var events = param.args[1] as Int
+                        // 移除 LISTEN_CELL_LOCATION (0x10) 和 LISTEN_CELL_INFO (0x400) 标志位
+                        // 这样系统就不会将真实的基站变更回调给应用
+                        events = events and 0x10.inv()   // 移除 LISTEN_CELL_LOCATION
+                        events = events and 0x400.inv()  // 移除 LISTEN_CELL_INFO
+                        param.args[1] = events
+                    }
+                }
+            )
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        XposedBridge.log("[LocationSpoofer] Cell environment hooks installed")
     }
 
-    /**
-     * 拦截蓝牙 BLE 扫描结果，防止通过附近 BLE 信标定位。
-     * 当模拟激活时，返回空列表，屏蔽所有 iBeacon / Eddystone 信标探测。
-     */
-    private fun hookBluetoothLE(classLoader: ClassLoader) {
+    // ══════════════════════════════════════════════════════════════════════════
+    // 网络连接层伪造 — 覆盖 ConnectivityManager / NetworkCapabilities / NetworkInterface
+    // ══════════════════════════════════════════════════════════════════════════
+    private fun hookConnectivityLayer(classLoader: ClassLoader) {
+
+        // ── 1. ConnectivityManager.getActiveNetworkInfo() ──
+        // 不修改返回值结构，NetworkInfo.getExtraInfo() 的 Hook 已在 hookWifiEnvironment 中处理 SSID 泄漏
         try {
-            // Android 5.0+ BLE Scanner
             XposedHelpers.findAndHookMethod(
-                "android.bluetooth.le.BluetoothLeScanner",
-                classLoader,
-                "startScan",
+                "android.net.ConnectivityManager", classLoader, "getActiveNetworkInfo",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        // 保持返回值不变 — SSID 泄漏由 NetworkInfo.getExtraInfo() Hook 处理
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        // ── 2. NetworkCapabilities — Android 6+ 网络能力查询 ──
+        // Android 12+ 的 NetworkCapabilities 包含 WifiInfo 作为 TransportInfo
+        // 必须清除以防止通过此路径获取真实 Wi-Fi 信息
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.net.ConnectivityManager", classLoader,
+                "getNetworkCapabilities",
+                "android.net.Network",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        val nc = param.result ?: return
+                        // 清除 TransportInfo 中可能包含的真实 Wi-Fi 信息
+                        try {
+                            XposedHelpers.setObjectField(nc, "mTransportInfo", null)
+                        } catch (e: Throwable) { /* 字段名可能因版本不同 */ }
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        // ── 3. NetworkInterface.getNetworkInterfaces() ──
+        // 过滤 wlan0/p2p 等 Wi-Fi 相关网络接口，防止通过接口名和 MAC 地址泄漏真实信息
+        try {
+            XposedHelpers.findAndHookMethod(
+                "java.net.NetworkInterface", classLoader, "getNetworkInterfaces",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        val result = param.result as? java.util.Enumeration<*> ?: return
+                        val filtered = java.util.Collections.list(result).filter { iface ->
+                            val name = try {
+                                (iface as java.net.NetworkInterface).name
+                            } catch (e: Throwable) { "" }
+                            // 保留非 Wi-Fi 接口（lo, rmnet 等），过滤 wlan/p2p/swlan
+                            !name.startsWith("wlan") && !name.startsWith("p2p") && !name.startsWith("swlan")
+                        }
+                        param.result = java.util.Collections.enumeration(filtered)
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        XposedBridge.log("[LocationSpoofer] Connectivity layer hooks installed")
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // 蓝牙 BLE 扫描拦截 — 防止通过 iBeacon / Eddystone 信标定位
+    // ══════════════════════════════════════════════════════════════════════════
+    private fun hookBluetoothLE(classLoader: ClassLoader) {
+
+        // ── BLE 扫描结果伪造的核心逻辑（复用于不同 startScan 重载）──
+        val buildAndDeliverBleResults = { config: JSONObject, callbackObj: Any, cl: ClassLoader ->
+            try {
+                val bluetoothArray = config.optJSONArray("bluetooth_json")
+                if (bluetoothArray != null && bluetoothArray.length() > 0) {
+                    val results = java.util.ArrayList<Any>()
+                    val scanResultClass = XposedHelpers.findClass("android.bluetooth.le.ScanResult", cl)
+                    val bluetoothDeviceClass = XposedHelpers.findClass("android.bluetooth.BluetoothDevice", cl)
+                    val scanRecordClass = XposedHelpers.findClass("android.bluetooth.le.ScanRecord", cl)
+
+                    for (i in 0 until bluetoothArray.length()) {
+                        try {
+                            val obj = bluetoothArray.getJSONObject(i)
+                            val address = obj.optString("address", "00:11:22:33:44:55")
+                            val rssi = obj.optInt("rssi", -60)
+                            val hexRecord = obj.optString("scanRecordHex", "")
+
+                            // 1. 构造 BluetoothDevice
+                            val device = XposedHelpers.newInstance(bluetoothDeviceClass, address)
+
+                            // 2. 构造 ScanRecord
+                            var scanRecord: Any? = null
+                            if (hexRecord.isNotEmpty()) {
+                                try {
+                                    val bytes = hexStringToByteArray(hexRecord)
+                                    scanRecord = XposedHelpers.callStaticMethod(scanRecordClass, "parseFromBytes", bytes)
+                                } catch (e: Throwable) { /* 忽略 */ }
+                            }
+
+                            // 3. 构造 ScanResult（兼容新旧构造器）
+                            val timestampNanos = android.os.SystemClock.elapsedRealtimeNanos()
+                            var scanResultObj: Any? = null
+                            try {
+                                // Android 8.0+ 构造器
+                                scanResultObj = XposedHelpers.newInstance(
+                                    scanResultClass, device,
+                                    0x001B, 1, 0, 255, 127, rssi, 0, scanRecord, timestampNanos
+                                )
+                            } catch (e: Throwable) {
+                                try {
+                                    // 旧版本构造器
+                                    scanResultObj = XposedHelpers.newInstance(
+                                        scanResultClass, device, scanRecord, rssi, timestampNanos
+                                    )
+                                } catch (e2: Throwable) { /* 忽略 */ }
+                            }
+
+                            if (scanResultObj != null) {
+                                results.add(scanResultObj)
+                                try { XposedHelpers.callMethod(callbackObj, "onScanResult", 1, scanResultObj) } catch (e: Throwable) {}
+                            }
+                        } catch (e: Throwable) {
+                            XposedBridge.log("[LocationSpoofer] 构建虚拟BLE失败: $e")
+                        }
+                    }
+
+                    // 批量触发回调
+                    if (results.isNotEmpty()) {
+                        try { XposedHelpers.callMethod(callbackObj, "onBatchScanResults", results) } catch (e: Throwable) {}
+                    }
+                }
+            } catch (e: Throwable) { XposedBridge.log(e) }
+            Unit
+        }
+
+        // ── 1. startScan(List<ScanFilter>, ScanSettings, ScanCallback) — 3参数重载 ──
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.le.BluetoothLeScanner", classLoader, "startScan",
                 java.util.List::class.java,
                 android.bluetooth.le.ScanSettings::class.java,
                 android.bluetooth.le.ScanCallback::class.java,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            // 短路原始扫描，防止目标应用获取真实基站
-                            param.result = null
-                            
-                            val bluetoothArray = config.optJSONArray("bluetooth_json")
-                            if (bluetoothArray != null && bluetoothArray.length() > 0) {
-                                val callback = param.args[2] ?: return
-                                val results = java.util.ArrayList<Any>()
-                                
-                                val scanResultClass = XposedHelpers.findClass("android.bluetooth.le.ScanResult", classLoader)
-                                val bluetoothDeviceClass = XposedHelpers.findClass("android.bluetooth.BluetoothDevice", classLoader)
-                                val scanRecordClass = XposedHelpers.findClass("android.bluetooth.le.ScanRecord", classLoader)
-                                
-                                for (i in 0 until bluetoothArray.length()) {
-                                    try {
-                                        val obj = bluetoothArray.getJSONObject(i)
-                                        val address = obj.optString("address", "00:11:22:33:44:55")
-                                        val name = obj.optString("name", "")
-                                        val rssi = obj.optInt("rssi", -60)
-                                        val hexRecord = obj.optString("scanRecordHex", "")
-                                        
-                                        // 1. 构造 BluetoothDevice (Hidden constructor: BluetoothDevice(String))
-                                        val device = XposedHelpers.newInstance(bluetoothDeviceClass, address)
-                                        
-                                        // 2. 构造 ScanRecord
-                                        var scanRecord: Any? = null
-                                        if (hexRecord.isNotEmpty()) {
-                                            try {
-                                                val bytes = hexStringToByteArray(hexRecord)
-                                                // ScanRecord.parseFromBytes(byte[])
-                                                scanRecord = XposedHelpers.callStaticMethod(scanRecordClass, "parseFromBytes", bytes)
-                                            } catch (e: Throwable) {}
-                                        }
-                                        
-                                        // 3. 构造 ScanResult
-                                        // 签名: ScanResult(BluetoothDevice device, int eventType, int primaryPhy, int secondaryPhy, int advertisingSid, int txPower, int rssi, int periodicAdvertisingInterval, ScanRecord scanRecord, long timestampNanos) -> API 26+
-                                        // 或者老签名: ScanResult(BluetoothDevice device, ScanRecord scanRecord, int rssi, long timestampNanos)
-                                        val timestampNanos = android.os.SystemClock.elapsedRealtimeNanos()
-                                        
-                                        var scanResultObj: Any? = null
-                                        try {
-                                            // 尝试 Android 8.0+ 构造器 (包含 eventType)
-                                            scanResultObj = XposedHelpers.newInstance(
-                                                scanResultClass,
-                                                device,
-                                                0x001B, // Data Complete
-                                                1, // PHY_LE_1M
-                                                0, // Secondary PHY
-                                                255, // SID not present
-                                                127, // TX Power not present
-                                                rssi,
-                                                0, // PA interval
-                                                scanRecord,
-                                                timestampNanos
-                                            )
-                                        } catch (e: Throwable) {
-                                            try {
-                                                // 尝试老版本构造器
-                                                scanResultObj = XposedHelpers.newInstance(
-                                                    scanResultClass,
-                                                    device,
-                                                    scanRecord,
-                                                    rssi,
-                                                    timestampNanos
-                                                )
-                                            } catch (e2: Throwable) {}
-                                        }
-                                        
-                                        if (scanResultObj != null) {
-                                            results.add(scanResultObj)
-                                            // 逐个触发回调
-                                            try {
-                                                XposedHelpers.callMethod(callback, "onScanResult", 1, scanResultObj)
-                                            } catch (e: Throwable) {}
-                                        }
-                                    } catch (e: Throwable) {
-                                        XposedBridge.log("[LocationSpoofer] 构建虚拟BLE失败: $e")
-                                    }
-                                }
-                                
-                                // 批量触发回调
-                                if (results.isNotEmpty()) {
-                                    try {
-                                        XposedHelpers.callMethod(callback, "onBatchScanResults", results)
-                                    } catch (e: Throwable) {}
-                                }
-                            }
-                        }
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = null // 短路原始扫描
+                        val callback = param.args[2] ?: return
+                        buildAndDeliverBleResults(config, callback, classLoader)
                     }
                 }
             )
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
-        }
+        } catch (e: Throwable) { XposedBridge.log(e) }
 
-        // 同时Hook老接口（Android 4.x BluetoothAdapter.startLeScan）
+        // ── 2. startScan(ScanCallback) — 1参数重载 ──
+        // 部分 App（如微信）使用无 filter 的简化版 startScan
         try {
             XposedHelpers.findAndHookMethod(
-                "android.bluetooth.BluetoothAdapter",
-                classLoader,
-                "startLeScan",
+                "android.bluetooth.le.BluetoothLeScanner", classLoader, "startScan",
+                android.bluetooth.le.ScanCallback::class.java,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = null
+                        val callback = param.args[0] ?: return
+                        buildAndDeliverBleResults(config, callback, classLoader)
+                    }
+                }
+            )
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        // ── 3. BluetoothAdapter.getBondedDevices() → 空集合 ──
+        // 防止通过已配对蓝牙设备列表进行指纹识别
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.BluetoothAdapter", classLoader, "getBondedDevices",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = java.util.HashSet<Any>()
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        // ── 4. BluetoothAdapter.startDiscovery() → false ──
+        // 阻止经典蓝牙扫描发现周围真实设备
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.BluetoothAdapter", classLoader, "startDiscovery",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        param.result = false
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
+        // ── 5. 老接口 BluetoothAdapter.startLeScan（Android 4.x）──
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.BluetoothAdapter", classLoader, "startLeScan",
                 android.bluetooth.BluetoothAdapter.LeScanCallback::class.java,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            // 老接口不具备很好的伪造性(需直接传递byte[]给应用)，为防穿帮直接返回启动失败
-                            param.result = false
-                        }
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        // 老接口不具备很好的伪造性，直接返回启动失败
+                        param.result = false
                     }
                 }
             )
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
-        }
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        XposedBridge.log("[LocationSpoofer] Bluetooth LE hooks installed")
     }
     
     private fun hexStringToByteArray(s: String): ByteArray {
