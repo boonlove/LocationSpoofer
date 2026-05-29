@@ -1,5 +1,6 @@
 package com.suseoaa.locationspoofer.utils
 
+import com.suseoaa.locationspoofer.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -13,13 +14,13 @@ class RootManager {
 
     suspend fun grantMockLocation(): Boolean = withContext(Dispatchers.IO) {
         val result =
-            executeCommand("appops set com.suseoaa.locationspoofer.fork android:mock_location allow")
+            executeCommand("appops set ${BuildConfig.APPLICATION_ID} android:mock_location allow")
         result != "ERROR"
     }
 
     suspend fun revokeMockLocation(): Boolean = withContext(Dispatchers.IO) {
         val result =
-            executeCommand("appops set com.suseoaa.locationspoofer.fork android:mock_location deny")
+            executeCommand("appops set ${BuildConfig.APPLICATION_ID} android:mock_location deny")
         result != "ERROR"
     }
 

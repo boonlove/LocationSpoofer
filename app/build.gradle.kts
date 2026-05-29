@@ -5,12 +5,16 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
 }
 
+val androidMinSdkVersion: Int by rootProject.extra
+val androidTargetSdkVersion: Int by rootProject.extra
+val androidCompileSdkVersion: Int by rootProject.extra
+val androidApplicationId: String by rootProject.extra
 val appVersionName: String by rootProject.extra
 val appVersionCode: Int by rootProject.extra
 
 android {
     namespace = "com.suseoaa.locationspoofer"
-    compileSdk = 36
+    compileSdk = androidCompileSdkVersion
 
     fun getLocalConfig(key: String): String? {
         val localYml = file("../local.yml")
@@ -50,9 +54,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.suseoaa.locationspoofer.fork"
-        minSdk = 26
-        targetSdk = 34
+        applicationId = androidApplicationId
+        minSdk = androidMinSdkVersion
+        targetSdk = androidTargetSdkVersion
         versionCode = appVersionCode
         versionName = appVersionName
 
@@ -62,6 +66,8 @@ android {
 
         manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
         manifestPlaceholders["amapApiKey"] = amapApiKey
+
+        buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
     }
 
     signingConfigs {
@@ -87,7 +93,6 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.findByName("release")
-            buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
         release {
             isMinifyEnabled = true
@@ -97,7 +102,6 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.findByName("release")
-            buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
         }
     }
     compileOptions {

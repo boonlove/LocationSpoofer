@@ -1,5 +1,6 @@
 package com.suseoaa.locationspoofer.xposed
 
+import com.suseoaa.locationspoofer.BuildConfig
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
@@ -228,7 +229,7 @@ class LocationHooker : XposedModule() {
         
 
         // 宿主App自报平安
-        if (pkg == "com.suseoaa.locationspoofer.fork") {
+        if (pkg == BuildConfig.APPLICATION_ID) {
             return // 宿主App不需要注入定位Hook
         }
 

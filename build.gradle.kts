@@ -4,6 +4,10 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.android) apply false
 }
 
+val androidMinSdkVersion by extra(26)
+val androidTargetSdkVersion by extra(34)
+val androidCompileSdkVersion by extra(36)
+val androidApplicationId by extra("com.suseoaa.locationspoofer.fork")
 val appVersionName by extra(getVersionName())
 val appVersionCode by extra(getVersionCode())
 
