@@ -20,9 +20,9 @@
     <application
         android:name=".LocationApp"
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_menu_mylocation"
+        android:icon="@mipmap/icon"
         android:label="LocationSpoofer"
-        android:roundIcon="@android:drawable/ic_menu_mylocation"
+        android:roundIcon="@mipmap/icon"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
         android:description="@string/app_description"

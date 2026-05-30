@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -144,15 +145,21 @@ fun SpoofingScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(topBarBg)
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(horizontal = 20.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape)
+                modifier = Modifier.size(48.dp).clip(CircleShape)
                     .background(AccentBlue.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.MyLocation, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                // Icon(Icons.Rounded.MyLocation, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                Icon(
+                    painter = painterResource(R.mipmap.icon),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(30.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
             Text(
