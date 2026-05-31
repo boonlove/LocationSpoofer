@@ -179,7 +179,11 @@ fun AppMapView(isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     if (isDomestic) {
-        val amapView = remember { TextureMapView(context).apply { onCreate(Bundle()) } }
+        val amapView = remember { 
+            val view = TextureMapView(context)
+            view.onCreate(Bundle())
+            view
+        }
         DisposableEffect(lifecycle, amapView) {
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
@@ -207,7 +211,11 @@ fun AppMapView(isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (
             modifier = modifier
         )
     } else {
-        val gmapView = remember { GMapView(context).apply { onCreate(Bundle()) } }
+        val gmapView = remember { 
+            val view = GMapView(context)
+            view.onCreate(Bundle())
+            view
+        }
         DisposableEffect(lifecycle, gmapView) {
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {

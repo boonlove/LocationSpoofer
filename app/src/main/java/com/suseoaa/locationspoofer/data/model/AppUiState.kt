@@ -1,14 +1,17 @@
 package com.suseoaa.locationspoofer.data.model
 
+import androidx.annotation.StringRes
+import com.suseoaa.locationspoofer.R
+
 enum class WifiLoadStatus { IDLE, LOADING, DONE }
 
-enum class SimMode(val label: String, val speedMs: Double) {
-    STILL("静止", 0.0),
-    WALKING("步行", 1.4),
-    RUNNING("慢跑", 3.0),
-    CYCLING("骑行", 5.5),
-    DRIVING("驾车", 15.0),
-    CUSTOM("自定义", 0.0)
+enum class SimMode(@StringRes val labelResId: Int, val speedMs: Double) {
+    STILL(R.string.still, 0.0),
+    WALKING(R.string.walking, 1.4),
+    RUNNING(R.string.running, 3.0),
+    CYCLING(R.string.cycling, 5.5),
+    DRIVING(R.string.driving, 15.0),
+    CUSTOM(R.string.custom, 0.0)
 }
 
 /** 路线规划阶段 */

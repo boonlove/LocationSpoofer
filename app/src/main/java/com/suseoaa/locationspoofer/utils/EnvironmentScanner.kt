@@ -23,6 +23,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 
+    @android.annotation.SuppressLint("MissingPermission", "NewApi")
 class EnvironmentScanner(private val context: Context) {
 
     @SuppressLint("MissingPermission")

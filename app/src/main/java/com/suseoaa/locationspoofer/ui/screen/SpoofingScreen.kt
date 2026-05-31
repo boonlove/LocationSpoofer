@@ -379,7 +379,7 @@ fun SpoofingScreen(
             })
             Spacer(Modifier.height(16.dp))
 
-            SectionHeader(Icons.Rounded.Extension, "自定义坐标算法", isDark)
+            SectionHeader(Icons.Rounded.Extension, stringResource(R.string.custom_coordinate_algo), isDark)
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -400,8 +400,8 @@ fun SpoofingScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("配置应用坐标系", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("解决固定偏移，为独立软件定制底层坐标系", color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                        Text(stringResource(R.string.config_app_coordinate), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.config_app_coordinate_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
                     }
                     Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
                 }
@@ -409,7 +409,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(16.dp))
 
 
-            SectionHeader(Icons.Rounded.Radar, "空间环境采集", isDark)
+            SectionHeader(Icons.Rounded.Radar, stringResource(R.string.spatial_env_collection), isDark)
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
@@ -432,8 +432,8 @@ fun SpoofingScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("环境图谱与扫街", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        val statusText = if (uiState.isContinuousScanning) "采集中... 已有 ${uiState.environmentRecordCount} 个参考点" else "查看环境热力图并开启连续扫描"
+                        Text(stringResource(R.string.env_map_scan), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        val statusText = if (uiState.isContinuousScanning) stringResource(R.string.scanning_reference_points, uiState.environmentRecordCount) else stringResource(R.string.view_heatmap_start_scan)
                         Text(statusText, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
                     }
                     if (uiState.isContinuousScanning) {
@@ -464,15 +464,15 @@ fun SpoofingScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("环境数据分享", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Text("导出图谱或导入合并他人数据", color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                        Text(stringResource(R.string.env_data_sharing), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.env_data_sharing_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) }) {
-                            Text("导入", color = AccentBlue)
+                            Text(stringResource(R.string.import_data), color = AccentBlue)
                         }
                         TextButton(onClick = { exportLauncher.launch("environment_data.json") }) {
-                            Text("导出", color = AccentBlue)
+                            Text(stringResource(R.string.export_data), color = AccentBlue)
                         }
                     }
                 }
@@ -515,7 +515,7 @@ fun SpoofingScreen(
     }
 
     if (showSettings) {
-        Dialog(onDismissRequest = { showSettings = false }) {
+        LocalizedDialog(onDismissRequest = { showSettings = false }) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface
@@ -625,7 +625,7 @@ fun SpoofingScreen(
     }
     
     if (showAppCoordinateScreen) {
-        androidx.compose.ui.window.Dialog(
+        LocalizedDialog(
             onDismissRequest = { showAppCoordinateScreen = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
         ) {
@@ -652,14 +652,14 @@ fun SpoofingScreen(
     }
 
     if (showEnvironmentDialog) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { showEnvironmentDialog = false }) {
+        LocalizedDialog(onDismissRequest = { showEnvironmentDialog = false }) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("本地环境数据", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                    Text(stringResource(R.string.local_env_data), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     Spacer(Modifier.height(16.dp))
                     
                     if (uiState.wifiLoadStatus == com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) {
@@ -669,7 +669,7 @@ fun SpoofingScreen(
                     } else {
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             item {
-                                Text("Wi-Fi 热点 (${uiState.wifiApCount}个)", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentBlue)
+                                Text(stringResource(R.string.wifi_hotspots, uiState.wifiApCount), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentBlue)
                                 Spacer(Modifier.height(8.dp))
                             }
                             
@@ -685,13 +685,13 @@ fun SpoofingScreen(
                             }
                             if (wifiArray.length() > 10) {
                                 item {
-                                    Text("...等 ${wifiArray.length()} 个", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
+                                    Text(stringResource(R.string.and_n_more, wifiArray.length()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
                                 }
                             }
                             
                             item {
                                 Spacer(Modifier.height(16.dp))
-                                Text("基站信息", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentOrange)
+                                Text(stringResource(R.string.cell_info), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AccentOrange)
                                 Spacer(Modifier.height(8.dp))
                             }
                             
@@ -700,14 +700,14 @@ fun SpoofingScreen(
                                 val obj = cellArray.optJSONObject(i)
                                 item {
                                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text("类型: ${obj?.optString("type", "Unknown")}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+                                        Text(stringResource(R.string.type_is, obj?.optString("type", "Unknown") ?: "Unknown"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
                                         Text("${obj?.optInt("dbm", 0)} dBm", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f))
                                     }
                                 }
                             }
                             if (cellArray.length() == 0) {
                                 item {
-                                    Text("未采集到基站数据", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
+                                    Text(stringResource(R.string.no_cell_data), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
                                 }
                             }
                         }
@@ -716,7 +716,7 @@ fun SpoofingScreen(
                     Spacer(Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { showEnvironmentDialog = false }) {
-                            Text("确定", color = AccentBlue)
+                            Text(stringResource(R.string.confirm), color = AccentBlue)
                         }
                     }
                 }
@@ -791,7 +791,7 @@ fun CoordinateInputCard(
                 TextButton(onClick = onCustomClick) {
                     Icon(Icons.Outlined.Edit, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("自定义")
+                    Text(stringResource(R.string.custom))
                 }
                 TextButton(onClick = onSaveClick) {
                     Icon(Icons.Rounded.StarBorder, null, modifier = Modifier.size(16.dp))
@@ -804,7 +804,7 @@ fun CoordinateInputCard(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "经度: ${uiState.longitudeInput.ifEmpty { "0.0" }}",
+                        text = "${stringResource(R.string.longitude)}: ${uiState.longitudeInput.ifEmpty { "0.0" }}",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium
@@ -812,7 +812,7 @@ fun CoordinateInputCard(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "纬度: ${uiState.latitudeInput.ifEmpty { "0.0" }}",
+                        text = "${stringResource(R.string.latitude)}: ${uiState.latitudeInput.ifEmpty { "0.0" }}",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium
@@ -938,7 +938,7 @@ fun UpdateDialog(
     onCancel: () -> Unit,
     onInstall: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    LocalizedDialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1037,7 +1037,7 @@ fun SavedLocationsDialog(
     onSelect: (SavedLocation) -> Unit,
     onDelete: (SavedLocation) -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    LocalizedDialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1293,50 +1293,79 @@ fun CustomCoordinateDialog(
     var lng by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(initialLng) }
     val textSecondary = AppColors.textSecondary(isDark)
 
+    val currentContext = androidx.compose.ui.platform.LocalContext.current
+    val currentConfiguration = androidx.compose.ui.platform.LocalConfiguration.current
+
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
         title = {
-            androidx.compose.material3.Text("自定义坐标", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides currentContext, androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration) {
+                androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_title), color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, fontSize = 18.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            }
         },
         text = {
-            Column {
-                androidx.compose.material3.Text("手动输入经纬度坐标，修改后地图位置也会同步更新。", color = textSecondary, fontSize = 14.sp)
-                Spacer(Modifier.height(16.dp))
-                androidx.compose.material3.OutlinedTextField(
-                    value = lng,
-                    onValueChange = { lng = it },
-                    label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.longitude)) },
-                    placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
-                    leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.East, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = coordinateFieldColors()
-                )
-                Spacer(Modifier.height(8.dp))
-                androidx.compose.material3.OutlinedTextField(
-                    value = lat,
-                    onValueChange = { lat = it },
-                    label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.latitude)) },
-                    placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
-                    leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.North, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = coordinateFieldColors()
-                )
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides currentContext, androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration) {
+                Column {
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coord_desc), color = textSecondary, fontSize = 14.sp)
+                    Spacer(Modifier.height(16.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = lng,
+                        onValueChange = { lng = it },
+                        label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.longitude)) },
+                        placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
+                        leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.East, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = coordinateFieldColors()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = lat,
+                        onValueChange = { lat = it },
+                        label = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.latitude)) },
+                        placeholder = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.coordinate_hint), color = textSecondary) },
+                        leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.North, null, tint = textSecondary, modifier = Modifier.size(18.dp)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = coordinateFieldColors()
+                    )
+                }
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = { onConfirm(lat, lng) }) {
-                androidx.compose.material3.Text("确认", color = AccentBlue)
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides currentContext, androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration) {
+                androidx.compose.material3.TextButton(onClick = { onConfirm(lat, lng) }) {
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.confirm), color = AccentBlue)
+                }
             }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                androidx.compose.material3.Text("取消", color = textSecondary)
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides currentContext, androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration) {
+                androidx.compose.material3.TextButton(onClick = onDismiss) {
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.cancel), color = textSecondary)
+                }
             }
         }
     )
+}
+
+@Composable
+fun LocalizedDialog(
+    onDismissRequest: () -> Unit,
+    properties: androidx.compose.ui.window.DialogProperties = androidx.compose.ui.window.DialogProperties(),
+    content: @Composable () -> Unit
+) {
+    val currentContext = androidx.compose.ui.platform.LocalContext.current
+    val currentConfiguration = androidx.compose.ui.platform.LocalConfiguration.current
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismissRequest, properties = properties) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalContext provides currentContext,
+            androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
+        ) {
+            content()
+        }
+    }
 }

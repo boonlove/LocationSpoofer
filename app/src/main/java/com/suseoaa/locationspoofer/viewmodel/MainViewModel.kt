@@ -164,10 +164,11 @@ class MainViewModel(
         }
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun fallbackToNativeLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)?, convertToGcj: Boolean) {
         try {
             if (forceCallback != null) {
-                android.widget.Toast.makeText(ctx, "高德定位受限，正在尝试原生GPS/基站定位...", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.amap_restricted_fallback), android.widget.Toast.LENGTH_SHORT).show()
             }
             val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
             val provider = if (locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)) {
@@ -180,13 +181,13 @@ class MainViewModel(
             if (lastLoc != null) {
                 applyNativeLocation(ctx, lastLoc, forceCallback, convertToGcj)
             } else if (forceCallback != null) {
-                android.widget.Toast.makeText(ctx, "系统未缓存位置，正在等待GPS信号(室内可能极慢或无信号)", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.waiting_gps_signal), android.widget.Toast.LENGTH_LONG).show()
             }
 
             val listener = object : android.location.LocationListener {
                 override fun onLocationChanged(location: android.location.Location) {
                     if (forceCallback != null) {
-                        android.widget.Toast.makeText(ctx, "原生定位成功！", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.native_location_success), android.widget.Toast.LENGTH_SHORT).show()
                     }
                     applyNativeLocation(ctx, location, forceCallback, convertToGcj)
                     locationManager.removeUpdates(this)
@@ -198,7 +199,7 @@ class MainViewModel(
             locationManager.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
         } catch (e: SecurityException) {
             if (forceCallback != null) {
-                android.widget.Toast.makeText(ctx, "未授予精准定位权限，无法获取位置", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.location_permission_denied), android.widget.Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -260,6 +261,7 @@ class MainViewModel(
         }
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun fallbackToNativeLocationSilent(ctx: Context, convertToGcj: Boolean, cont: kotlin.coroutines.Continuation<Pair<Double, Double>?>) {
         try {
             val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
@@ -338,11 +340,12 @@ class MainViewModel(
 
     // 定点模拟
 
+    @android.annotation.SuppressLint("MissingPermission")
     fun startSpoofing() {
         val state = _uiState.value
         
         if (state.isContinuousScanning) {
-            android.widget.Toast.makeText(context, "请先关闭“大面积扫街模式”再开启模拟定位", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, context.getString(com.suseoaa.locationspoofer.R.string.disable_continuous_scan_first), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -500,9 +503,6 @@ class MainViewModel(
     }
 
     /** 清除地图选点状态 */
-    fun clearMapPoint() {
-        _uiState.update { it.copy(mapConfirmedPoint = null) }
-    }
 
     /**
      * 开始路线模拟。
@@ -512,7 +512,7 @@ class MainViewModel(
     fun startRoutePlanning() {
         val state = _uiState.value
         if (state.isContinuousScanning) {
-            android.widget.Toast.makeText(context, "请先关闭“大面积扫街模式”再开启路线模拟", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, context.getString(com.suseoaa.locationspoofer.R.string.disable_continuous_scan_route_first), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         if (state.routePoints.size < 2) return
@@ -614,13 +614,7 @@ class MainViewModel(
 
     // 搜索
 
-    fun updateSearchKeyword(keyword: String) {
-        _uiState.update { it.copy(searchKeyword = keyword) }
-    }
 
-    fun updateSearchResults(results: List<SavedLocation>) {
-        _uiState.update { it.copy(searchResults = results) }
-    }
 
     // 内部工具
 
@@ -801,32 +795,10 @@ class MainViewModel(
         return (Math.toDegrees(kotlin.math.atan2(x, y)) + 360) % 360
     }
 
-    fun scanLocalEnvironment() {
-        if (_uiState.value.isSpoofingActive) {
-            android.widget.Toast.makeText(context, "模拟定位已开启，无法采集真实物理环境", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) }
-            val wifiJson = environmentScanner.scanWifi()
-            val cellJson = environmentScanner.scanCell()
-            val bluetoothJson = environmentScanner.scanBluetooth()
-            val wifiCount = try { org.json.JSONArray(wifiJson).length() } catch(e: Exception) { 0 }
-            _uiState.update {
-                it.copy(
-                    collectedWifiJson = wifiJson,
-                    collectedCellJson = cellJson,
-                    collectedBluetoothJson = bluetoothJson,
-                    wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE,
-                    wifiApCount = wifiCount
-                )
-            }
-        }
-    }
 
     fun toggleContinuousScanning() {
         if (_uiState.value.isSpoofingActive) {
-            android.widget.Toast.makeText(context, "请先停止模拟定位再开启扫街模式", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(context, context.getString(com.suseoaa.locationspoofer.R.string.stop_spoofing_before_scan), android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         

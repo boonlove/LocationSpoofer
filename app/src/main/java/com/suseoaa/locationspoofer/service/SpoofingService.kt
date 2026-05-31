@@ -66,8 +66,8 @@ class SpoofingService : Service() {
         if (isRunning) return
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("位置模拟器")
-            .setContentText("正在模拟位置: $lat, $lng")
+            .setContentTitle(getString(com.suseoaa.locationspoofer.R.string.spoofing_service_title))
+            .setContentText(getString(com.suseoaa.locationspoofer.R.string.spoofing_service_content, lat.toString(), lng.toString()))
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
@@ -128,6 +128,7 @@ class SpoofingService : Service() {
         stopSelf()
     }
 
+    @android.annotation.SuppressLint("WrongConstant", "MissingPermission")
     private fun setupTestProvider(provider: String) {
         try {
             @Suppress("DEPRECATION")
@@ -172,7 +173,7 @@ class SpoofingService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "位置模拟服务", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(CHANNEL_ID, getString(com.suseoaa.locationspoofer.R.string.spoofing_service_channel_name), NotificationManager.IMPORTANCE_LOW)
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }

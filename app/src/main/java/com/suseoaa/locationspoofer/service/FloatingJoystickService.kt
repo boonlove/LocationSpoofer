@@ -198,7 +198,7 @@ fun JoystickOverlay(
             ) {
                 androidx.compose.material3.Icon(
                     androidx.compose.material.icons.Icons.Rounded.Close,
-                    "关闭摇杆"
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.close_joystick)
                 )
             }
         }

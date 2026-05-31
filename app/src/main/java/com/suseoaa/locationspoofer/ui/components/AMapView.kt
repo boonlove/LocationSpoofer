@@ -17,9 +17,9 @@ import com.amap.api.maps.TextureMapView
 fun AMapView(modifier: Modifier = Modifier, onMapReady: (AMap) -> Unit) {
     val context = LocalContext.current
     val mapView = remember { 
-        TextureMapView(context).apply {
-            onCreate(Bundle())
-        }
+        val view = TextureMapView(context)
+        view.onCreate(Bundle())
+        view
     }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 

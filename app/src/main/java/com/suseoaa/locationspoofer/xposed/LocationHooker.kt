@@ -1560,7 +1560,7 @@ class LocationHooker : XposedModule() {
                             val cell = cellArray.getJSONObject(0)
                             val mcc = cell.optInt("mcc", 460)
                             val mnc = cell.optInt("mnc", 0)
-                            param.result = String.format("%d%02d", mcc, mnc)
+                            param.result = String.format(java.util.Locale.US, "%d%02d", mcc, mnc)
                         }
                         // 无数据时不修改，保留真实值（避免因空值触发异常）
                     }

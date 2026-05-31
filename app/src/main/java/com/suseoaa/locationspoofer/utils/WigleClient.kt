@@ -111,7 +111,7 @@ class WigleClient {
             "3c:37:86"  // Ruijie(锐捷)
         )
         return "${ouis.random()}:${
-            String.format(
+            String.format(java.util.Locale.US, 
                 "%02x:%02x:%02x",
                 (0..255).random(),
                 (0..255).random(),

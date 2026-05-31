@@ -94,7 +94,7 @@ fun ScannerMapScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        if (uiState.isContinuousScanning) "采集中 (${uiState.environmentRecordCount})" else "未开启采集",
+                        if (uiState.isContinuousScanning) androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_status_active, uiState.environmentRecordCount) else androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_status_inactive),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )

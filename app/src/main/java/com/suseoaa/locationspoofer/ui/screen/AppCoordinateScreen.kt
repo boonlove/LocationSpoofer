@@ -54,7 +54,14 @@ fun AppCoordinateScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                title = { Text("自定义坐标算法") },
+                title = { 
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_algo),
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -66,7 +73,7 @@ fun AppCoordinateScreen(
                         modifier = Modifier.padding(end = 16.dp)
                     ) {
                         Text(
-                            text = "显示系统应用",
+                            text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.show_system_apps),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -93,7 +100,7 @@ fun AppCoordinateScreen(
         ) {
             if (appsToShow.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("当前未获取到或未勾选任何已 Hook 的目标应用", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                    Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.no_hooked_apps), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -219,24 +226,35 @@ fun CoordinateSelectionDialog(
     onSelect: (String) -> Unit
 ) {
     val systems = listOf(
-        "GCJ-02" to "火星坐标系 (中国大陆地图默认, 如高德/微信)",
-        "WGS-84" to "国际标准GPS (国外地图默认, 如Google Maps)",
-        "BD-09"  to "百度坐标系 (百度地图专属)"
+        "GCJ-02" to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.gcj02_desc),
+        "WGS-84" to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.wgs84_desc),
+        "BD-09"  to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.bd09_desc)
     )
 
+    val currentContext = androidx.compose.ui.platform.LocalContext.current
+    val currentConfiguration = androidx.compose.ui.platform.LocalConfiguration.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalContext provides currentContext,
+                androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
+            ) {
             Text(
-                text = "设置坐标算法",
+                text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.set_coordinate_algo),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
+            }
         },
         text = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalContext provides currentContext,
+                androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
+            ) {
             Column {
                 Text(
-                    text = "为 ${appInfo.appName} 选择要模拟的底层坐标系标准\n(我写的提示不一定是正确的，要自己测)",
+                    text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.select_coord_sys_desc, appInfo.appName),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
@@ -280,10 +298,16 @@ fun CoordinateSelectionDialog(
                     }
                 }
             }
+            }
         },
         confirmButton = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalContext provides currentContext,
+                androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
+            ) {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.cancel))
+            }
             }
         }
     )
