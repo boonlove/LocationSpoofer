@@ -133,6 +133,12 @@ git clone https://github.com/your-username/LocationSpoofer.git
 
 ---
 
+## 🎁 鸣谢
+
+- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): 上游
+
+---
+
 ## ⚠️ 免责声明
 
 本项目**仅供学习和技术研究使用**。请勿将本工具用于任何违法违规活动（包括但不限于虚假打卡、作弊等）。
@@ -143,12 +149,6 @@ git clone https://github.com/your-username/LocationSpoofer.git
 ## 📜 开源许可
 
 本项目采用 [GNU General Public License v3.0](LICENSE) 开源许可证。
-
----
-
-## 🎁 鸣谢
-
-- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): 上游
 
 ```
 Copyright (C) 2026 SuseOAA

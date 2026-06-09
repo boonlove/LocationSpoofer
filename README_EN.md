@@ -132,6 +132,12 @@ To avoid reaching the default API key's quota limits, it is recommended to apply
 
 ---
 
+## 🎁 Credit
+
+- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): upstream
+
+---
+
 ## ⚠️ Disclaimer
 
 This project is for **educational and research purposes only**. Do not use this tool for any illegal activities (including but not limited to fraudulent clock-ins, cheating, etc.).
@@ -142,12 +148,6 @@ Users should comply with local laws and regulations. The author is not responsib
 ## 📜 License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
-
----
-
-## 🎁 Credit
-
-- [LocationSpoofer](https://github.com/HuangZhuoRui/LocationSpoofer): upstream
 
 ```
 Copyright (C) 2026 SuseOAA
