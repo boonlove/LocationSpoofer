@@ -32,8 +32,24 @@ class EnvironmentScanner(private val context: Context) {
         val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
         val jsonArray = JSONArray()
         try {
-            val activeNetwork = connectivityManager.activeNetworkInfo
-            val isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+            var isWifiConnected = false
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                val networks = connectivityManager.allNetworks
+                for (network in networks) {
+                    val caps = connectivityManager.getNetworkCapabilities(network)
+                    if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                        // 确保这个 Wi-Fi 网络具备基础的连接能力
+                        if (caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) || 
+                            caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                            isWifiConnected = true
+                            break
+                        }
+                    }
+                }
+            } else {
+                val activeNetwork = connectivityManager.activeNetworkInfo
+                isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+            }
 
             if (!isWifiConnected) {
                 // 如果没有连接 Wi-Fi，则不采集 Wi-Fi 列表，返回空数组
@@ -43,24 +59,40 @@ class EnvironmentScanner(private val context: Context) {
             // 1. 优先提取当前正在连接的 Wi-Fi 信息，并置于数组首位
             val connectionInfo = wifiManager.connectionInfo
             val connectedBssid = connectionInfo?.bssid
+            val results = wifiManager.scanResults
+
             if (connectedBssid != null && connectedBssid != "02:00:00:00:00:00") {
                 val obj = JSONObject()
                 obj.put("bssid", connectedBssid)
                 val rawSsid = connectionInfo.ssid
-                val cleanSsid = if (rawSsid != null && rawSsid.startsWith("\"") && rawSsid.endsWith("\"")) {
+                var cleanSsid = if (rawSsid != null && rawSsid.startsWith("\"") && rawSsid.endsWith("\"")) {
                     rawSsid.substring(1, rawSsid.length - 1)
                 } else {
                     rawSsid ?: ""
                 }
+                
+                // 如果是 unknown ssid 或为空，尝试从扫描结果中恢复真实 SSID
+                if (cleanSsid == "<unknown ssid>" || cleanSsid.isEmpty()) {
+                    val match = results.find { it.BSSID == connectedBssid }
+                    if (match != null && !match.SSID.isNullOrEmpty()) {
+                        cleanSsid = match.SSID
+                    }
+                }
+                
                 obj.put("ssid", if (cleanSsid == "<unknown ssid>") "" else cleanSsid)
                 obj.put("level", connectionInfo.rssi)
                 obj.put("frequency", connectionInfo.frequency)
                 obj.put("capabilities", "[WPA2-PSK-CCMP][ESS]") // 兜底 capability
+                try { obj.put("macAddress", connectionInfo.macAddress) } catch(e:Throwable){}
+                try { obj.put("linkSpeed", connectionInfo.linkSpeed) } catch(e:Throwable){}
+                try { obj.put("networkId", connectionInfo.networkId) } catch(e:Throwable){}
+                if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    try { obj.put("wifiStandard", connectionInfo.wifiStandard) } catch(e:Throwable){}
+                }
                 jsonArray.put(obj)
             }
 
             // 2. 提取周围扫描到的其他 Wi-Fi（去重）
-            val results = wifiManager.scanResults
             results.forEach { scanResult ->
                 if (scanResult.BSSID != connectedBssid) {
                     val obj = JSONObject()
@@ -81,8 +113,23 @@ class EnvironmentScanner(private val context: Context) {
     @SuppressLint("MissingPermission")
     suspend fun scanCell(): String = withContext(Dispatchers.IO) {
         val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val activeNetwork = connectivityManager.activeNetworkInfo
-        val isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+        var isWifiConnected = false
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            val networks = connectivityManager.allNetworks
+            for (network in networks) {
+                val caps = connectivityManager.getNetworkCapabilities(network)
+                if (caps != null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) {
+                    if (caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) || 
+                        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        isWifiConnected = true
+                        break
+                    }
+                }
+            }
+        } else {
+            val activeNetwork = connectivityManager.activeNetworkInfo
+            isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+        }
 
         if (isWifiConnected) {
             // 如果连接了 Wi-Fi，就不采集基站
