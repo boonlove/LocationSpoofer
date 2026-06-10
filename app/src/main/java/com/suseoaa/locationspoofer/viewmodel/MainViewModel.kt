@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlin.coroutines.resume
@@ -44,7 +45,10 @@ class MainViewModel(
             savedLocations = settingsRepository.getSavedLocations(),
             currentLanguage = settingsRepository.getLanguage(),
             isLanguageSet = settingsRepository.isLanguageSet(),
-            appCoordinateSystems = settingsRepository.getAppCoordinateSystems()
+            appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
+            mockWifi = settingsRepository.mockWifi,
+            mockCell = settingsRepository.mockCell,
+            mockBluetooth = settingsRepository.mockBluetooth
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -105,6 +109,82 @@ class MainViewModel(
                     )
                 }
             }
+        }
+    }
+
+    fun updateLanguage(langCode: String) {
+        settingsRepository.setLanguage(langCode)
+        _uiState.update { it.copy(currentLanguage = langCode) }
+    }
+
+    fun setSearchMode(mode: com.suseoaa.locationspoofer.data.model.SearchMode) {
+        _uiState.update { it.copy(searchMode = mode) }
+    }
+
+    data class ClusterData(
+        val center: com.suseoaa.locationspoofer.data.db.LocationRecord,
+        var count: Int,
+        var hasWifi: Boolean,
+        var hasBluetooth: Boolean,
+        var hasCell: Boolean
+    )
+
+    suspend fun performLocalSearch(): List<com.suseoaa.locationspoofer.ui.screen.AppPoiItem> {
+        val allRecords = environmentDao.getAllCompleteLocations()
+        if (allRecords.isEmpty()) {
+            return emptyList()
+        }
+
+        // Simple clustering logic: group by ~150m distance
+        val clusters = mutableListOf<ClusterData>()
+
+        for (record in allRecords) {
+            val loc = record.location
+            val hasW = record.wifis.isNotEmpty()
+            val hasB = record.bluetooths.isNotEmpty()
+            val hasC = record.cells.isNotEmpty()
+
+            var foundCluster = false
+            for (i in clusters.indices) {
+                val cluster = clusters[i]
+                val dLat = Math.toRadians(cluster.center.lat - loc.lat)
+                val dLng = Math.toRadians(cluster.center.lng - loc.lng)
+                val a = kotlin.math.sin(dLat / 2).let { it * it } + 
+                        kotlin.math.cos(Math.toRadians(loc.lat)) * 
+                        kotlin.math.cos(Math.toRadians(cluster.center.lat)) * 
+                        kotlin.math.sin(dLng / 2).let { it * it }
+                val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+
+                if (distance <= 150.0) { // 150 meters radius
+                    cluster.count += 1
+                    cluster.hasWifi = cluster.hasWifi || hasW
+                    cluster.hasBluetooth = cluster.hasBluetooth || hasB
+                    cluster.hasCell = cluster.hasCell || hasC
+                    foundCluster = true
+                    break
+                }
+            }
+            if (!foundCluster) {
+                clusters.add(ClusterData(loc, 1, hasW, hasB, hasC))
+            }
+        }
+
+        clusters.sortByDescending { it.count }
+
+        return clusters.map { cluster ->
+            val tags = mutableListOf<String>()
+            if (cluster.hasWifi) tags.add("Wi-Fi")
+            if (cluster.hasBluetooth) tags.add("蓝牙")
+            if (cluster.hasCell) tags.add("基站")
+            
+            val tagStr = if (tags.isNotEmpty()) " [${tags.joinToString(", ")}]" else ""
+
+            com.suseoaa.locationspoofer.ui.screen.AppPoiItem(
+                title = "本地采集热点$tagStr",
+                snippet = "包含 ${cluster.count} 条记录 (${String.format("%.4f", cluster.center.lat)}, ${String.format("%.4f", cluster.center.lng)})",
+                lat = cluster.center.lat,
+                lng = cluster.center.lng
+            )
         }
     }
 
@@ -369,7 +449,10 @@ class MainViewModel(
                 state.appCoordinateSystems,
                 state.collectedWifiJson,
                 state.collectedCellJson,
-                state.collectedBluetoothJson
+                state.collectedBluetoothJson,
+                state.mockWifi,
+                state.mockCell,
+                state.mockBluetooth
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -794,9 +877,61 @@ class MainViewModel(
             kotlin.math.sin(lat1) * kotlin.math.cos(lat2) * kotlin.math.cos(dLng)
         return (Math.toDegrees(kotlin.math.atan2(x, y)) + 360) % 360
     }
+    fun toggleMockWifi() {
+        val newVal = !_uiState.value.mockWifi
+        settingsRepository.mockWifi = newVal
+        _uiState.update { it.copy(mockWifi = newVal) }
+        syncMockSettings()
+    }
+
+    fun toggleMockCell() {
+        val newVal = !_uiState.value.mockCell
+        settingsRepository.mockCell = newVal
+        _uiState.update { it.copy(mockCell = newVal) }
+        syncMockSettings()
+    }
+
+    fun toggleMockBluetooth() {
+        val newVal = !_uiState.value.mockBluetooth
+        settingsRepository.mockBluetooth = newVal
+        _uiState.update { it.copy(mockBluetooth = newVal) }
+        syncMockSettings()
+    }
+    
+    private fun syncMockSettings() {
+        if (_uiState.value.isSpoofingActive) {
+            val state = _uiState.value
+            val lat = state.latitudeInput.toDoubleOrNull() ?: return
+            val lng = state.longitudeInput.toDoubleOrNull() ?: return
+            viewModelScope.launch {
+                locationRepository.updateConfig(
+                    lat = lat,
+                    lng = lng,
+                    simMode = if (state.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING) state.routeSimMode.name else "STILL",
+                    simBearing = state.simBearing,
+                    startTime = SpooferProvider.startTimestamp,
+                    routePoints = state.routePoints,
+                    isRouteMode = state.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.RUNNING,
+                    appCoordinateSystems = state.appCoordinateSystems,
+                    wifiJson = state.collectedWifiJson,
+                    cellJson = state.collectedCellJson,
+                    bluetoothJson = state.collectedBluetoothJson,
+                    mockWifi = state.mockWifi,
+                    mockCell = state.mockCell,
+                    mockBluetooth = state.mockBluetooth
+                )
+            }
+        }
+    }
+
 
 
     fun toggleContinuousScanning() {
+        if (_uiState.value.isSpoofingActive) {
+            android.widget.Toast.makeText(context, context.getString(com.suseoaa.locationspoofer.R.string.disable_continuous_scan_route_first), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         if (_uiState.value.isSpoofingActive) {
             android.widget.Toast.makeText(context, context.getString(com.suseoaa.locationspoofer.R.string.stop_spoofing_before_scan), android.widget.Toast.LENGTH_SHORT).show()
             return
@@ -844,6 +979,47 @@ class MainViewModel(
 
     suspend fun getAllLocations(): List<com.suseoaa.locationspoofer.data.db.LocationRecord> {
         return environmentDao.getAllLocations()
+    }
+
+    fun loadManageData() {
+        _uiState.update { it.copy(manageDataIsLoading = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = environmentDao.getAllCompleteLocations()
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(manageDataList = list, manageDataIsLoading = false) }
+            }
+        }
+    }
+
+    fun deleteManageData(ids: List<Long>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            environmentDao.deleteLocations(ids)
+            loadManageData()
+            refreshRecordCount()
+        }
+    }
+
+    fun deleteManageDataSingle(id: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            environmentDao.deleteLocation(id)
+            loadManageData()
+            refreshRecordCount()
+        }
+    }
+
+    fun clearAllManageData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            environmentDao.clearAll()
+            loadManageData()
+            refreshRecordCount()
+        }
+    }
+
+    fun toggleManageDataScreen(show: Boolean) {
+        _uiState.update { it.copy(isManageDataScreen = show) }
+        if (show) {
+            loadManageData()
+        }
     }
 
     fun setAmapApiKey(key: String) {

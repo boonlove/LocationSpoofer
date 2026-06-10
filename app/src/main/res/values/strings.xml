@@ -140,4 +140,6 @@
     <string name="select_coord_sys_desc">Choose the underlying coordinate system standard to simulate for %1$s\n(Hints may not be 100%% accurate, please verify)</string>
     <string name="scanning_status_active">Scanning (%1$d)</string>
     <string name="scanning_status_inactive">Not started</string>
+    <string name="title_manage_data">Manage Collected Data</string>
+    <string name="manage_collected_data_desc">View, select, and delete locally collected environment data</string>
 </resources>

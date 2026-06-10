@@ -20,7 +20,10 @@ class ConfigManager(private val rootManager: RootManager) {
         wifiJson: String = "[]",
         appCoordinateSystems: Map<String, String> = emptyMap(),
         cellJson: String = "[]",
-        bluetoothJson: String = "[]"
+        bluetoothJson: String = "[]",
+        mockWifi: Boolean = true,
+        mockCell: Boolean = true,
+        mockBluetooth: Boolean = true
     ) = withContext(Dispatchers.IO) {
         val routeArray = JSONArray()
         routePoints.forEach { p ->
@@ -42,6 +45,9 @@ class ConfigManager(private val rootManager: RootManager) {
             put("wifi_json", JSONArray(wifiJson))
             put("cell_json", JSONArray(cellJson))
             put("bluetooth_json", JSONArray(bluetoothJson))
+            put("mock_wifi", mockWifi)
+            put("mock_cell", mockCell)
+            put("mock_bluetooth", mockBluetooth)
             
             val coordSysObj = JSONObject()
             appCoordinateSystems.forEach { (pkg, sys) -> coordSysObj.put(pkg, sys) }

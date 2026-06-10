@@ -14,6 +14,11 @@ enum class SimMode(@StringRes val labelResId: Int, val speedMs: Double) {
     CUSTOM(R.string.custom, 0.0)
 }
 
+enum class SearchMode {
+    NETWORK,
+    LOCAL
+}
+
 /** 路线规划阶段 */
 enum class RoutePlanStage {
     /** 未开始，默认状态 */
@@ -48,6 +53,7 @@ data class AppState(
     val wifiApCount: Int = 0,
     val savedLocations: List<SavedLocation> = emptyList(),
     val searchKeyword: String = "",
+    val searchMode: SearchMode = SearchMode.NETWORK,
     val searchResults: List<SavedLocation> = emptyList(),
     val simBearing: Float = 0f,
     val savedRoutes: List<SavedRoute> = emptyList(),
@@ -71,7 +77,16 @@ data class AppState(
     // 采集到的本地环境数据
     val collectedWifiJson: String = "[]",
     val collectedCellJson: String = "[]",
-    val collectedBluetoothJson: String = "[]"
+    val collectedBluetoothJson: String = "[]",
+    // 模拟开关
+    val mockWifi: Boolean = true,
+    val mockCell: Boolean = true,
+    val mockBluetooth: Boolean = true,
+    
+    // Data Management
+    val isManageDataScreen: Boolean = false,
+    val manageDataList: List<com.suseoaa.locationspoofer.data.db.CompleteLocation> = emptyList(),
+    val manageDataIsLoading: Boolean = false
 )
 
 data class AppInfoItem(

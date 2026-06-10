@@ -103,7 +103,8 @@ fun SpoofingScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showEnvironmentDialog by remember { mutableStateOf(false) }
-    
+    var showStartSpoofingDialog by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -217,10 +218,32 @@ fun SpoofingScreen(
         // 搜索栏
         HomeSearchBar(
             query = searchQuery,
+            searchMode = uiState.searchMode,
+            onSearchModeChange = { mode ->
+                viewModel.setSearchMode(mode)
+                if (mode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
+                    focusManager.clearFocus()
+                    // Perform local search immediately
+                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                        val results = viewModel.performLocalSearch()
+                        searchResults = results
+                        showSearchResults = results.isNotEmpty()
+                    }
+                } else {
+                    searchResults = emptyList()
+                    showSearchResults = false
+                }
+            },
             onQueryChange = { searchQuery = it },
             onSearch = {
                 focusManager.clearFocus()
-                if (uiState.amapApiKey.isBlank()) {
+                if (uiState.searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
+                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                        val results = viewModel.performLocalSearch()
+                        searchResults = results
+                        showSearchResults = results.isNotEmpty()
+                    }
+                } else if (uiState.amapApiKey.isBlank()) {
                     showApiKeyWarning = true
                 } else if (searchQuery.isNotBlank()) {
                     performPoiSearch(context, searchQuery, isDomestic) { results ->
@@ -357,7 +380,7 @@ fun SpoofingScreen(
             )
             Spacer(Modifier.height(12.dp))
 
-            ActionButtons(viewModel, uiState, onExpandMap)
+            ActionButtons(viewModel, uiState, onExpandMap, onStartFixedSpoofing = { showStartSpoofingDialog = true })
             Spacer(Modifier.height(16.dp))
 
             // 已保存的位置列表（显示在操作按钮下方）
@@ -444,6 +467,34 @@ fun SpoofingScreen(
                             modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AccentGreen)
                         )
                         Spacer(Modifier.width(8.dp))
+                    }
+                    Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(0.dp),
+                modifier = Modifier.clickable {
+                    viewModel.toggleManageDataScreen(true)
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.title_manage_data), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text(stringResource(R.string.manage_collected_data_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
                     }
                     Icon(Icons.Outlined.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
                 }
@@ -642,6 +693,21 @@ fun SpoofingScreen(
                 onBack = { showAppCoordinateScreen = false }
             )
         }
+    }
+
+
+    if (showStartSpoofingDialog) {
+        StartSpoofingDialog(
+            uiState = uiState,
+            onDismiss = { showStartSpoofingDialog = false },
+            onConfirm = {
+                viewModel.startSpoofing()
+                showStartSpoofingDialog = false
+            },
+            onToggleWifi = { viewModel.toggleMockWifi() },
+            onToggleCell = { viewModel.toggleMockCell() },
+            onToggleBluetooth = { viewModel.toggleMockBluetooth() }
+        )
     }
 
     if (showCustomCoordDialog) {
@@ -858,7 +924,7 @@ fun coordinateFieldColors() = OutlinedTextFieldDefaults.colors(
 // 操作按钮
 
 @Composable
-fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> Unit) {
+fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> Unit, onStartFixedSpoofing: () -> Unit) {
     if (uiState.isSpoofingActive) {
         val stopColor by animateColorAsState(
             targetValue = MaterialTheme.colorScheme.error,
@@ -880,7 +946,7 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Button(
-                onClick = { viewModel.startSpoofing() },
+                onClick = onStartFixedSpoofing,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
@@ -1124,13 +1190,41 @@ fun SavedLocationsDialog(
 @Composable
 fun HomeSearchBar(
     query: String,
+    searchMode: com.suseoaa.locationspoofer.data.model.SearchMode,
+    onSearchModeChange: (com.suseoaa.locationspoofer.data.model.SearchMode) -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            val isNetwork = searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK
+            val activeColor = AccentBlue
+            val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
+
+            Button(
+                onClick = { onSearchModeChange(com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK) },
+                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isNetwork) activeColor else inactiveColor),
+                modifier = Modifier.weight(1f).height(36.dp)
+            ) {
+                Text("网络检索", fontSize = 13.sp, color = if (isNetwork) Color.White else MaterialTheme.colorScheme.onSurface)
+            }
+            Button(
+                onClick = { onSearchModeChange(com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) },
+                shape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (!isNetwork) activeColor else inactiveColor),
+                modifier = Modifier.weight(1f).height(36.dp)
+            ) {
+                Text("本地采集", fontSize = 13.sp, color = if (!isNetwork) Color.White else MaterialTheme.colorScheme.onSurface)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         androidx.compose.foundation.text.BasicTextField(
@@ -1177,6 +1271,7 @@ fun HomeSearchBar(
             Icon(Icons.Rounded.Search, stringResource(R.string.search), tint = Color.White, modifier = Modifier.size(20.dp))
         }
     }
+}
 }
 
 // 首页已保存位置卡片（内嵌列表，非弹窗）
@@ -1409,6 +1504,80 @@ fun LocalizedDialog(
             androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
         ) {
             content()
+        }
+    }
+}
+
+@Composable
+fun StartSpoofingDialog(
+    uiState: AppState,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+    onToggleWifi: () -> Unit,
+    onToggleCell: () -> Unit,
+    onToggleBluetooth: () -> Unit
+) {
+    LocalizedDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth()
+            ) {
+                Text(
+                    text = "模拟选项",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "请选择本次定点模拟需要伪造的环境数据。未勾选的项将被彻底屏蔽（即App无法获取您的真实数据）。默认包含经纬度伪造。",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+                Spacer(Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Wifi, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("伪造 Wi-Fi 数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Switch(checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() })
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.CellTower, null, tint = AccentOrange, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("伪造基站数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Switch(checked = uiState.mockCell, onCheckedChange = { onToggleCell() })
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Bluetooth, null, tint = AccentGreen, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text("伪造蓝牙数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Switch(checked = uiState.mockBluetooth, onCheckedChange = { onToggleBluetooth() })
+                }
+
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onConfirm,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                    ) {
+                        Text(stringResource(R.string.start_simulation))
+                    }
+                }
+            }
         }
     }
 }

@@ -45,4 +45,10 @@ interface EnvironmentDao {
 
     @Query("DELETE FROM location_records")
     suspend fun clearAll()
+
+    @Query("DELETE FROM location_records WHERE id = :id")
+    suspend fun deleteLocation(id: Long)
+
+    @Query("DELETE FROM location_records WHERE id IN (:ids)")
+    suspend fun deleteLocations(ids: List<Long>)
 }

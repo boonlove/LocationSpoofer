@@ -32,7 +32,10 @@ class LocationRepository(
         appCoordinateSystems: Map<String, String>,
         wifiJson: String = "[]",
         cellJson: String = "[]",
-        bluetoothJson: String = "[]"
+        bluetoothJson: String = "[]",
+        mockWifi: Boolean = true,
+        mockCell: Boolean = true,
+        mockBluetooth: Boolean = true
     ) {
         SpooferProvider.isActive = true
         SpooferProvider.latitude = lat
@@ -46,7 +49,7 @@ class LocationRepository(
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -83,7 +86,10 @@ class LocationRepository(
         appCoordinateSystems: Map<String, String>,
         wifiJson: String = SpooferProvider.wifiJson,
         cellJson: String = SpooferProvider.cellJson,
-        bluetoothJson: String = SpooferProvider.bluetoothJson
+        bluetoothJson: String = SpooferProvider.bluetoothJson,
+        mockWifi: Boolean = true,
+        mockCell: Boolean = true,
+        mockBluetooth: Boolean = true
     ) {
         SpooferProvider.latitude = lat
         SpooferProvider.longitude = lng
@@ -95,7 +101,7 @@ class LocationRepository(
         SpooferProvider.wifiJson = wifiJson
         SpooferProvider.cellJson = cellJson
         SpooferProvider.bluetoothJson = bluetoothJson
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth)
     }
 
     suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {

@@ -29,17 +29,48 @@ class EnvironmentScanner(private val context: Context) {
     @SuppressLint("MissingPermission")
     suspend fun scanWifi(): String = withContext(Dispatchers.IO) {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
         val jsonArray = JSONArray()
         try {
+            val activeNetwork = connectivityManager.activeNetworkInfo
+            val isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+
+            if (!isWifiConnected) {
+                // 如果没有连接 Wi-Fi，则不采集 Wi-Fi 列表，返回空数组
+                return@withContext "[]"
+            }
+
+            // 1. 优先提取当前正在连接的 Wi-Fi 信息，并置于数组首位
+            val connectionInfo = wifiManager.connectionInfo
+            val connectedBssid = connectionInfo?.bssid
+            if (connectedBssid != null && connectedBssid != "02:00:00:00:00:00") {
+                val obj = JSONObject()
+                obj.put("bssid", connectedBssid)
+                val rawSsid = connectionInfo.ssid
+                val cleanSsid = if (rawSsid != null && rawSsid.startsWith("\"") && rawSsid.endsWith("\"")) {
+                    rawSsid.substring(1, rawSsid.length - 1)
+                } else {
+                    rawSsid ?: ""
+                }
+                obj.put("ssid", if (cleanSsid == "<unknown ssid>") "" else cleanSsid)
+                obj.put("level", connectionInfo.rssi)
+                obj.put("frequency", connectionInfo.frequency)
+                obj.put("capabilities", "[WPA2-PSK-CCMP][ESS]") // 兜底 capability
+                jsonArray.put(obj)
+            }
+
+            // 2. 提取周围扫描到的其他 Wi-Fi（去重）
             val results = wifiManager.scanResults
             results.forEach { scanResult ->
-                val obj = JSONObject()
-                obj.put("bssid", scanResult.BSSID)
-                obj.put("ssid", scanResult.SSID)
-                obj.put("level", scanResult.level)
-                obj.put("capabilities", scanResult.capabilities)
-                obj.put("frequency", scanResult.frequency)
-                jsonArray.put(obj)
+                if (scanResult.BSSID != connectedBssid) {
+                    val obj = JSONObject()
+                    obj.put("bssid", scanResult.BSSID)
+                    obj.put("ssid", scanResult.SSID)
+                    obj.put("level", scanResult.level)
+                    obj.put("capabilities", scanResult.capabilities)
+                    obj.put("frequency", scanResult.frequency)
+                    jsonArray.put(obj)
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -49,6 +80,15 @@ class EnvironmentScanner(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     suspend fun scanCell(): String = withContext(Dispatchers.IO) {
+        val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val activeNetwork = connectivityManager.activeNetworkInfo
+        val isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
+
+        if (isWifiConnected) {
+            // 如果连接了 Wi-Fi，就不采集基站
+            return@withContext "[]"
+        }
+
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val jsonArray = JSONArray()
         try {

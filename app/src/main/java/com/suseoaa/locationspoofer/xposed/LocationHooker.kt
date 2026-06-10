@@ -247,11 +247,11 @@ class LocationHooker : XposedModule() {
             return // 宿主App不需要注入定位Hook
         }
 
-        // 系统进程：只Hook Location API，不动Wi-Fi（避免系统崩溃）
-        if (SYSTEM_PACKAGES.contains(pkg)) {
-            hookLocationAPIs(classLoader, pkg)
-            return
-        }
+        // 系统进程：允许执行所有的环境数据Hook，实现系统原生界面的完美覆盖
+        // if (SYSTEM_PACKAGES.contains(pkg)) {
+        //     hookLocationAPIs(classLoader, pkg)
+        //     return
+        // }
 
 
         XposedBridge.log("[LocationSpoofer] Hooking package: $pkg")
@@ -377,6 +377,59 @@ class LocationHooker : XposedModule() {
                     }
                 })
         } catch (_: Throwable) {}
+
+// ── 4. 拦截 AppOpsManager 的 OP_MOCK_LOCATION (58) ──
+        // 很多深度定制系统（如 MIUI）和硬核反作弊会检查 AppOps 权限
+        try {
+            val appOpsHook = object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val config = readConfig() ?: return
+                    if (!config.optBoolean("active", false)) return
+                    
+                    val opArg = param.args[0]
+                    val isMockOp = if (opArg is Int) {
+                        opArg == 58 // OP_MOCK_LOCATION
+                    } else if (opArg is String) {
+                        opArg == "android:mock_location"
+                    } else false
+
+                    if (isMockOp) {
+                        // MODE_IGNORED = 1, MODE_ERRORED = 2
+                        param.result = 1 // MODE_IGNORED，让对方以为我们没有被授权模拟位置
+                    }
+                }
+            }
+            
+            val appOpsClass = XposedHelpers.findClass("android.app.AppOpsManager", classLoader)
+            try { XposedBridge.hookAllMethods(appOpsClass, "checkOp", appOpsHook) } catch (e: Throwable) {}
+            try { XposedBridge.hookAllMethods(appOpsClass, "checkOpNoThrow", appOpsHook) } catch (e: Throwable) {}
+            try { XposedBridge.hookAllMethods(appOpsClass, "noteOp", appOpsHook) } catch (e: Throwable) {}
+            try { XposedBridge.hookAllMethods(appOpsClass, "noteOpNoThrow", appOpsHook) } catch (e: Throwable) {}
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+        // ── 5. 拦截 Settings.Secure 的 mock_location 开关查询 ──
+        try {
+            val secureHook = object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val config = readConfig() ?: return
+                    if (!config.optBoolean("active", false)) return
+                    
+                    val name = param.args[1] as? String
+                    if (name == "mock_location") {
+                        if (param.method?.name == "getInt") {
+                            param.result = 0
+                        } else if (param.method?.name == "getString") {
+                            param.result = "0"
+                        }
+                    }
+                }
+            }
+            
+            val secureClass = XposedHelpers.findClass("android.provider.Settings\$Secure", classLoader)
+            try { XposedHelpers.findAndHookMethod(secureClass, "getInt", android.content.ContentResolver::class.java, String::class.java, secureHook) } catch (e: Throwable) {}
+            try { XposedHelpers.findAndHookMethod(secureClass, "getInt", android.content.ContentResolver::class.java, String::class.java, Int::class.javaPrimitiveType, secureHook) } catch (e: Throwable) {}
+            try { XposedHelpers.findAndHookMethod(secureClass, "getString", android.content.ContentResolver::class.java, String::class.java, secureHook) } catch (e: Throwable) {}
+        } catch (e: Throwable) { XposedBridge.log(e) }
 
         XposedBridge.log("[LocationSpoofer] Anti-detection hooks installed")
     }
@@ -1244,10 +1297,11 @@ class LocationHooker : XposedModule() {
         // 拦截所有 WifiInfo 属性读取，返回数据库中第一个 AP 的信息
         // 无数据时返回伪造的断开状态值，避免泄漏真实 Wi-Fi 指纹
         val wifiInfoHook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
+            override fun beforeHookedMethod(param: MethodHookParam) {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
-                val wifiArray = config.optJSONArray("wifi_json")
+                val mockWifi = config.optBoolean("mock_wifi", true)
+                val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
                 val firstWifi =
                     if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
                 when (param.method!!.name) {
@@ -1288,14 +1342,15 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiInfo", classLoader, "getSupplicantState",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
+                        val mockWifi = config.optBoolean("mock_wifi", true)
                         try {
                             val enumClass = XposedHelpers.findClass(
                                 "android.net.wifi.SupplicantState", classLoader
                             )
-                            param.result = enumClass.getField("COMPLETED").get(null)
+                            param.result = enumClass.getField(if (mockWifi) "COMPLETED" else "DISCONNECTED").get(null)
                         } catch (e: Throwable) { /* 忽略 */ }
                     }
                 }
@@ -1319,11 +1374,12 @@ class LocationHooker : XposedModule() {
         )
 
         val wifiScanHook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
+            override fun beforeHookedMethod(param: MethodHookParam) {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
                 val fakeList = java.util.ArrayList<Any>()
-                val wifiArray = config.optJSONArray("wifi_json")
+                val mockWifi = config.optBoolean("mock_wifi", true)
+                val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
                 if (wifiArray != null && wifiArray.length() > 0) {
                     try {
                         val scanResultClass =
@@ -1376,10 +1432,10 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getWifiState",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
-                        param.result = 3
+                        param.result = if (config.optBoolean("mock_wifi", true)) 3 else 1
                     }
                 })
 
@@ -1387,10 +1443,10 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "isWifiEnabled",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
-                        param.result = true
+                        param.result = config.optBoolean("mock_wifi", true)
                     }
                 })
 
@@ -1398,10 +1454,11 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getConnectionInfo",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
-                        val wifiArray = config.optJSONArray("wifi_json")
+                        val mockWifi = config.optBoolean("mock_wifi", true)
+                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
                         if (wifiArray != null && wifiArray.length() > 0) {
                             val firstWifi = wifiArray.getJSONObject(0)
                             try {
@@ -1434,7 +1491,7 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getConfiguredNetworks",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         param.result = java.util.ArrayList<Any>()
@@ -1445,7 +1502,7 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getDhcpInfo",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         try {
@@ -1471,10 +1528,11 @@ class LocationHooker : XposedModule() {
             XposedHelpers.findAndHookMethod(
                 "android.net.NetworkInfo", classLoader, "getExtraInfo",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
-                        val wifiArray = config.optJSONArray("wifi_json")
+                        val mockWifi = config.optBoolean("mock_wifi", true)
+                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
                         if (wifiArray != null && wifiArray.length() > 0) {
                             param.result = "\"${wifiArray.getJSONObject(0).optString("ssid", "HOME_WIFI")}\""
                         } else {
@@ -1483,6 +1541,74 @@ class LocationHooker : XposedModule() {
                     }
                 }
             )
+        } catch (e: Throwable) { XposedBridge.log(e) }
+
+// ── 5. WifiScanner 隐藏接口 Hook (高德/腾讯/百度/抖音 绕过 WifiManager 的通道) ──
+        try {
+            val wifiScannerClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiScanner", classLoader)
+            if (wifiScannerClass != null) {
+                val scannerHook = object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        
+                        // 阻断真实扫描
+                        param.result = null
+                        
+                        // 最后一个参数通常是 ScanListener
+                        val listener = param.args.lastOrNull() ?: return
+                        val mockWifi = config.optBoolean("mock_wifi", true)
+                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
+                        
+                        if (wifiArray != null && wifiArray.length() > 0) {
+                            try {
+                                val scanResultClass = XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
+                                val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
+                                val fakeArray = java.lang.reflect.Array.newInstance(scanResultClass, wifiArray.length())
+                                
+                                for (i in 0 until wifiArray.length()) {
+                                    val wifi = wifiArray.getJSONObject(i)
+                                    val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
+                                    XposedHelpers.setObjectField(fakeScanResult, "SSID", wifi.optString("ssid"))
+                                    XposedHelpers.setObjectField(fakeScanResult, "BSSID", wifi.optString("bssid"))
+                                    val level = (-65 + (rng.nextGaussian() * 10).toInt()).coerceIn(-90, -30)
+                                    XposedHelpers.setIntField(fakeScanResult, "level", level)
+                                    XposedHelpers.setIntField(fakeScanResult, "frequency", wifi.optInt("frequency", 2412))
+                                    XposedHelpers.setObjectField(fakeScanResult, "capabilities", wifi.optString("capabilities", "[WPA2-PSK-CCMP][ESS]"))
+                                    try {
+                                        val offsetNanos = (rng.nextInt(200_000) * 1000L)
+                                        XposedHelpers.setLongField(fakeScanResult, "timestamp", (baseTimestamp - offsetNanos) / 1000)
+                                    } catch (e: Throwable) { /* 忽略 */ }
+                                    java.lang.reflect.Array.set(fakeArray, i, fakeScanResult)
+                                }
+                                
+                                // 构造 ScanData 对象（包含 ScanResult 数组）
+                                val scanDataClass = XposedHelpers.findClass("android.net.wifi.WifiScanner\$ScanData", classLoader)
+                                val fakeScanData = XposedHelpers.newInstance(scanDataClass, 0, 0, fakeArray)
+                                val fakeScanDataArray = java.lang.reflect.Array.newInstance(scanDataClass, 1)
+                                java.lang.reflect.Array.set(fakeScanDataArray, 0, fakeScanData)
+                                
+                                // 主动回调 Listener，把假数据塞回去
+                                XposedHelpers.callMethod(listener, "onResults", fakeScanDataArray)
+                            } catch (e: Throwable) {
+                                XposedBridge.log("[LocationSpoofer] WifiScanner 伪造失败: $e")
+                            }
+                        } else {
+                            try {
+                                val scanDataClass = XposedHelpers.findClass("android.net.wifi.WifiScanner\$ScanData", classLoader)
+                                val scanResultClass = XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
+                                val emptyScanData = XposedHelpers.newInstance(scanDataClass, 0, 0, java.lang.reflect.Array.newInstance(scanResultClass, 0))
+                                val fakeScanDataArray = java.lang.reflect.Array.newInstance(scanDataClass, 1)
+                                java.lang.reflect.Array.set(fakeScanDataArray, 0, emptyScanData)
+                                XposedHelpers.callMethod(listener, "onResults", fakeScanDataArray)
+                            } catch (e: Throwable) { /* 忽略 */ }
+                        }
+                    }
+                }
+                
+                // startScan(ScanSettings, ScanListener) 和重载
+                XposedBridge.hookAllMethods(wifiScannerClass, "startScan", scannerHook)
+            }
         } catch (e: Throwable) { XposedBridge.log(e) }
 
         XposedBridge.log("[LocationSpoofer] Wi-Fi environment hooks installed")
@@ -1495,7 +1621,7 @@ class LocationHooker : XposedModule() {
 
         // ── 1. 基站信息伪造（CellLocation / AllCellInfo / NeighboringCellInfo）──
         val cellHook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
+            override fun beforeHookedMethod(param: MethodHookParam) {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
                 val lat = config.optDouble("lat", 0.0)
@@ -1504,7 +1630,8 @@ class LocationHooker : XposedModule() {
                 when (param.method!!.name) {
                     "getCellLocation" -> {
                         try {
-                            val cellArray = config.optJSONArray("cell_json")
+                            val mockCell = config.optBoolean("mock_cell", true)
+                            val cellArray = if (mockCell) config.optJSONArray("cell_json") else null
                             if (cellArray != null && cellArray.length() > 0) {
                                 // 有采集数据时，使用数据库中的 LAC/CID
                                 val cell = cellArray.getJSONObject(0)
@@ -1527,7 +1654,11 @@ class LocationHooker : XposedModule() {
 
                     "getAllCellInfo" -> {
                         try {
-                            param.result = buildFakeCellInfoList(classLoader, lat, lng, config)
+                            if (config.optBoolean("mock_cell", true)) {
+                                param.result = buildFakeCellInfoList(classLoader, lat, lng, config)
+                            } else {
+                                param.result = java.util.ArrayList<Any>()
+                            }
                         } catch (e: Throwable) {
                             XposedBridge.log("[LocationSpoofer] CellInfo构造失败: $e")
                             param.result = java.util.ArrayList<Any>()
@@ -1549,20 +1680,21 @@ class LocationHooker : XposedModule() {
         // 防止 MCC/MNC/运营商名称/网络类型泄漏真实地理位置
         // 高德用 getNetworkOperator() 验证基站数据是否与 GPS 位置地理一致
         val telephonyMetaHook = object : XC_MethodHook() {
-            override fun afterHookedMethod(param: MethodHookParam) {
+            override fun beforeHookedMethod(param: MethodHookParam) {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
-                val cellArray = config.optJSONArray("cell_json")
+                val mockCell = config.optBoolean("mock_cell", true)
+                val cellArray = if (mockCell) config.optJSONArray("cell_json") else null
                 when (param.method!!.name) {
                     "getNetworkOperator" -> {
-                        // 返回 MCC+MNC 字符串（如 "46000"），必须与基站数据一致
                         if (cellArray != null && cellArray.length() > 0) {
                             val cell = cellArray.getJSONObject(0)
                             val mcc = cell.optInt("mcc", 460)
                             val mnc = cell.optInt("mnc", 0)
                             param.result = String.format(java.util.Locale.US, "%d%02d", mcc, mnc)
+                        } else if (!mockCell) {
+                            param.result = ""
                         }
-                        // 无数据时不修改，保留真实值（避免因空值触发异常）
                     }
                     "getNetworkOperatorName" -> {
                         if (cellArray != null && cellArray.length() > 0) {
@@ -1573,13 +1705,14 @@ class LocationHooker : XposedModule() {
                                 3, 5, 11 -> "中国电信"
                                 else -> "中国移动"
                             }
+                        } else if (!mockCell) {
+                            param.result = ""
                         }
                     }
-                    // SIM 卡运营商编码/名称 — 不修改（SIM 是物理的，修改反而可疑）
                     "getSimOperator" -> { /* 保留真实值 */ }
                     "getSimOperatorName" -> { /* 保留真实值 */ }
-                    "getNetworkType" -> param.result = 13   // NETWORK_TYPE_LTE
-                    "getDataNetworkType" -> param.result = 13
+                    "getNetworkType" -> param.result = if (mockCell) 13 else 0
+                    "getDataNetworkType" -> param.result = if (mockCell) 13 else 0
                     "getPhoneType" -> param.result = 1      // PHONE_TYPE_GSM
                 }
             }
@@ -1620,6 +1753,45 @@ class LocationHooker : XposedModule() {
             )
         } catch (e: Throwable) { XposedBridge.log(e) }
 
+// ── 4. TelephonyManager.requestCellInfoUpdate 异步刷新拦截 (Android 10+) ──
+        try {
+            XposedBridge.hookAllMethods(
+                XposedHelpers.findClass("android.telephony.TelephonyManager", classLoader),
+                "requestCellInfoUpdate",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        
+                        // 阻断真实请求
+                        param.result = null
+                        
+                        val executor = param.args[0] as? java.util.concurrent.Executor ?: return
+                        val callback = param.args[1] ?: return
+                        
+                        val mockCell = config.optBoolean("mock_cell", true)
+                        val lat = config.optDouble("lat", 0.0)
+                        val lng = config.optDouble("lng", 0.0)
+                        
+                        val fakeCells = if (mockCell) {
+                            buildFakeCellInfoList(classLoader, lat, lng, config)
+                        } else {
+                            java.util.ArrayList<Any>()
+                        }
+                        
+                        // 异步回调
+                        executor.execute {
+                            try {
+                                XposedHelpers.callMethod(callback, "onCellInfo", fakeCells)
+                            } catch (e: Throwable) {
+                                XposedBridge.log("[LocationSpoofer] onCellInfo 回调失败: $e")
+                            }
+                        }
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 低版本可能没有这个方法 */ }
+
         XposedBridge.log("[LocationSpoofer] Cell environment hooks installed")
     }
 
@@ -1627,23 +1799,41 @@ class LocationHooker : XposedModule() {
     // 网络连接层伪造 — 覆盖 ConnectivityManager / NetworkCapabilities / NetworkInterface
     // ══════════════════════════════════════════════════════════════════════════
     private fun hookConnectivityLayer(classLoader: ClassLoader) {
+        val buildFakeNetworkInfo = fun(): Any? {
+            try {
+                val networkInfoClass = XposedHelpers.findClass("android.net.NetworkInfo", classLoader)
+                val fakeNetworkInfo = XposedHelpers.newInstance(networkInfoClass, 1, 0, "WIFI", "")
+                XposedHelpers.callMethod(fakeNetworkInfo, "setIsAvailable", true)
+                try {
+                    val stateEnum = XposedHelpers.findClass("android.net.NetworkInfo\$State", classLoader)
+                    XposedHelpers.setObjectField(fakeNetworkInfo, "mState", stateEnum.getField("CONNECTED").get(null))
+                } catch (e: Throwable) { /* 忽略 */ }
+                try {
+                    val detailedStateEnum = XposedHelpers.findClass("android.net.NetworkInfo\$DetailedState", classLoader)
+                    XposedHelpers.setObjectField(fakeNetworkInfo, "mDetailedState", detailedStateEnum.getField("CONNECTED").get(null))
+                } catch (e: Throwable) { /* 忽略 */ }
+                return fakeNetworkInfo
+            } catch (e: Throwable) { return null }
+        }
 
-        // ── 1. ConnectivityManager.getActiveNetworkInfo() ──
-        // 不修改返回值结构，NetworkInfo.getExtraInfo() 的 Hook 已在 hookWifiEnvironment 中处理 SSID 泄漏
-        try {
-            XposedHelpers.findAndHookMethod(
-                "android.net.ConnectivityManager", classLoader, "getActiveNetworkInfo",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        // 保持返回值不变 — SSID 泄漏由 NetworkInfo.getExtraInfo() Hook 处理
+        // ── 1. 强制让系统以为连着 Wi-Fi ──
+        val networkInfoHook = object : XC_MethodHook() {
+            override fun afterHookedMethod(param: MethodHookParam) {
+                val config = readConfig() ?: return
+                if (!config.optBoolean("active", false)) return
+                if (config.optBoolean("mock_wifi", true)) {
+                    val fakeInfo = buildFakeNetworkInfo()
+                    if (fakeInfo != null) {
+                        param.result = fakeInfo
                     }
                 }
-            )
-        } catch (e: Throwable) { /* 忽略 */ }
+            }
+        }
 
-        // ── 2. NetworkCapabilities — Android 6+ 网络能力查询 ──
-        // Android 12+ 的 NetworkCapabilities 包含 WifiInfo 作为 TransportInfo
-        // 必须清除以防止通过此路径获取真实 Wi-Fi 信息
+        try { XposedHelpers.findAndHookMethod("android.net.ConnectivityManager", classLoader, "getActiveNetworkInfo", networkInfoHook) } catch (e: Throwable) {}
+        try { XposedHelpers.findAndHookMethod("android.net.ConnectivityManager", classLoader, "getNetworkInfo", Int::class.javaPrimitiveType, networkInfoHook) } catch (e: Throwable) {}
+
+        // ── 2. NetworkCapabilities 包含 WifiInfo ──
         try {
             XposedHelpers.findAndHookMethod(
                 "android.net.ConnectivityManager", classLoader,
@@ -1653,18 +1843,36 @@ class LocationHooker : XposedModule() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
+                        if (!config.optBoolean("mock_wifi", true)) return
+                        
                         val nc = param.result ?: return
-                        // 清除 TransportInfo 中可能包含的真实 Wi-Fi 信息
                         try {
-                            XposedHelpers.setObjectField(nc, "mTransportInfo", null)
-                        } catch (e: Throwable) { /* 字段名可能因版本不同 */ }
+                            val wifiInfoClass = XposedHelpers.findClass("android.net.wifi.WifiInfo", classLoader)
+                            val fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
+                            val wifiArray = config.optJSONArray("wifi_json")
+                            val firstWifi = if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
+                            if (firstWifi != null) {
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mBSSID", firstWifi.optString("bssid")) } catch (e: Throwable) {}
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mMacAddress", firstWifi.optString("bssid")) } catch (e: Throwable) {}
+                                try {
+                                    val wifiSsidClass = XposedHelpers.findClass("android.net.wifi.WifiSsid", classLoader)
+                                    val createMethod = XposedHelpers.findMethodExact(wifiSsidClass, "createFromAsciiEncoded", String::class.java)
+                                    val wifiSsid = createMethod.invoke(null, firstWifi.optString("ssid"))
+                                    XposedHelpers.setObjectField(fakeWifiInfo, "mWifiSsid", wifiSsid)
+                                } catch (e: Throwable) {
+                                    try { XposedHelpers.setObjectField(fakeWifiInfo, "mSSID", "\"${firstWifi.optString("ssid")}\"") } catch (e2: Throwable) {}
+                                }
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mNetworkId", 1) } catch (e: Throwable) {}
+                            }
+                            
+                            XposedHelpers.setObjectField(nc, "mTransportInfo", fakeWifiInfo)
+                        } catch (e: Throwable) { /* 忽略 */ }
                     }
                 }
             )
         } catch (e: Throwable) { /* 忽略 */ }
 
         // ── 3. NetworkInterface.getNetworkInterfaces() ──
-        // 过滤 wlan0/p2p 等 Wi-Fi 相关网络接口，防止通过接口名和 MAC 地址泄漏真实信息
         try {
             XposedHelpers.findAndHookMethod(
                 "java.net.NetworkInterface", classLoader, "getNetworkInterfaces",
@@ -1677,7 +1885,6 @@ class LocationHooker : XposedModule() {
                             val name = try {
                                 (iface as java.net.NetworkInterface).name
                             } catch (e: Throwable) { "" }
-                            // 保留非 Wi-Fi 接口（lo, rmnet 等），过滤 wlan/p2p/swlan
                             !name.startsWith("wlan") && !name.startsWith("p2p") && !name.startsWith("swlan")
                         }
                         param.result = java.util.Collections.enumeration(filtered)
@@ -1695,7 +1902,8 @@ class LocationHooker : XposedModule() {
     private fun hookBluetoothLE(classLoader: ClassLoader) {
 
         // ── BLE 扫描结果伪造的核心逻辑（复用于不同 startScan 重载）──
-        val buildAndDeliverBleResults = { config: JSONObject, callbackObj: Any, cl: ClassLoader ->
+        val buildAndDeliverBleResults = fun(config: JSONObject, callbackObj: Any, cl: ClassLoader) {
+            if (!config.optBoolean("mock_bluetooth", true)) return
             try {
                 val bluetoothArray = config.optJSONArray("bluetooth_json")
                 if (bluetoothArray != null && bluetoothArray.length() > 0) {
@@ -1796,13 +2004,41 @@ class LocationHooker : XposedModule() {
             )
         } catch (e: Throwable) { XposedBridge.log(e) }
 
+
+        try {
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.BluetoothAdapter", classLoader, "isEnabled",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        if (!config.optBoolean("mock_bluetooth", true)) {
+                            param.result = false
+                        }
+                    }
+                }
+            )
+            XposedHelpers.findAndHookMethod(
+                "android.bluetooth.BluetoothAdapter", classLoader, "getState",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig() ?: return
+                        if (!config.optBoolean("active", false)) return
+                        if (!config.optBoolean("mock_bluetooth", true)) {
+                            param.result = 10 // STATE_OFF
+                        }
+                    }
+                }
+            )
+        } catch (e: Throwable) { /* 忽略 */ }
+
         // ── 3. BluetoothAdapter.getBondedDevices() → 空集合 ──
         // 防止通过已配对蓝牙设备列表进行指纹识别
         try {
             XposedHelpers.findAndHookMethod(
                 "android.bluetooth.BluetoothAdapter", classLoader, "getBondedDevices",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         param.result = java.util.HashSet<Any>()

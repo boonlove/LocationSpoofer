@@ -163,17 +163,23 @@ fun MainScreen(
         isFullScreenMap = false
     }
 
-    BackHandler(enabled = isFullScreenMap || isScannerMap) {
-        if (isScannerMap) isScannerMap = false else closeMapAndResetRouteIfNeeded()
+    BackHandler(enabled = isFullScreenMap || isScannerMap || uiState.isManageDataScreen) {
+        if (uiState.isManageDataScreen) {
+            viewModel.toggleManageDataScreen(false)
+        } else if (isScannerMap) {
+            isScannerMap = false
+        } else {
+            closeMapAndResetRouteIfNeeded()
+        }
     }
 
     AnimatedContent(
-        targetState = Pair(isFullScreenMap, isScannerMap),
+        targetState = Triple(isFullScreenMap, isScannerMap, uiState.isManageDataScreen),
         transitionSpec = {
             slideInVertically(tween(400)) { it } togetherWith slideOutVertically(tween(400)) { -it }
         },
         label = "fullscreen_transition"
-    ) { (fullScreen, scannerMap) ->
+    ) { (fullScreen, scannerMap, manageData) ->
         if (fullScreen) {
             FullScreenMapPage(
                 viewModel = viewModel,
@@ -187,6 +193,13 @@ fun MainScreen(
                 uiState = uiState,
                 isDark = isDark,
                 onClose = { isScannerMap = false }
+            )
+        } else if (manageData) {
+            com.suseoaa.locationspoofer.ui.screen.ManageDataScreen(
+                viewModel = viewModel,
+                uiState = uiState,
+                isDark = isDark,
+                onClose = { viewModel.toggleManageDataScreen(false) }
             )
         } else {
             when {

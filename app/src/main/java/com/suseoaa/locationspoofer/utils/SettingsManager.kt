@@ -39,6 +39,18 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("last_spoofed_lng", "0") ?: "0"
         set(value) = prefs.edit().putString("last_spoofed_lng", value).apply()
 
+    var mockWifi: Boolean
+        get() = prefs.getBoolean("mock_wifi", true)
+        set(value) = prefs.edit().putBoolean("mock_wifi", value).apply()
+
+    var mockCell: Boolean
+        get() = prefs.getBoolean("mock_cell", true)
+        set(value) = prefs.edit().putBoolean("mock_cell", value).apply()
+
+    var mockBluetooth: Boolean
+        get() = prefs.getBoolean("mock_bluetooth", true)
+        set(value) = prefs.edit().putBoolean("mock_bluetooth", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()

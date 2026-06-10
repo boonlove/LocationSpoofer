@@ -51,4 +51,16 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     var lastSpoofedLng: String
         get() = settingsManager.lastSpoofedLng
         set(value) { settingsManager.lastSpoofedLng = value }
+
+    var mockWifi: Boolean
+        get() = settingsManager.mockWifi
+        set(value) { settingsManager.mockWifi = value }
+
+    var mockCell: Boolean
+        get() = settingsManager.mockCell
+        set(value) { settingsManager.mockCell = value }
+
+    var mockBluetooth: Boolean
+        get() = settingsManager.mockBluetooth
+        set(value) { settingsManager.mockBluetooth = value }
 }

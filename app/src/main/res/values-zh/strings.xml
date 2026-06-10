@@ -139,4 +139,6 @@
     <string name="select_coord_sys_desc">为 %1$s 选择要模拟的底层坐标系标准\n(我写的提示不一定是正确的，要自己测)</string>
     <string name="scanning_status_active">采集中 (%1$d)</string>
     <string name="scanning_status_inactive">未开启采集</string>
+    <string name="title_manage_data">管理本地采集数据</string>
+    <string name="manage_collected_data_desc">查看、多选、批量删除已采集的环境数据</string>
 </resources>
