@@ -143,4 +143,5 @@
     <string name="mock_cell_data">محاكاة بيانات الخلية</string>
     <string name="mock_bluetooth_data">محاكاة بيانات البلوتوث</string>
     <string name="enable_slight_jitter">تمكين الاهتزاز الخفيف</string>
+    <string name="app_package_name">اسم حزمة التطبيق</string>
 </resources>

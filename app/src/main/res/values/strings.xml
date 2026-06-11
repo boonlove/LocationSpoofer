@@ -148,4 +148,5 @@
     <string name="mock_cell_data">Mock Cell Tower Data</string>
     <string name="mock_bluetooth_data">Mock Bluetooth Data</string>
     <string name="enable_slight_jitter">Enable Slight Jitter</string>
+    <string name="app_package_name">App Package Name</string>
 </resources>

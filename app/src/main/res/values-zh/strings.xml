@@ -147,4 +147,5 @@
     <string name="mock_cell_data">伪造基站数据</string>
     <string name="mock_bluetooth_data">伪造蓝牙数据</string>
     <string name="enable_slight_jitter">开启轻微抖动</string>
+    <string name="app_package_name">软件包名</string>
 </resources>

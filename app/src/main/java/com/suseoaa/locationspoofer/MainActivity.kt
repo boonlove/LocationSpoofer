@@ -146,6 +146,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private data class MainNavState(
+    val fullScreen: Boolean,
+    val scanner: Boolean,
+    val manage: Boolean,
+    val settings: Boolean
+)
+
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
@@ -154,6 +161,7 @@ fun MainScreen(
 ) {
     var isFullScreenMap by remember { mutableStateOf(false) }
     var isScannerMap by remember { mutableStateOf(false) }
+    var isSettingsScreen by remember { mutableStateOf(false) }
 
     val closeMapAndResetRouteIfNeeded = {
         if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
@@ -163,9 +171,11 @@ fun MainScreen(
         isFullScreenMap = false
     }
 
-    BackHandler(enabled = isFullScreenMap || isScannerMap || uiState.isManageDataScreen) {
+    BackHandler(enabled = isFullScreenMap || isScannerMap || uiState.isManageDataScreen || isSettingsScreen) {
         if (uiState.isManageDataScreen) {
             viewModel.toggleManageDataScreen(false)
+        } else if (isSettingsScreen) {
+            isSettingsScreen = false
         } else if (isScannerMap) {
             isScannerMap = false
         } else {
@@ -174,32 +184,38 @@ fun MainScreen(
     }
 
     AnimatedContent(
-        targetState = Triple(isFullScreenMap, isScannerMap, uiState.isManageDataScreen),
+        targetState = MainNavState(isFullScreenMap, isScannerMap, uiState.isManageDataScreen, isSettingsScreen),
         transitionSpec = {
             slideInVertically(tween(400)) { it } togetherWith slideOutVertically(tween(400)) { -it }
         },
         label = "fullscreen_transition"
-    ) { (fullScreen, scannerMap, manageData) ->
-        if (fullScreen) {
+    ) { navState ->
+        if (navState.fullScreen) {
             FullScreenMapPage(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
                 onClose = { closeMapAndResetRouteIfNeeded() }
             )
-        } else if (scannerMap) {
+        } else if (navState.scanner) {
             com.suseoaa.locationspoofer.ui.screen.ScannerMapScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
                 onClose = { isScannerMap = false }
             )
-        } else if (manageData) {
+        } else if (navState.manage) {
             com.suseoaa.locationspoofer.ui.screen.ManageDataScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
                 onClose = { viewModel.toggleManageDataScreen(false) }
+            )
+        } else if (navState.settings) {
+            com.suseoaa.locationspoofer.ui.screen.SettingsScreen(
+                viewModel = viewModel,
+                uiState = uiState,
+                onClose = { isSettingsScreen = false }
             )
         } else {
             when {
@@ -222,7 +238,8 @@ fun MainScreen(
                     uiState = uiState,
                     isDark = isDark,
                     onExpandMap = { isFullScreenMap = true },
-                    onExpandScannerMap = { isScannerMap = true }
+                    onExpandScannerMap = { isScannerMap = true },
+                    onExpandSettings = { isSettingsScreen = true }
                 )
             }
         }

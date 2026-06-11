@@ -95,12 +95,13 @@ fun SpoofingScreen(
     isDark: Boolean,
     onExpandMap: () -> Unit,
     onExpandScannerMap: () -> Unit,
+    onExpandSettings: () -> Unit,
     updateViewModel: com.suseoaa.locationspoofer.viewmodel.UpdateViewModel = org.koin.androidx.compose.koinViewModel()
 ) {
     val scrollState = rememberScrollState()
     var showSavedLocations by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showStartSpoofingDialog by remember { mutableStateOf(false) }
@@ -204,7 +205,7 @@ fun SpoofingScreen(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { showSettings = true }, modifier = Modifier.size(36.dp)) {
+            IconButton(onClick = onExpandSettings, modifier = Modifier.size(36.dp)) {
                 Icon(
                     Icons.Rounded.Settings, stringResource(R.string.settings),
                     tint = MaterialTheme.colorScheme.onBackground,
@@ -572,115 +573,6 @@ fun SpoofingScreen(
         )
     }
 
-    if (showSettings) {
-        LocalizedDialog(onDismissRequest = { showSettings = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        stringResource(R.string.settings),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    
-                    Text(
-                        stringResource(R.string.select_language),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    
-                    LANGUAGES.forEach { lang ->
-                        LanguageItem(
-                            option = lang,
-                            isSelected = viewModel.getSavedLanguage() == lang.code,
-                            onClick = {
-                                viewModel.selectLanguage(lang.code)
-                                androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
-                                    androidx.core.os.LocaleListCompat.forLanguageTags(lang.code)
-                                )
-                                showSettings = false
-                            }
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    
-                    Spacer(Modifier.height(8.dp))
-                    
-                    Text(
-                        stringResource(R.string.amap_config),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    
-                    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-                    OutlinedTextField(
-                        value = uiState.appSha1,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.app_sha1)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(uiState.appSha1))
-                                Toast.makeText(context, context.getString(R.string.copied_to_clipboard), Toast.LENGTH_SHORT).show()
-                            }) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy))
-                            }
-                        },
-                        colors = coordinateFieldColors()
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    
-                    var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
-                    
-                    OutlinedTextField(
-                        value = localAmapApiKey,
-                        onValueChange = { localAmapApiKey = it },
-                        label = { Text(stringResource(R.string.custom_amap_key)) },
-                        placeholder = { Text(stringResource(R.string.custom_amap_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = coordinateFieldColors()
-                    )
-                    
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = { showSettings = false }) {
-                            Text(stringResource(R.string.close))
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Button(
-                            onClick = { 
-                                viewModel.setAmapApiKey(localAmapApiKey)
-                                Toast.makeText(context, context.getString(R.string.restart_required_hint), Toast.LENGTH_SHORT).show()
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                        ) {
-                            Text(stringResource(R.string.ok))
-                        }
-                    }
-                }
-            }
-        }
-    }
     
     if (showAppCoordinateScreen) {
         LocalizedDialog(
