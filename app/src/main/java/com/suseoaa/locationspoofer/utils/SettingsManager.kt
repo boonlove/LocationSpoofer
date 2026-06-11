@@ -27,6 +27,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("amap_api_key", "") ?: ""
         set(value) = prefs.edit().putString("amap_api_key", value).apply()
 
+    var ignoredVersion: String
+        get() = prefs.getString("ignored_version", "") ?: ""
+        set(value) = prefs.edit().putString("ignored_version", value).apply()
+
     var isSpoofingActive: Boolean
         get() = prefs.getBoolean("is_spoofing_active", false)
         set(value) = prefs.edit().putBoolean("is_spoofing_active", value).apply()

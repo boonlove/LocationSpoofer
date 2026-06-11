@@ -73,6 +73,7 @@
     <string name="app_dingtalk">DingTalk</string>
     <string name="app_google">Google Play Services</string>
     <string name="app_settings">System Settings</string>
+    <string name="ignore_this_version">Ignore this version</string>
     <string name="amap_config">AMap Configuration</string>
     <string name="app_sha1">App SHA1 Signature</string>
     <string name="custom_amap_key">Custom AMap API Key</string>
@@ -160,4 +161,8 @@
     <string name="clear_all">Clear All</string>
     <string name="selected_items">%d Selected</string>
     <string name="select_all">Select All</string>
+    <string name="features_header">Features &amp; Improvements</string>
+    <string name="fixes_header">Bug Fixes</string>
+    <string name="others_header">Other Changes</string>
+    <string name="merged_updates_badge">Includes %1$d versions of updates</string>
 </resources>

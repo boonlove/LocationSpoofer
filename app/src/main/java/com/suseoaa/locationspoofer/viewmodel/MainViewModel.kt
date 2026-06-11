@@ -1462,4 +1462,10 @@ class MainViewModel(
             }
         }
     }
+
+    fun getIgnoredVersion(): String = settingsRepository.getIgnoredVersion()
+
+    fun setIgnoredVersion(version: String) {
+        settingsRepository.setIgnoredVersion(version)
+    }
 }

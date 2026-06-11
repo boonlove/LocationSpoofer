@@ -36,6 +36,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.amapApiKey = value
     }
 
+    fun getIgnoredVersion(): String = settingsManager.ignoredVersion
+
+    fun setIgnoredVersion(value: String) {
+        settingsManager.ignoredVersion = value
+    }
+
     fun getAppCoordinateSystems(): Map<String, String> = settingsManager.getAppCoordinateSystems()
 
     fun setAppCoordinateSystems(map: Map<String, String>) = settingsManager.setAppCoordinateSystems(map)

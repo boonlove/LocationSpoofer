@@ -45,6 +45,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -60,6 +66,7 @@ import com.amap.api.services.poisearch.PoiSearch
 import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
+import com.suseoaa.locationspoofer.data.model.GithubRelease
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
 import com.suseoaa.locationspoofer.ui.components.AppMapView
@@ -172,7 +179,8 @@ fun SpoofingScreen(
                     return false
                 }
 
-                if (isNewer(currentVersion, latestVersion)) {
+                val ignoredVersion = viewModel.getIgnoredVersion()
+                if (isNewer(currentVersion, latestVersion) && latestVersion != ignoredVersion) {
                     showUpdateDialog = true
                 }
             }
@@ -621,7 +629,11 @@ fun SpoofingScreen(
             onDismiss = { showUpdateDialog = false },
             onDownload = { url, version -> updateViewModel.startDownload(url, version) },
             onCancel = { updateViewModel.cancelDownload() },
-            onInstall = { updateViewModel.installApk() }
+            onInstall = { updateViewModel.installApk() },
+            onIgnore = { version ->
+                viewModel.setIgnoredVersion(version)
+                showUpdateDialog = false
+            }
         )
     }
 
@@ -1089,8 +1101,30 @@ fun UpdateDialog(
     onDismiss: () -> Unit,
     onDownload: (String, String) -> Unit,
     onCancel: () -> Unit,
-    onInstall: () -> Unit
+    onInstall: () -> Unit,
+    onIgnore: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val currentVersion = BuildConfig.VERSION_NAME
+
+    // Find missed versions (newer than current version)
+    val missed = remember(uiState.releases) {
+        uiState.releases.filter { isNewerVersion(it.versionName, currentVersion) }
+    }
+
+    val displayList = remember(uiState.releases, missed) {
+        if (missed.size > 1) {
+            val latest = missed.first()
+            val grouped = parseAndCategorizeReleaseNotes(missed)
+            val mergedBody = generateMergedMarkdown(context, grouped)
+            val mergedRelease = latest.copy(body = mergedBody)
+            val historical = uiState.releases.filter { it !in missed }
+            listOf(mergedRelease) + historical
+        } else {
+            uiState.releases
+        }
+    }
+
     LocalizedDialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -1108,9 +1142,11 @@ fun UpdateDialog(
                     Text(stringResource(R.string.no_updates_available))
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                        items(uiState.releases) { release ->
+                        items(displayList) { release ->
                             val isCurrentVersion = release.versionName.contains(BuildConfig.VERSION_NAME) || 
                                                    BuildConfig.VERSION_NAME.contains(release.versionName)
+                            val isMergedRelease = missed.size > 1 && release == displayList.first()
+                            
                             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(stringResource(R.string.version, release.versionName), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
@@ -1122,9 +1158,21 @@ fun UpdateDialog(
                                             Text(stringResource(R.string.current_version), fontSize = 10.sp, color = AccentGreen, fontWeight = FontWeight.Bold)
                                         }
                                     }
+                                    if (isMergedRelease) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(AccentBlue.copy(alpha = 0.2f)).padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(stringResource(R.string.merged_updates_badge, missed.size), fontSize = 10.sp, color = AccentBlue, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                                 Spacer(Modifier.height(4.dp))
-                                Text(release.body, fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                Text(
+                                    text = parseMarkdown(release.body),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                                 Spacer(Modifier.height(8.dp))
                                 if (release.downloadUrl != null) {
                                     if (uiState.activeDownloadId != null && uiState.activeDownloadUrl == release.downloadUrl) {
@@ -1157,10 +1205,172 @@ fun UpdateDialog(
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.close)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val latestRelease = uiState.releases.firstOrNull()
+                    if (latestRelease != null) {
+                        val isCurrentVersion = latestRelease.versionName.contains(BuildConfig.VERSION_NAME) || 
+                                               BuildConfig.VERSION_NAME.contains(latestRelease.versionName)
+                        if (!isCurrentVersion) {
+                            TextButton(
+                                onClick = { onIgnore(latestRelease.versionName) }
+                            ) {
+                                Text(stringResource(R.string.ignore_this_version), color = MaterialTheme.colorScheme.error)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                    }
+                    TextButton(onClick = onDismiss) { 
+                        Text(stringResource(R.string.close)) 
+                    }
+                }
             }
         }
     }
+}
+
+data class GroupedReleaseNotes(
+    val features: List<String>,
+    val fixes: List<String>,
+    val others: List<String>
+)
+
+fun parseAndCategorizeReleaseNotes(releases: List<GithubRelease>): GroupedReleaseNotes {
+    val features = mutableListOf<String>()
+    val fixes = mutableListOf<String>()
+    val others = mutableListOf<String>()
+    
+    val featureHeaderKeywords = listOf(
+        "feature", "feat", "add", "new", "improve", "optimize", "enhancement",
+        "功能", "新增", "特性", "新功能", "优化", "改进", "提速", "增强"
+    )
+    val fixHeaderKeywords = listOf(
+        "fix", "bug", "crash", "issue", "solve", "repair",
+        "修复", "解决", "崩溃", "问题", "纠正", "故障"
+    )
+    
+    for (release in releases) {
+        val lines = release.body.split("\n")
+        var currentSection = "other" // "feature", "fix", "other"
+        
+        for (line in lines) {
+            val cleanLine = line.trim()
+            if (cleanLine.isEmpty()) continue
+            
+            // Check if it is a heading
+            if (cleanLine.startsWith("#")) {
+                val headingText = cleanLine.replace(Regex("^#+\\s*"), "").lowercase()
+                
+                // Determine section by header keywords
+                if (featureHeaderKeywords.any { headingText.contains(it) }) {
+                    currentSection = "feature"
+                } else if (fixHeaderKeywords.any { headingText.contains(it) }) {
+                    currentSection = "fix"
+                } else {
+                    currentSection = "other"
+                }
+                continue
+            }
+            
+            // Check if it is a list item
+            val isListItem = cleanLine.startsWith("- ") || cleanLine.startsWith("* ") || cleanLine.startsWith("+ ") || cleanLine.matches(Regex("""^\d+\.\s+.*"""))
+            
+            if (isListItem) {
+                // Remove list prefix
+                var itemContent = cleanLine
+                if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ") || cleanLine.startsWith("+ ")) {
+                    itemContent = cleanLine.substring(2).trim()
+                } else {
+                    itemContent = cleanLine.replace(Regex("""^\d+\.\s*"""), "").trim()
+                }
+                
+                if (itemContent.isEmpty()) continue
+                
+                val itemLower = itemContent.lowercase()
+                var category = currentSection
+                
+                if (category == "other") {
+                    if (fixHeaderKeywords.any { itemLower.contains(it) }) {
+                        category = "fix"
+                    } else if (featureHeaderKeywords.any { itemLower.contains(it) }) {
+                        category = "feature"
+                    }
+                }
+                
+                when (category) {
+                    "feature" -> features.add(itemContent)
+                    "fix" -> fixes.add(itemContent)
+                    else -> others.add(itemContent)
+                }
+            } else {
+                if (!cleanLine.startsWith("```") && !cleanLine.startsWith(">")) {
+                    others.add(cleanLine)
+                }
+            }
+        }
+    }
+    
+    return GroupedReleaseNotes(
+        features = features.distinct(),
+        fixes = fixes.distinct(),
+        others = others.distinct()
+    )
+}
+
+fun generateMergedMarkdown(
+    context: android.content.Context,
+    grouped: GroupedReleaseNotes
+): String {
+    val sb = java.lang.StringBuilder()
+    
+    if (grouped.features.isNotEmpty()) {
+        sb.append("### 🌟 ").append(context.getString(R.string.features_header)).append("\n")
+        grouped.features.forEach { item ->
+            sb.append("- ").append(item).append("\n")
+        }
+        sb.append("\n")
+    }
+    
+    if (grouped.fixes.isNotEmpty()) {
+        sb.append("### 🛠 ").append(context.getString(R.string.fixes_header)).append("\n")
+        grouped.fixes.forEach { item ->
+            sb.append("- ").append(item).append("\n")
+        }
+        sb.append("\n")
+    }
+    
+    if (grouped.others.isNotEmpty()) {
+        sb.append("### 📝 ").append(context.getString(R.string.others_header)).append("\n")
+        grouped.others.forEach { item ->
+            if (item.length < 100) {
+                sb.append("- ").append(item).append("\n")
+            } else {
+                sb.append(item).append("\n\n")
+            }
+        }
+    }
+    
+    return sb.toString().trim()
+}
+
+fun isNewerVersion(versionStr: String, currentStr: String): Boolean {
+    val v1 = versionStr.lowercase().removePrefix("v").trim()
+    val v2 = currentStr.lowercase().removePrefix("v").trim()
+    
+    val parts1 = v1.split(".")
+    val parts2 = v2.split(".")
+    
+    val length = maxOf(parts1.size, parts2.size)
+    for (i in 0 until length) {
+        val p1 = parts1.getOrNull(i)?.toIntOrNull() ?: 0
+        val p2 = parts2.getOrNull(i)?.toIntOrNull() ?: 0
+        if (p1 > p2) return true
+        if (p1 < p2) return false
+    }
+    return false
 }
 
 // 章节标题
@@ -1672,6 +1882,204 @@ fun StartSpoofingDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+// Markdown 简易解析函数，渲染 Release Notes 内容
+@Composable
+fun parseMarkdown(text: String): androidx.compose.ui.text.AnnotatedString {
+    return buildAnnotatedString {
+        val lines = text.split("\n")
+        var isInCodeBlock = false
+        
+        lines.forEachIndexed { index, line ->
+            val cleanLine = line.trim()
+            
+            // Check for code block boundary
+            if (cleanLine.startsWith("```")) {
+                isInCodeBlock = !isInCodeBlock
+                return@forEachIndexed
+            }
+            
+            if (isInCodeBlock) {
+                withStyle(style = SpanStyle(
+                    fontFamily = FontFamily.Monospace,
+                    background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    color = AccentBlue
+                )) {
+                    append("    ")
+                    append(line)
+                }
+            } else {
+                val headerMatch = Regex("""^(#{1,6})\s+(.*)""").matchEntire(cleanLine)
+                if (headerMatch != null) {
+                    val hashCount = headerMatch.groupValues[1].length
+                    val rest = headerMatch.groupValues[2]
+                    val fontSize = when (hashCount) {
+                        1 -> 18.sp
+                        2 -> 16.sp
+                        3 -> 14.sp
+                        4 -> 13.sp
+                        else -> 12.sp
+                    }
+                    val fontWeight = FontWeight.Bold
+                    val fontStyle = if (hashCount >= 6) FontStyle.Italic else FontStyle.Normal
+                    
+                    withStyle(style = SpanStyle(
+                        fontWeight = fontWeight,
+                        fontStyle = fontStyle,
+                        fontSize = fontSize,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )) {
+                        parseInlineFormatting(rest)
+                    }
+                } else if (cleanLine.startsWith(">")) {
+                    val rest = if (cleanLine.startsWith("> ")) cleanLine.substring(2) else cleanLine.substring(1)
+                    withStyle(style = SpanStyle(
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )) {
+                        append("▎ ")
+                        parseInlineFormatting(rest)
+                    }
+                } else if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ") || cleanLine.startsWith("+ ")) {
+                    append("  • ")
+                    val rest = cleanLine.substring(2).trim()
+                    parseInlineFormatting(rest)
+                } else if (cleanLine.matches(Regex("""^\d+\.\s+.*"""))) {
+                    val matchResult = Regex("""^(\d+\.\s+)(.*)""").find(cleanLine)
+                    if (matchResult != null) {
+                        val prefix = matchResult.groupValues[1]
+                        val rest = matchResult.groupValues[2]
+                        append("  $prefix")
+                        parseInlineFormatting(rest)
+                    } else {
+                        parseInlineFormatting(cleanLine)
+                    }
+                } else {
+                    parseInlineFormatting(cleanLine)
+                }
+            }
+            
+            if (index < lines.lastIndex) {
+                append("\n")
+            }
+        }
+    }
+}
+
+@Composable
+private fun androidx.compose.ui.text.AnnotatedString.Builder.parseInlineFormatting(text: String) {
+    var i = 0
+    while (i < text.length) {
+        var tokenType = ""
+        var minIdx = Int.MAX_VALUE
+        
+        val bold1 = text.indexOf("**", i)
+        val bold2 = text.indexOf("__", i)
+        val italic1 = text.indexOf("*", i)
+        val italic2 = text.indexOf("_", i)
+        val code = text.indexOf("`", i)
+        val strike = text.indexOf("~~", i)
+        val link = text.indexOf("[", i)
+        
+        if (bold1 in i until minIdx) { minIdx = bold1; tokenType = "bold1" }
+        if (bold2 in i until minIdx) { minIdx = bold2; tokenType = "bold2" }
+        if (italic1 in i until minIdx && bold1 != italic1) { minIdx = italic1; tokenType = "italic1" }
+        if (italic2 in i until minIdx && bold2 != italic2) { minIdx = italic2; tokenType = "italic2" }
+        if (code in i until minIdx) { minIdx = code; tokenType = "code" }
+        if (strike in i until minIdx) { minIdx = strike; tokenType = "strike" }
+        if (link in i until minIdx) { minIdx = link; tokenType = "link" }
+        
+        if (minIdx == Int.MAX_VALUE) {
+            append(text.substring(i))
+            break
+        }
+        
+        if (minIdx > i) {
+            append(text.substring(i, minIdx))
+        }
+        
+        i = minIdx
+        var parsed = false
+        
+        when (tokenType) {
+            "bold1", "bold2" -> {
+                val delim = if (tokenType == "bold1") "**" else "__"
+                val end = text.indexOf(delim, i + 2)
+                if (end != -1) {
+                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                        parseInlineFormatting(text.substring(i + 2, end))
+                    }
+                    i = end + 2
+                    parsed = true
+                }
+            }
+            "italic1", "italic2" -> {
+                val delim = if (tokenType == "italic1") "*" else "_"
+                val end = text.indexOf(delim, i + 1)
+                if (end != -1) {
+                    withStyle(style = SpanStyle(fontStyle = FontStyle.Italic)) {
+                        parseInlineFormatting(text.substring(i + 1, end))
+                    }
+                    i = end + 1
+                    parsed = true
+                }
+            }
+            "code" -> {
+                val end = text.indexOf("`", i + 1)
+                if (end != -1) {
+                    withStyle(style = SpanStyle(
+                        fontFamily = FontFamily.Monospace,
+                        background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        color = AccentBlue
+                    )) {
+                        append(text.substring(i + 1, end))
+                    }
+                    i = end + 1
+                    parsed = true
+                }
+            }
+            "strike" -> {
+                val end = text.indexOf("~~", i + 2)
+                if (end != -1) {
+                    withStyle(style = SpanStyle(textDecoration = TextDecoration.LineThrough)) {
+                        parseInlineFormatting(text.substring(i + 2, end))
+                    }
+                    i = end + 2
+                    parsed = true
+                }
+            }
+            "link" -> {
+                val closeBracket = text.indexOf("]", i + 1)
+                if (closeBracket != -1) {
+                    val openParen = closeBracket + 1
+                    if (openParen < text.length && text[openParen] == '(') {
+                        val closeParen = text.indexOf(")", openParen + 1)
+                        if (closeParen != -1) {
+                            val linkText = text.substring(i + 1, closeBracket)
+                            val linkUrl = text.substring(openParen + 1, closeParen)
+                            
+                            withStyle(style = SpanStyle(
+                                color = AccentBlue,
+                                textDecoration = TextDecoration.Underline
+                            )) {
+                                pushStringAnnotation(tag = "URL", annotation = linkUrl)
+                                parseInlineFormatting(linkText)
+                                pop()
+                            }
+                            i = closeParen + 1
+                            parsed = true
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!parsed) {
+            append(text[i])
+            i++
         }
     }
 }

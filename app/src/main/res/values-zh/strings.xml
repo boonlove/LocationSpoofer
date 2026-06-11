@@ -72,6 +72,7 @@
     <string name="app_dingtalk">钉钉</string>
     <string name="app_google">Google 服务</string>
     <string name="app_settings">系统设置</string>
+    <string name="ignore_this_version">忽略此版本</string>
     <string name="amap_config">高德地图配置</string>
     <string name="app_sha1">应用 SHA1 签名</string>
     <string name="custom_amap_key">自定义高德地图 API Key</string>
@@ -158,4 +159,8 @@
     <string name="clear_all">全部清除</string>
     <string name="selected_items">已选择 %d 项</string>
     <string name="select_all">全选</string>
+    <string name="features_header">功能新增与优化</string>
+    <string name="fixes_header">缺陷修复</string>
+    <string name="others_header">其他更新</string>
+    <string name="merged_updates_badge">包含 %1$d 个版本的更新</string>
 </resources>

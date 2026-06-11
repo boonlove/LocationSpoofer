@@ -72,6 +72,7 @@
     <string name="app_dingtalk">DingTalk</string>
     <string name="app_google">خدمات Google Play</string>
     <string name="app_settings">إعدادات النظام</string>
+    <string name="ignore_this_version">تجاهل هذا الإصدار</string>
     <string name="still">ثابت</string>
     <string name="amap_restricted_fallback">تقييد AMap، محاولة استخدام GPS/الشبكة...</string>
     <string name="waiting_gps_signal">لا يوجد موقع مخزن، في انتظار إشارة GPS (قد يكون بطيئًا/غير متاح بالداخل)</string>
@@ -153,4 +154,8 @@
     <string name="clear_all_data">مسح جميع البيانات</string>
     <string name="clear_all_data_confirm">هل أنت متأكد أنك تريد حذف جميع بيانات البيئة المجمعة؟ لا يمكن التراجع عن هذا الإجراء.</string>
     <string name="clear_all">مسح الكل</string>
+    <string name="features_header">الميزات والتحسينات</string>
+    <string name="fixes_header">إصلاح الأخطاء</string>
+    <string name="others_header">تغييرات أخرى</string>
+    <string name="merged_updates_badge">يتضمن %1$d إصدارات من التحديثات</string>
 </resources>
