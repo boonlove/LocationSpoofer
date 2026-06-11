@@ -94,7 +94,8 @@ class SpoofingService : Service() {
             TrajectorySimulator.calculateRoutePosition(
                 routePoints,
                 SpooferProvider.startTimestamp,
-                SpooferProvider.simMode
+                SpooferProvider.simMode,
+                enableJitter = SpooferProvider.enableJitter
             )
         } else {
             TrajectorySimulator.calculateSimulatedLocation(
@@ -102,7 +103,8 @@ class SpoofingService : Service() {
                 SpooferProvider.longitude,
                 SpooferProvider.startTimestamp,
                 SpooferProvider.simMode,
-                SpooferProvider.simBearing
+                SpooferProvider.simBearing,
+                enableJitter = SpooferProvider.enableJitter
             )
         }
     }

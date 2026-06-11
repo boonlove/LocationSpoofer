@@ -48,7 +48,8 @@ class MainViewModel(
             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
             mockWifi = settingsRepository.mockWifi,
             mockCell = settingsRepository.mockCell,
-            mockBluetooth = settingsRepository.mockBluetooth
+            mockBluetooth = settingsRepository.mockBluetooth,
+            enableJitter = settingsRepository.enableJitter
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -75,7 +76,11 @@ class MainViewModel(
                         context, lastLat, lastLng,
                         "STILL", 0f, System.currentTimeMillis(),
                         emptyList(), false,
-                        settingsRepository.getAppCoordinateSystems()
+                        settingsRepository.getAppCoordinateSystems(),
+                        mockWifi = settingsRepository.mockWifi,
+                        mockCell = settingsRepository.mockCell,
+                        mockBluetooth = settingsRepository.mockBluetooth,
+                        enableJitter = settingsRepository.enableJitter
                     )
                 }
             } else if (SpoofingService.isRunning) {
@@ -452,7 +457,8 @@ class MainViewModel(
                 state.collectedBluetoothJson,
                 state.mockWifi,
                 state.mockCell,
-                state.mockBluetooth
+                state.mockBluetooth,
+                state.enableJitter
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -624,7 +630,8 @@ class MainViewModel(
                 context, startPoint.lat, startPoint.lng,
                 if (isLoop) state.routeSimMode.name else "STILL",
                 0f, now, routePoints, isLoop, state.appCoordinateSystems,
-                state.collectedWifiJson, state.collectedCellJson
+                state.collectedWifiJson, state.collectedCellJson, state.collectedBluetoothJson,
+                state.mockWifi, state.mockCell, state.mockBluetooth, state.enableJitter
             )
             _uiState.update {
                 it.copy(isSpoofingActive = true)
@@ -897,6 +904,13 @@ class MainViewModel(
         _uiState.update { it.copy(mockBluetooth = newVal) }
         syncMockSettings()
     }
+
+    fun toggleEnableJitter() {
+        val newVal = !_uiState.value.enableJitter
+        settingsRepository.enableJitter = newVal
+        _uiState.update { it.copy(enableJitter = newVal) }
+        syncMockSettings()
+    }
     
     private fun syncMockSettings() {
         if (_uiState.value.isSpoofingActive) {
@@ -918,7 +932,8 @@ class MainViewModel(
                     bluetoothJson = state.collectedBluetoothJson,
                     mockWifi = state.mockWifi,
                     mockCell = state.mockCell,
-                    mockBluetooth = state.mockBluetooth
+                    mockBluetooth = state.mockBluetooth,
+                    enableJitter = state.enableJitter
                 )
             }
         }

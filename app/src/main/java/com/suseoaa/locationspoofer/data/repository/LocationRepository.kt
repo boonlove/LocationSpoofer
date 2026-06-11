@@ -35,7 +35,8 @@ class LocationRepository(
         bluetoothJson: String = "[]",
         mockWifi: Boolean = true,
         mockCell: Boolean = true,
-        mockBluetooth: Boolean = true
+        mockBluetooth: Boolean = true,
+        enableJitter: Boolean = true
     ) {
         SpooferProvider.isActive = true
         SpooferProvider.latitude = lat
@@ -48,8 +49,9 @@ class LocationRepository(
         SpooferProvider.bluetoothJson = bluetoothJson
         SpooferProvider.routeJson = routePointsToJson(routePoints)
         SpooferProvider.isRouteMode = isRouteMode
+        SpooferProvider.enableJitter = enableJitter
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth)
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -89,7 +91,8 @@ class LocationRepository(
         bluetoothJson: String = SpooferProvider.bluetoothJson,
         mockWifi: Boolean = true,
         mockCell: Boolean = true,
-        mockBluetooth: Boolean = true
+        mockBluetooth: Boolean = true,
+        enableJitter: Boolean = true
     ) {
         SpooferProvider.latitude = lat
         SpooferProvider.longitude = lng
@@ -101,7 +104,8 @@ class LocationRepository(
         SpooferProvider.wifiJson = wifiJson
         SpooferProvider.cellJson = cellJson
         SpooferProvider.bluetoothJson = bluetoothJson
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth)
+        SpooferProvider.enableJitter = enableJitter
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter)
     }
 
     suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {

@@ -51,6 +51,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean("mock_bluetooth", true)
         set(value) = prefs.edit().putBoolean("mock_bluetooth", value).apply()
 
+    var enableJitter: Boolean
+        get() = prefs.getBoolean("enable_jitter", true)
+        set(value) = prefs.edit().putBoolean("enable_jitter", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()

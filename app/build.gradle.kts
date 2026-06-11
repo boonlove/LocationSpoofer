@@ -114,7 +114,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
+        freeCompilerArgs += listOf(
+            "-Xskip-metadata-version-check",
+            "-opt-in=kotlinx.serialization.InternalSerializationApi"
+        )
     }
     buildFeatures {
         compose = true

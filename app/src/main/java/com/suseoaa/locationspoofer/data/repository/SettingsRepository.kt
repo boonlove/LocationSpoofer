@@ -63,4 +63,8 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     var mockBluetooth: Boolean
         get() = settingsManager.mockBluetooth
         set(value) { settingsManager.mockBluetooth = value }
+
+    var enableJitter: Boolean
+        get() = settingsManager.enableJitter
+        set(value) { settingsManager.enableJitter = value }
 }

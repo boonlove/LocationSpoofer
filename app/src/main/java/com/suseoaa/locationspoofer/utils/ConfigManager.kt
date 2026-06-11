@@ -23,7 +23,8 @@ class ConfigManager(private val rootManager: RootManager) {
         bluetoothJson: String = "[]",
         mockWifi: Boolean = true,
         mockCell: Boolean = true,
-        mockBluetooth: Boolean = true
+        mockBluetooth: Boolean = true,
+        enableJitter: Boolean = true
     ) = withContext(Dispatchers.IO) {
         val routeArray = JSONArray()
         routePoints.forEach { p ->
@@ -48,6 +49,7 @@ class ConfigManager(private val rootManager: RootManager) {
             put("mock_wifi", mockWifi)
             put("mock_cell", mockCell)
             put("mock_bluetooth", mockBluetooth)
+            put("enable_jitter", enableJitter)
             
             val coordSysObj = JSONObject()
             appCoordinateSystems.forEach { (pkg, sys) -> coordSysObj.put(pkg, sys) }

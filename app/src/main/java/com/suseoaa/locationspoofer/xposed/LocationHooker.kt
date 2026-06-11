@@ -520,6 +520,9 @@ class LocationHooker : XposedModule() {
     private var hookLastCallTime = 0L
 
     private fun getJitteredLocation(baseLat: Double, baseLng: Double): Pair<Double, Double> {
+        val enableJitter = lastConfig?.optBoolean("enable_jitter", true) ?: true
+        if (!enableJitter) return Pair(baseLat, baseLng)
+
         val now = System.currentTimeMillis()
         val dt = if (hookLastCallTime > 0) {
             ((now - hookLastCallTime) / 1000.0).coerceIn(0.01, 5.0)

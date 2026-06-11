@@ -20,6 +20,7 @@ class SpooferProvider : ContentProvider() {
         var startTimestamp = 0L
         var routeJson = "[]"
         var isRouteMode = false
+        var enableJitter = true
     }
 
     override fun onCreate(): Boolean = true

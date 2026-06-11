@@ -1,3 +1,4 @@
+@file:OptIn(kotlinx.serialization.InternalSerializationApi::class)
 package com.suseoaa.locationspoofer.data.db
 
 import androidx.room.Entity
@@ -31,8 +32,18 @@ data class WifiDevice(
     tableName = "location_wifi",
     primaryKeys = ["locationId", "bssid"],
     foreignKeys = [
-        ForeignKey(entity = LocationRecord::class, parentColumns = ["id"], childColumns = ["locationId"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = WifiDevice::class, parentColumns = ["bssid"], childColumns = ["bssid"], onDelete = ForeignKey.CASCADE)
+        ForeignKey(
+            entity = LocationRecord::class,
+            parentColumns = ["id"],
+            childColumns = ["locationId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = WifiDevice::class,
+            parentColumns = ["bssid"],
+            childColumns = ["bssid"],
+            onDelete = ForeignKey.CASCADE
+        )
     ],
     indices = [Index("bssid")]
 )
@@ -55,8 +66,18 @@ data class BluetoothDevice(
     tableName = "location_bluetooth",
     primaryKeys = ["locationId", "address"],
     foreignKeys = [
-        ForeignKey(entity = LocationRecord::class, parentColumns = ["id"], childColumns = ["locationId"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = BluetoothDevice::class, parentColumns = ["address"], childColumns = ["address"], onDelete = ForeignKey.CASCADE)
+        ForeignKey(
+            entity = LocationRecord::class,
+            parentColumns = ["id"],
+            childColumns = ["locationId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = BluetoothDevice::class,
+            parentColumns = ["address"],
+            childColumns = ["address"],
+            onDelete = ForeignKey.CASCADE
+        )
     ],
     indices = [Index("address")]
 )
@@ -95,8 +116,18 @@ data class CellDevice(
     tableName = "location_cells",
     primaryKeys = ["locationId", "cellKey"],
     foreignKeys = [
-        ForeignKey(entity = LocationRecord::class, parentColumns = ["id"], childColumns = ["locationId"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = CellDevice::class, parentColumns = ["cellKey"], childColumns = ["cellKey"], onDelete = ForeignKey.CASCADE)
+        ForeignKey(
+            entity = LocationRecord::class,
+            parentColumns = ["id"],
+            childColumns = ["locationId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = CellDevice::class,
+            parentColumns = ["cellKey"],
+            childColumns = ["cellKey"],
+            onDelete = ForeignKey.CASCADE
+        )
     ],
     indices = [Index("cellKey")]
 )

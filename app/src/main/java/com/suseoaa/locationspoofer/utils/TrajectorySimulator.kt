@@ -72,7 +72,8 @@ object TrajectorySimulator {
         startTimestamp: Long,
         simModeName: String,
         bearingDeg: Float,
-        currentTime: Long = System.currentTimeMillis()
+        currentTime: Long = System.currentTimeMillis(),
+        enableJitter: Boolean = true
     ): SimulatedLocation {
         val elapsedSec = (currentTime - startTimestamp) / 1000.0
         if (elapsedSec <= 0) return SimulatedLocation(baseLat, baseLng, 0f, bearingDeg, 5.0f, 0.0)
@@ -97,7 +98,7 @@ object TrajectorySimulator {
         // 步频模拟: 使用高斯噪声替代确定性正弦摆动
         // 真实行走中每步产生的横向偏移并非严格周期性的,而是受地面不平、步态差异等
         // 随机因素影响,因此用高斯采样模拟每步的随机横向偏移
-        if (stepFreqHz > 0) {
+        if (enableJitter && stepFreqHz > 0) {
             val stepJitterMeters = 0.15 * rng.nextGaussian()
             val perpBearingRad = bearingRad + Math.PI / 2
             currentLat += Math.toDegrees((stepJitterMeters * cos(perpBearingRad)) / R)
@@ -107,15 +108,17 @@ object TrajectorySimulator {
         }
 
         // 高斯随机游走: 在上一次漂移基础上叠加增量
-        applyGaussianDrift(currentTime, jitterRadius)
-        currentLat += Math.toDegrees(driftLatMeters / R)
-        currentLng += Math.toDegrees(driftLngMeters / (R * cos(newLatRad)))
+        if (enableJitter) {
+            applyGaussianDrift(currentTime, jitterRadius)
+            currentLat += Math.toDegrees(driftLatMeters / R)
+            currentLng += Math.toDegrees(driftLngMeters / (R * cos(newLatRad)))
+        }
 
         // Accuracy: 基准值 + 高斯漂移(模拟GDOP变化引起的精度波动)
-        val accuracy = computeGaussianAccuracy(jitterRadius)
+        val accuracy = if (enableJitter) computeGaussianAccuracy(jitterRadius) else 5.0f
 
         // Altitude: 基准值 + 高斯漂移(模拟对流层延迟引起的海拔漂移)
-        val altitude = computeGaussianAltitude(stepFreqHz)
+        val altitude = if (enableJitter) computeGaussianAltitude(stepFreqHz) else 10.0
 
         return SimulatedLocation(
             currentLat,
@@ -138,7 +141,8 @@ object TrajectorySimulator {
         points: List<RoutePoint>,
         startTimestamp: Long,
         simModeName: String,
-        currentTime: Long = System.currentTimeMillis()
+        currentTime: Long = System.currentTimeMillis(),
+        enableJitter: Boolean = true
     ): SimulatedLocation {
         if (points.size < 2) {
             val p = points.firstOrNull() ?: RoutePoint(0.0, 0.0)
@@ -224,7 +228,7 @@ object TrajectorySimulator {
         var lng = Math.toDegrees(newLngRad)
 
         // 步频模拟: 高斯随机横向偏移
-        if (stepFreqHz > 0) {
+        if (enableJitter && stepFreqHz > 0) {
             val stepJitterMeters = 0.15 * rng.nextGaussian()
             val perpBearingRad = bearingRad + Math.PI / 2
             lat += Math.toDegrees((stepJitterMeters * cos(perpBearingRad)) / R)
@@ -232,13 +236,15 @@ object TrajectorySimulator {
         }
 
         // 高斯随机游走漂移
-        applyGaussianDrift(currentTime, jitterRadius)
-        lat += Math.toDegrees(driftLatMeters / R)
-        lng += Math.toDegrees(driftLngMeters / (R * cos(newLatRad)))
+        if (enableJitter) {
+            applyGaussianDrift(currentTime, jitterRadius)
+            lat += Math.toDegrees(driftLatMeters / R)
+            lng += Math.toDegrees(driftLngMeters / (R * cos(newLatRad)))
+        }
 
         // Accuracy和Altitude: 高斯波动
-        val accuracy = computeGaussianAccuracy(jitterRadius)
-        val altitude = computeGaussianAltitude(stepFreqHz)
+        val accuracy = if (enableJitter) computeGaussianAccuracy(jitterRadius) else 5.0f
+        val altitude = if (enableJitter) computeGaussianAltitude(stepFreqHz) else 10.0
 
         return SimulatedLocation(lat, lng, speedMs.toFloat(), bearing.toFloat(), accuracy, altitude)
     }
