@@ -141,4 +141,10 @@
     <string name="scanning_status_inactive">未开启采集</string>
     <string name="title_manage_data">管理本地采集数据</string>
     <string name="manage_collected_data_desc">查看、多选、批量删除已采集的环境数据</string>
+    <string name="spoofing_options_title">模拟选项</string>
+    <string name="spoofing_options_desc">请选择本次定点模拟需要伪造的环境数据。未勾选的项将被彻底屏蔽（即App无法获取您的真实数据）。默认包含经纬度伪造。</string>
+    <string name="mock_wifi_data">伪造 Wi-Fi 数据</string>
+    <string name="mock_cell_data">伪造基站数据</string>
+    <string name="mock_bluetooth_data">伪造蓝牙数据</string>
+    <string name="enable_slight_jitter">开启轻微抖动</string>
 </resources>

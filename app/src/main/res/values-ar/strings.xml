@@ -137,4 +137,10 @@
     <string name="select_coord_sys_desc">اختر معيار نظام الإحداثيات الأساسي لمحاكاته لـ %1$s\n(قد لا تكون التلميحات دقيقة بنسبة 100%%، يرجى التحقق)</string>
     <string name="scanning_status_active">جاري المسح (%1$d)</string>
     <string name="scanning_status_inactive">لم يبدأ</string>
+    <string name="spoofing_options_title">خيارات المحاكاة</string>
+    <string name="spoofing_options_desc">يرجى تحديد بيانات البيئة التي سيتم تزييفها لمحاكاة هذه النقطة. سيتم حظر العناصر غير المحددة بالكامل (أي لا يمكن للتطبيق الحصول على بياناتك الحقيقية). يتم تضمين محاكاة خطوط الطول والعرض افتراضيًا.</string>
+    <string name="mock_wifi_data">محاكاة بيانات Wi-Fi</string>
+    <string name="mock_cell_data">محاكاة بيانات الخلية</string>
+    <string name="mock_bluetooth_data">محاكاة بيانات البلوتوث</string>
+    <string name="enable_slight_jitter">تمكين الاهتزاز الخفيف</string>
 </resources>

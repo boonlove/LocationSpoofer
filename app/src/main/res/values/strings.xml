@@ -142,4 +142,10 @@
     <string name="scanning_status_inactive">Not started</string>
     <string name="title_manage_data">Manage Collected Data</string>
     <string name="manage_collected_data_desc">View, select, and delete locally collected environment data</string>
+    <string name="spoofing_options_title">Simulation Options</string>
+    <string name="spoofing_options_desc">Please select the environment data to fake for this point simulation. Unchecked items will be completely blocked (i.e. the App cannot obtain your real data). Latitude and longitude spoofing is included by default.</string>
+    <string name="mock_wifi_data">Mock Wi-Fi Data</string>
+    <string name="mock_cell_data">Mock Cell Tower Data</string>
+    <string name="mock_bluetooth_data">Mock Bluetooth Data</string>
+    <string name="enable_slight_jitter">Enable Slight Jitter</string>
 </resources>

@@ -1530,14 +1530,14 @@ fun StartSpoofingDialog(
                     .fillMaxWidth()
             ) {
                 Text(
-                    text = "模拟选项",
+                    text = stringResource(R.string.spoofing_options_title),
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "请选择本次定点模拟需要伪造的环境数据。未勾选的项将被彻底屏蔽（即App无法获取您的真实数据）。默认包含经纬度伪造。",
+                    text = stringResource(R.string.spoofing_options_desc),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                 )
@@ -1546,25 +1546,25 @@ fun StartSpoofingDialog(
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Wifi, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("伪造 Wi-Fi 数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text(stringResource(R.string.mock_wifi_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
                     Switch(checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() })
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.CellTower, null, tint = AccentOrange, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("伪造基站数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text(stringResource(R.string.mock_cell_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
                     Switch(checked = uiState.mockCell, onCheckedChange = { onToggleCell() })
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Bluetooth, null, tint = AccentGreen, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("伪造蓝牙数据", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text(stringResource(R.string.mock_bluetooth_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
                     Switch(checked = uiState.mockBluetooth, onCheckedChange = { onToggleBluetooth() })
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.GraphicEq, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("开启轻微抖动", modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text(stringResource(R.string.enable_slight_jitter), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
                     Switch(checked = uiState.enableJitter, onCheckedChange = { onToggleJitter() })
                 }
 
