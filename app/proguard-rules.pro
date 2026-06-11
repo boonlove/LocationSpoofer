@@ -22,6 +22,8 @@
 -keep class com.suseoaa.locationspoofer.utils.ConfigManager { *; }
 -keep class com.suseoaa.locationspoofer.utils.LSPosedManager { *; }
 -keep class com.suseoaa.locationspoofer.provider.** { *; }
+-keep class com.suseoaa.locationspoofer.data.** { *; }
+-keepclassmembers class com.suseoaa.locationspoofer.data.** { *; }
 
 # General safety for Android lifecycle
 -keep class * extends android.app.Application { *; }
