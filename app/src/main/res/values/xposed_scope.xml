@@ -15,5 +15,6 @@
         <item>system</item>
         <item>com.android.phone</item>
         <item>com.android.providers.settings</item>
+        <item>com.android.settings</item>
     </string-array>
 </resources>

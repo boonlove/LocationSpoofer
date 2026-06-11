@@ -87,6 +87,7 @@ val RECOMMENDED_APPS = listOf(
     RecommendedApp(R.string.app_meituan, "com.sankuai.meituan", Icons.Outlined.LocalDining),
     RecommendedApp(R.string.app_dingtalk, "com.alibaba.android.rimet", Icons.Outlined.Work),
     RecommendedApp(R.string.app_google, "com.google.android.gms", Icons.Outlined.Android),
+    RecommendedApp(R.string.app_settings, "com.android.settings", Icons.Outlined.Settings),
 )
 
 @Composable

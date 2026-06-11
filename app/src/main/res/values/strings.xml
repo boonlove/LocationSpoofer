@@ -72,6 +72,7 @@
     <string name="app_meituan">Meituan</string>
     <string name="app_dingtalk">DingTalk</string>
     <string name="app_google">Google Play Services</string>
+    <string name="app_settings">System Settings</string>
     <string name="amap_config">AMap Configuration</string>
     <string name="app_sha1">App SHA1 Signature</string>
     <string name="custom_amap_key">Custom AMap API Key</string>

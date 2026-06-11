@@ -71,6 +71,7 @@
     <string name="app_meituan">Meituan</string>
     <string name="app_dingtalk">DingTalk</string>
     <string name="app_google">خدمات Google Play</string>
+    <string name="app_settings">إعدادات النظام</string>
     <string name="still">ثابت</string>
     <string name="amap_restricted_fallback">تقييد AMap، محاولة استخدام GPS/الشبكة...</string>
     <string name="waiting_gps_signal">لا يوجد موقع مخزن، في انتظار إشارة GPS (قد يكون بطيئًا/غير متاح بالداخل)</string>
