@@ -138,6 +138,47 @@ fun SpoofingScreen(
     val focusManager = LocalFocusManager.current
     var showApiKeyWarning by remember { mutableStateOf(false) }
 
+    var hasAutoCheckedUpdates by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (!hasAutoCheckedUpdates) {
+            updateViewModel.fetchReleases()
+        }
+    }
+
+    LaunchedEffect(updateUiState.releases, updateUiState.isLoading) {
+        if (!hasAutoCheckedUpdates && !updateUiState.isLoading && updateUiState.releases.isNotEmpty()) {
+            val latestRelease = updateUiState.releases.firstOrNull()
+            if (latestRelease != null) {
+                val latestVersion = latestRelease.versionName
+                val currentVersion = BuildConfig.VERSION_NAME
+                
+                fun isNewer(current: String, latest: String): Boolean {
+                    try {
+                        val curClean = current.trim().removePrefix("v").removePrefix("V")
+                        val latClean = latest.trim().removePrefix("v").removePrefix("V")
+                        val curParts = curClean.split(".")
+                        val latParts = latClean.split(".")
+                        val maxLen = maxOf(curParts.size, latParts.size)
+                        for (i in 0 until maxLen) {
+                            val curVal = curParts.getOrNull(i)?.toIntOrNull() ?: 0
+                            val latVal = latParts.getOrNull(i)?.toIntOrNull() ?: 0
+                            if (latVal > curVal) return true
+                            if (curVal > latVal) return false
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    return false
+                }
+
+                if (isNewer(currentVersion, latestVersion)) {
+                    showUpdateDialog = true
+                }
+            }
+            hasAutoCheckedUpdates = true
+        }
+    }
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
     BackHandler(enabled = showSearchResults) {
