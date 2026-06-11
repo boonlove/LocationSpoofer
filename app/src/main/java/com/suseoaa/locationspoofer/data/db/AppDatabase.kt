@@ -7,11 +7,12 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [
         LocationRecord::class,
+        LocationConnectedWifi::class,
         WifiDevice::class, LocationWifi::class,
         BluetoothDevice::class, LocationBluetooth::class,
         CellDevice::class, LocationCell::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

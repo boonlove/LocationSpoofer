@@ -1297,33 +1297,35 @@ class LocationHooker : XposedModule() {
     private fun hookWifiEnvironment(classLoader: ClassLoader) {
 
         // ── 1. WifiInfo getter Hook ──
-        // 拦截所有 WifiInfo 属性读取，返回数据库中第一个 AP 的信息
-        // 无数据时返回伪造的断开状态值，避免泄漏真实 Wi-Fi 指纹
         val wifiInfoHook = object : XC_MethodHook() {
             override fun beforeHookedMethod(param: MethodHookParam) {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
                 val mockWifi = config.optBoolean("mock_wifi", true)
-                val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
-                val firstWifi =
-                    if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
+                val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                val connectedWifi = if (isConnected) wifiObj?.optJSONObject("connectedWifi") else null
+                
                 when (param.method!!.name) {
                     "getBSSID" -> param.result =
-                        firstWifi?.optString("bssid") ?: "02:00:00:00:00:00"
+                        connectedWifi?.optString("bssid") ?: "02:00:00:00:00:00"
                     "getMacAddress" -> param.result =
-                        firstWifi?.optString("bssid") ?: "02:00:00:00:00:00"
+                        connectedWifi?.optString("macAddress") ?: "02:00:00:00:00:00"
                     "getSSID" -> {
-                        val ssidVal = firstWifi?.optString("ssid", "") ?: ""
-                        val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") "HOME_WIFI" else ssidVal
-                        param.result = "\"$finalSsid\""
+                        val ssidVal = connectedWifi?.optString("ssid", "") ?: ""
+                        val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") "" else ssidVal
+                        param.result = if (finalSsid.isEmpty()) "<unknown ssid>" else "\"$finalSsid\""
                     }
                     "getNetworkId" -> param.result =
-                        if (firstWifi != null) 1 else -1
-                    "getRssi" -> param.result = -65
-                    "getLinkSpeed" -> param.result = 65
+                        connectedWifi?.optInt("networkId", -1) ?: -1
+                    "getRssi" -> param.result =
+                        connectedWifi?.optInt("level", -127) ?: -127
+                    "getLinkSpeed" -> param.result =
+                        connectedWifi?.optInt("linkSpeed", -1) ?: -1
                     "getFrequency" -> param.result =
-                        firstWifi?.optInt("frequency", 2412) ?: 2412
-                    "getIpAddress" -> param.result = 0x6401A8C0 // 192.168.1.100 小端序
+                        connectedWifi?.optInt("frequency", -1) ?: -1
+                    "getIpAddress" -> param.result =
+                        if (isConnected) 0x6401A8C0 else 0 // 192.168.1.100 小端序
                 }
             }
         }
@@ -1342,8 +1344,7 @@ class LocationHooker : XposedModule() {
             }
         } catch (e: Throwable) { XposedBridge.log(e) }
 
-        // ── 1b. WifiInfo.getSupplicantState() → COMPLETED ──
-        // 表示 Wi-Fi 已完成四次握手，处于正常连接状态
+        // ── 1b. WifiInfo.getSupplicantState() ──
         try {
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiInfo", classLoader, "getSupplicantState",
@@ -1352,11 +1353,14 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         val mockWifi = config.optBoolean("mock_wifi", true)
+                        val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                        val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
                         try {
                             val enumClass = XposedHelpers.findClass(
                                 "android.net.wifi.SupplicantState", classLoader
                             )
-                            param.result = enumClass.getField(if (mockWifi) "COMPLETED" else "DISCONNECTED").get(null)
+                            val stateStr = if (mockWifi && isConnected) "COMPLETED" else "DISCONNECTED"
+                            param.result = enumClass.getField(stateStr).get(null)
                         } catch (e: Throwable) { /* 忽略 */ }
                     }
                 }
@@ -1364,8 +1368,6 @@ class LocationHooker : XposedModule() {
         } catch (e: Throwable) { /* 忽略 */ }
 
         // ── 2. Wi-Fi 扫描结果伪造 (getScanResults) ──
-        // 真实扫描周期约4-5秒，timestamp 字段必须接近 SystemClock.elapsedRealtimeNanos()
-        // 缺失 timestamp 是反作弊 SDK 最常用的检测维度之一
         val realCapabilities = listOf(
             "[WPA2-PSK-CCMP][RSN-PSK-CCMP][ESS]",
             "[WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP][ESS]",
@@ -1385,47 +1387,59 @@ class LocationHooker : XposedModule() {
                 if (!config.optBoolean("active", false)) return
                 val fakeList = java.util.ArrayList<Any>()
                 val mockWifi = config.optBoolean("mock_wifi", true)
-                val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
-                if (wifiArray != null && wifiArray.length() > 0) {
+                val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                if (wifiObj != null) {
                     try {
                         val scanResultClass =
                             XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
                         val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
-                        for (i in 0 until wifiArray.length()) {
-                            val wifi = wifiArray.getJSONObject(i)
+                        
+                        fun addFakeScanResult(wifi: org.json.JSONObject) {
                             val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
                             val ssidVal = wifi.optString("ssid", "")
-                            val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") "WIFI_${wifi.optString("bssid").takeLast(5).replace(":", "")}" else ssidVal
+                            val bssidVal = wifi.optString("bssid", "")
+                            val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") {
+                                "WIFI_${bssidVal.takeLast(5).replace(":", "")}"
+                            } else {
+                                ssidVal
+                            }
                             XposedHelpers.setObjectField(fakeScanResult, "SSID", finalSsid)
-                            XposedHelpers.setObjectField(fakeScanResult, "BSSID", wifi.optString("bssid"))
-                            // 信号强度: 高斯分布(均值-65dBm, 标准差10dBm)
-                            val level = (-65 + (rng.nextGaussian() * 10).toInt()).coerceIn(-90, -30)
+                            XposedHelpers.setObjectField(fakeScanResult, "BSSID", bssidVal)
+                            val level = wifi.optInt("level", -65)
                             XposedHelpers.setIntField(fakeScanResult, "level", level)
                             XposedHelpers.setIntField(
                                 fakeScanResult, "frequency",
-                                wifi.optInt("frequency",
-                                    listOf(2412, 2417, 2422, 2427, 2432, 2437, 2442,
-                                        2447, 2452, 2457, 2462, 5180, 5200, 5220, 5240,
-                                        5260, 5280, 5300, 5320, 5745, 5765, 5785, 5805).random()
-                                )
+                                wifi.optInt("frequency", 2412)
                             )
                             XposedHelpers.setObjectField(
                                 fakeScanResult, "capabilities",
                                 wifi.optString("capabilities", realCapabilities.random())
                             )
-                            // 时间戳: 基准时间 - 随机微秒偏移(模拟各 AP 被扫描到的先后差异)
                             try {
                                 val offsetNanos = (rng.nextInt(200_000) * 1000L)
                                 XposedHelpers.setLongField(
                                     fakeScanResult, "timestamp",
-                                    (baseTimestamp - offsetNanos) / 1000 // timestamp 字段单位为微秒
+                                    (baseTimestamp - offsetNanos) / 1000
                                 )
-                            } catch (e: Throwable) { /* 部分 ROM 该字段可能不存在 */ }
+                            } catch (e: Throwable) {}
                             fakeList.add(fakeScanResult)
+                        }
+
+                        val isConnected = wifiObj.optBoolean("isConnected", false)
+                        val connectedWifi = if (isConnected) wifiObj.optJSONObject("connectedWifi") else null
+                        if (connectedWifi != null) {
+                            addFakeScanResult(connectedWifi)
+                        }
+
+                        val nearbyArray = wifiObj.optJSONArray("nearbyWifi")
+                        if (nearbyArray != null) {
+                            for (i in 0 until nearbyArray.length()) {
+                                val wifi = nearbyArray.getJSONObject(i)
+                                addFakeScanResult(wifi)
+                            }
                         }
                     } catch (e: Throwable) { /* 忽略 */ }
                 }
-                // 无论有无数据，都替换结果（空列表 = 周围没有 AP，不泄漏真实数据）
                 param.result = fakeList
             }
         }
@@ -1436,7 +1450,7 @@ class LocationHooker : XposedModule() {
                 "android.net.wifi.WifiManager", classLoader, "getScanResults", wifiScanHook
             )
 
-            // getWifiState() → 3 (WIFI_STATE_ENABLED)
+            // getWifiState()
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getWifiState",
                 object : XC_MethodHook() {
@@ -1444,15 +1458,15 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         val mockWifi = config.optBoolean("mock_wifi", true)
-                        val wifiArray = config.optJSONArray("wifi_json")
-                        val hasWifiData = wifiArray != null && wifiArray.length() > 0
+                        val wifiObj = config.optJSONObject("wifi_json")
+                        val hasWifiData = wifiObj != null && (wifiObj.has("connectedWifi") || wifiObj.optJSONArray("nearbyWifi")?.length() ?: 0 > 0)
                         if (mockWifi) {
-                            param.result = if (hasWifiData) 3 else 1 // 1 is WIFI_STATE_DISABLED
+                            param.result = if (hasWifiData) 3 else 1 // 3 is WIFI_STATE_ENABLED, 1 is disabled
                         }
                     }
                 })
 
-            // isWifiEnabled() → true
+            // isWifiEnabled()
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "isWifiEnabled",
                 object : XC_MethodHook() {
@@ -1460,15 +1474,15 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         val mockWifi = config.optBoolean("mock_wifi", true)
-                        val wifiArray = config.optJSONArray("wifi_json")
-                        val hasWifiData = wifiArray != null && wifiArray.length() > 0
+                        val wifiObj = config.optJSONObject("wifi_json")
+                        val hasWifiData = wifiObj != null && (wifiObj.has("connectedWifi") || wifiObj.optJSONArray("nearbyWifi")?.length() ?: 0 > 0)
                         if (mockWifi) {
                             param.result = hasWifiData
                         }
                     }
                 })
 
-            // getConnectionInfo() — 返回伪造的 WifiInfo 对象（包含目标地点的 BSSID/SSID）
+            // getConnectionInfo() — 返回伪造的 WifiInfo 对象
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getConnectionInfo",
                 object : XC_MethodHook() {
@@ -1476,18 +1490,22 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         val mockWifi = config.optBoolean("mock_wifi", true)
-                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
-                        if (wifiArray != null && wifiArray.length() > 0) {
-                            val firstWifi = wifiArray.getJSONObject(0)
+                        val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                        val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                        val connectedWifi = if (isConnected) wifiObj?.optJSONObject("connectedWifi") else null
+                        
+                        if (isConnected && connectedWifi != null) {
                             try {
                                 val fakeWifiInfo: Any
-                                val ssidVal = firstWifi.optString("ssid", "")
+                                val ssidVal = connectedWifi.optString("ssid", "")
                                 val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") "HOME_WIFI" else ssidVal
-                                val bssidVal = firstWifi.optString("bssid", "02:00:00:00:00:00")
-                                val freqVal = firstWifi.optInt("frequency", 2412)
-                                val macAddressVal = firstWifi.optString("macAddress", bssidVal)
-                                val linkSpeedVal = firstWifi.optInt("linkSpeed", 65)
-                                val standardVal = firstWifi.optInt("wifiStandard", 6)
+                                val bssidVal = connectedWifi.optString("bssid", "02:00:00:00:00:00")
+                                val freqVal = connectedWifi.optInt("frequency", 2412)
+                                val macAddressVal = connectedWifi.optString("macAddress", bssidVal)
+                                val linkSpeedVal = connectedWifi.optInt("linkSpeed", 65)
+                                val standardVal = connectedWifi.optInt("wifiStandard", 6)
+                                val levelVal = connectedWifi.optInt("level", -65)
+                                val networkIdVal = connectedWifi.optInt("networkId", 1)
                                 
                                 // Try Builder (Android 12+)
                                 var builtWithBuilder = false
@@ -1495,61 +1513,48 @@ class LocationHooker : XposedModule() {
                                 try {
                                     val builderClass = XposedHelpers.findClass("android.net.wifi.WifiInfo\$Builder", classLoader)
                                     val builder = XposedHelpers.newInstance(builderClass)
+                                    XposedHelpers.callMethod(builder, "setSsid", finalSsid)
                                     XposedHelpers.callMethod(builder, "setBssid", bssidVal)
-                                    try { XposedHelpers.callMethod(builder, "setMacAddress", macAddressVal) } catch(e:Throwable){}
-                                    try { XposedHelpers.callMethod(builder, "setSsid", finalSsid.toByteArray(Charsets.UTF_8)) } catch(e:Throwable){}
-                                    try { XposedHelpers.callMethod(builder, "setNetworkId", 1) } catch(e:Throwable){}
-                                    try { XposedHelpers.callMethod(builder, "setRssi", -65) } catch(e:Throwable){}
+                                    XposedHelpers.callMethod(builder, "setRssi", levelVal)
+                                    XposedHelpers.callMethod(builder, "setFrequency", freqVal)
+                                    XposedHelpers.callMethod(builder, "setLinkSpeed", linkSpeedVal)
                                     builtInfo = XposedHelpers.callMethod(builder, "build")
-                                    
-                                    // Inject missing fields via reflection
-                                    builtInfo?.let { info ->
-                                        try { XposedHelpers.setIntField(info, "mFrequency", freqVal) } catch(e:Throwable){}
-                                        try { XposedHelpers.setIntField(info, "mLinkSpeed", linkSpeedVal) } catch(e:Throwable){}
-                                        try { XposedHelpers.setObjectField(info, "mMacAddress", macAddressVal) } catch(e:Throwable){}
-                                        try { XposedHelpers.setIntField(info, "mWifiStandard", standardVal) } catch(e:Throwable){}
-                                    }
-                                    
                                     builtWithBuilder = true
-                                } catch (e: Throwable) {
-                                    // Fallback to older methods
-                                }
+                                } catch (e: Throwable) {}
                                 
-                                if (builtWithBuilder && builtInfo != null) {
-                                    fakeWifiInfo = builtInfo
+                                fakeWifiInfo = if (builtWithBuilder) {
+                                    builtInfo!!
                                 } else {
                                     val wifiInfoClass = XposedHelpers.findClass("android.net.wifi.WifiInfo", classLoader)
-                                    fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
-                                    try { XposedHelpers.callMethod(fakeWifiInfo, "setBSSID", bssidVal) } catch (e: Throwable) {
-                                        try { XposedHelpers.setObjectField(fakeWifiInfo, "mBSSID", bssidVal) } catch (e2: Throwable) {}
-                                        try { XposedHelpers.setObjectField(fakeWifiInfo, "mBssid", bssidVal) } catch (e2: Throwable) {}
-                                    }
-                                    try { XposedHelpers.callMethod(fakeWifiInfo, "setMacAddress", macAddressVal) } catch (e: Throwable) {
-                                        try { XposedHelpers.setObjectField(fakeWifiInfo, "mMacAddress", macAddressVal) } catch (e2: Throwable) {}
-                                    }
-                                    
-                                    try {
-                                        val wifiSsidClass = XposedHelpers.findClass("android.net.wifi.WifiSsid", classLoader)
-                                        val createMethod = XposedHelpers.findMethodExact(wifiSsidClass, "createFromAsciiEncoded", String::class.java)
-                                        val wifiSsid = createMethod.invoke(null, finalSsid)
-                                        XposedHelpers.setObjectField(fakeWifiInfo, "mWifiSsid", wifiSsid)
-                                    } catch (e: Throwable) {
-                                        try { XposedHelpers.setObjectField(fakeWifiInfo, "mSSID", "\"$finalSsid\"") } catch (e2: Throwable) {}
-                                    }
-                                    try { XposedHelpers.setIntField(fakeWifiInfo, "mNetworkId", 1) } catch (e: Throwable) {}
-                                    try { XposedHelpers.setIntField(fakeWifiInfo, "mRssi", -65) } catch (e: Throwable) {}
-                                    try { XposedHelpers.setIntField(fakeWifiInfo, "mLinkSpeed", linkSpeedVal) } catch (e: Throwable) {}
-                                    try { XposedHelpers.setIntField(fakeWifiInfo, "mFrequency", freqVal) } catch (e: Throwable) {}
-                                    try { XposedHelpers.setIntField(fakeWifiInfo, "mWifiStandard", standardVal) } catch (e: Throwable) {}
+                                    val info = XposedHelpers.newInstance(wifiInfoClass)
+                                    try { XposedHelpers.setObjectField(info, "mSSID", finalSsid) } catch(e:Throwable){}
+                                    try { XposedHelpers.setObjectField(info, "mBSSID", bssidVal) } catch(e:Throwable){}
+                                    try { XposedHelpers.setIntField(info, "mRssi", levelVal) } catch(e:Throwable){}
+                                    try { XposedHelpers.setIntField(info, "mFrequency", freqVal) } catch(e:Throwable){}
+                                    try { XposedHelpers.setIntField(info, "mLinkSpeed", linkSpeedVal) } catch(e:Throwable){}
+                                    try { XposedHelpers.setIntField(info, "mNetworkId", networkIdVal) } catch(e:Throwable){}
+                                    info
                                 }
                                 
                                 param.result = fakeWifiInfo
                             } catch (e: Throwable) { /* 忽略 */ }
+                        } else {
+                            try {
+                                val wifiInfoClass = XposedHelpers.findClass("android.net.wifi.WifiInfo", classLoader)
+                                val fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mBSSID", "02:00:00:00:00:00") } catch(e:Throwable){}
+                                try { XposedHelpers.setObjectField(fakeWifiInfo, "mMacAddress", "02:00:00:00:00:00") } catch(e:Throwable){}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mNetworkId", -1) } catch(e:Throwable){}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mRssi", -127) } catch(e:Throwable){}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mLinkSpeed", -1) } catch(e:Throwable){}
+                                try { XposedHelpers.setIntField(fakeWifiInfo, "mFrequency", -1) } catch(e:Throwable){}
+                                param.result = fakeWifiInfo
+                            } catch (e: Throwable) {}
                         }
                     }
                 })
 
-            // getConfiguredNetworks() → 空列表（防止已保存 Wi-Fi 配置泄漏）
+            // getConfiguredNetworks()
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getConfiguredNetworks",
                 object : XC_MethodHook() {
@@ -1560,7 +1565,7 @@ class LocationHooker : XposedModule() {
                     }
                 })
 
-            // getDhcpInfo() → 伪造的 DHCP 信息（192.168.1.x 网段）
+            // getDhcpInfo()
             XposedHelpers.findAndHookMethod(
                 "android.net.wifi.WifiManager", classLoader, "getDhcpInfo",
                 object : XC_MethodHook() {
@@ -1570,7 +1575,6 @@ class LocationHooker : XposedModule() {
                         try {
                             val dhcpClass = XposedHelpers.findClass("android.net.DhcpInfo", classLoader)
                             val dhcp = XposedHelpers.newInstance(dhcpClass)
-                            // IP 地址采用小端序: 192.168.1.100 → 0x6401A8C0
                             XposedHelpers.setIntField(dhcp, "ipAddress", 0x6401A8C0.toInt())
                             XposedHelpers.setIntField(dhcp, "gateway", 0x0101A8C0)     // 192.168.1.1
                             XposedHelpers.setIntField(dhcp, "netmask", 0x00FFFFFF)     // 255.255.255.0
@@ -1584,8 +1588,6 @@ class LocationHooker : XposedModule() {
         } catch (e: Throwable) { XposedBridge.log(e) }
 
         // ── 4. NetworkInfo.getExtraInfo() ──
-        // 这是高德/抖音用来交叉验证 Wi-Fi 身份的核心 API 之一
-        // 直接返回当前连接的真实 SSID，必须拦截！
         try {
             XposedHelpers.findAndHookMethod(
                 "android.net.NetworkInfo", classLoader, "getExtraInfo",
@@ -1594,9 +1596,11 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         val mockWifi = config.optBoolean("mock_wifi", true)
-                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
-                        if (wifiArray != null && wifiArray.length() > 0) {
-                            param.result = "\"${wifiArray.getJSONObject(0).optString("ssid", "HOME_WIFI")}\""
+                        val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                        val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                        val connectedWifi = if (isConnected) wifiObj?.optJSONObject("connectedWifi") else null
+                        if (connectedWifi != null) {
+                            param.result = "\"${connectedWifi.optString("ssid", "HOME_WIFI")}\""
                         } else {
                             param.result = null
                         }
@@ -1605,7 +1609,7 @@ class LocationHooker : XposedModule() {
             )
         } catch (e: Throwable) { XposedBridge.log(e) }
 
-// ── 5. WifiScanner 隐藏接口 Hook (高德/腾讯/百度/抖音 绕过 WifiManager 的通道) ──
+        // ── 5. WifiScanner Hook ──
         try {
             val wifiScannerClass = XposedHelpers.findClassIfExists("android.net.wifi.WifiScanner", classLoader)
             if (wifiScannerClass != null) {
@@ -1614,44 +1618,73 @@ class LocationHooker : XposedModule() {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
                         
-                        // 阻断真实扫描
                         param.result = null
-                        
-                        // 最后一个参数通常是 ScanListener
                         val listener = param.args.lastOrNull() ?: return
                         val mockWifi = config.optBoolean("mock_wifi", true)
-                        val wifiArray = if (mockWifi) config.optJSONArray("wifi_json") else null
-                        
-                        if (wifiArray != null && wifiArray.length() > 0) {
+                        val wifiObj = if (mockWifi) config.optJSONObject("wifi_json") else null
+                        if (wifiObj != null) {
                             try {
                                 val scanResultClass = XposedHelpers.findClass("android.net.wifi.ScanResult", classLoader)
                                 val baseTimestamp = android.os.SystemClock.elapsedRealtimeNanos()
-                                val fakeArray = java.lang.reflect.Array.newInstance(scanResultClass, wifiArray.length())
+                                val fakeList = java.util.ArrayList<Any>()
                                 
-                                for (i in 0 until wifiArray.length()) {
-                                    val wifi = wifiArray.getJSONObject(i)
+                                fun addFakeScanResult(wifi: org.json.JSONObject) {
                                     val fakeScanResult = XposedHelpers.newInstance(scanResultClass)
-                                    XposedHelpers.setObjectField(fakeScanResult, "SSID", wifi.optString("ssid"))
-                                    XposedHelpers.setObjectField(fakeScanResult, "BSSID", wifi.optString("bssid"))
-                                    val level = (-65 + (rng.nextGaussian() * 10).toInt()).coerceIn(-90, -30)
+                                    val ssidVal = wifi.optString("ssid", "")
+                                    val bssidVal = wifi.optString("bssid", "")
+                                    val finalSsid = if (ssidVal.isEmpty() || ssidVal == "<unknown ssid>") {
+                                        "WIFI_${bssidVal.takeLast(5).replace(":", "")}"
+                                    } else {
+                                        ssidVal
+                                    }
+                                    XposedHelpers.setObjectField(fakeScanResult, "SSID", finalSsid)
+                                    XposedHelpers.setObjectField(fakeScanResult, "BSSID", bssidVal)
+                                    val level = wifi.optInt("level", -65)
                                     XposedHelpers.setIntField(fakeScanResult, "level", level)
                                     XposedHelpers.setIntField(fakeScanResult, "frequency", wifi.optInt("frequency", 2412))
                                     XposedHelpers.setObjectField(fakeScanResult, "capabilities", wifi.optString("capabilities", "[WPA2-PSK-CCMP][ESS]"))
                                     try {
                                         val offsetNanos = (rng.nextInt(200_000) * 1000L)
                                         XposedHelpers.setLongField(fakeScanResult, "timestamp", (baseTimestamp - offsetNanos) / 1000)
-                                    } catch (e: Throwable) { /* 忽略 */ }
-                                    java.lang.reflect.Array.set(fakeArray, i, fakeScanResult)
+                                    } catch (e: Throwable) {}
+                                    fakeList.add(fakeScanResult)
                                 }
-                                
-                                // 构造 ScanData 对象（包含 ScanResult 数组）
-                                val scanDataClass = XposedHelpers.findClass("android.net.wifi.WifiScanner\$ScanData", classLoader)
-                                val fakeScanData = XposedHelpers.newInstance(scanDataClass, 0, 0, fakeArray)
-                                val fakeScanDataArray = java.lang.reflect.Array.newInstance(scanDataClass, 1)
-                                java.lang.reflect.Array.set(fakeScanDataArray, 0, fakeScanData)
-                                
-                                // 主动回调 Listener，把假数据塞回去
-                                XposedHelpers.callMethod(listener, "onResults", fakeScanDataArray)
+
+                                val isConnected = wifiObj.optBoolean("isConnected", false)
+                                val connectedWifi = if (isConnected) wifiObj.optJSONObject("connectedWifi") else null
+                                if (connectedWifi != null) {
+                                    addFakeScanResult(connectedWifi)
+                                }
+
+                                val nearbyArray = wifiObj.optJSONArray("nearbyWifi")
+                                if (nearbyArray != null) {
+                                    for (i in 0 until nearbyArray.length()) {
+                                        val wifi = nearbyArray.getJSONObject(i)
+                                        addFakeScanResult(wifi)
+                                    }
+                                }
+
+                                if (fakeList.isNotEmpty()) {
+                                    val scanResultArray = java.lang.reflect.Array.newInstance(scanResultClass, fakeList.size)
+                                    for (i in 0 until fakeList.size) {
+                                        java.lang.reflect.Array.set(scanResultArray, i, fakeList[i])
+                                    }
+                                    
+                                    // 构造 ScanData 对象（包含 ScanResult 数组）
+                                    val scanDataClass = XposedHelpers.findClass("android.net.wifi.WifiScanner\$ScanData", classLoader)
+                                    val fakeScanData = XposedHelpers.newInstance(scanDataClass, 0, 0, scanResultArray)
+                                    val fakeScanDataArray = java.lang.reflect.Array.newInstance(scanDataClass, 1)
+                                    java.lang.reflect.Array.set(fakeScanDataArray, 0, fakeScanData)
+                                    
+                                    // 主动回调 Listener，把假数据塞回去
+                                    XposedHelpers.callMethod(listener, "onResults", fakeScanDataArray)
+                                } else {
+                                    val scanDataClass = XposedHelpers.findClass("android.net.wifi.WifiScanner\$ScanData", classLoader)
+                                    val emptyScanData = XposedHelpers.newInstance(scanDataClass, 0, 0, java.lang.reflect.Array.newInstance(scanResultClass, 0))
+                                    val fakeScanDataArray = java.lang.reflect.Array.newInstance(scanDataClass, 1)
+                                    java.lang.reflect.Array.set(fakeScanDataArray, 0, emptyScanData)
+                                    XposedHelpers.callMethod(listener, "onResults", fakeScanDataArray)
+                                }
                             } catch (e: Throwable) {
                                 XposedBridge.log("[LocationSpoofer] WifiScanner 伪造失败: $e")
                             }
@@ -1884,8 +1917,9 @@ class LocationHooker : XposedModule() {
                 val config = readConfig() ?: return
                 if (!config.optBoolean("active", false)) return
                 if (config.optBoolean("mock_wifi", true)) {
-                    val wifiArray = config.optJSONArray("wifi_json")
-                    val hasWifiData = wifiArray != null && wifiArray.length() > 0
+                    val wifiObj = config.optJSONObject("wifi_json")
+                    val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                    val hasWifiData = isConnected && wifiObj?.optJSONObject("connectedWifi") != null
                     if (hasWifiData) {
                         val fakeInfo = buildFakeNetworkInfo()
                         if (fakeInfo != null) {
@@ -1930,8 +1964,9 @@ class LocationHooker : XposedModule() {
                         try {
                             val wifiInfoClass = XposedHelpers.findClass("android.net.wifi.WifiInfo", classLoader)
                             val fakeWifiInfo = XposedHelpers.newInstance(wifiInfoClass)
-                            val wifiArray = config.optJSONArray("wifi_json")
-                            val firstWifi = if (wifiArray != null && wifiArray.length() > 0) wifiArray.getJSONObject(0) else null
+                            val wifiObj = config.optJSONObject("wifi_json")
+                            val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                            val firstWifi = if (isConnected) wifiObj?.optJSONObject("connectedWifi") else null
                             if (firstWifi != null) {
                                 val fakeWifiInfo: Any
                                 val ssidVal = firstWifi.optString("ssid", "")

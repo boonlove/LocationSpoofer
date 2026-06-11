@@ -43,7 +43,16 @@ class ConfigManager(private val rootManager: RootManager) {
             put("start_timestamp", startTimestamp)
             put("route_points", routeArray)
             put("is_route_mode", isRouteMode)
-            put("wifi_json", JSONArray(wifiJson))
+            val wifiObj = try {
+                JSONObject(wifiJson)
+            } catch (e: Exception) {
+                JSONObject().apply {
+                    put("isConnected", false)
+                    put("connectedWifi", JSONObject.NULL)
+                    put("nearbyWifi", JSONArray())
+                }
+            }
+            put("wifi_json", wifiObj)
             put("cell_json", JSONArray(cellJson))
             put("bluetooth_json", JSONArray(bluetoothJson))
             put("mock_wifi", mockWifi)

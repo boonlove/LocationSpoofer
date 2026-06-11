@@ -1195,15 +1195,53 @@ class MainViewModel(
         val locId = environmentDao.insertLocation(com.suseoaa.locationspoofer.data.db.LocationRecord(lat = lat, lng = lng))
         
         try {
-            val wifiArr = org.json.JSONArray(wifiJson)
-            for (i in 0 until wifiArr.length()) {
-                val obj = wifiArr.getJSONObject(i)
-                val bssid = obj.optString("bssid")
-                if (bssid.isEmpty()) continue
-                environmentDao.insertWifiDevice(com.suseoaa.locationspoofer.data.db.WifiDevice(bssid, obj.optString("ssid", ""), obj.optInt("frequency", 0), obj.optString("capabilities", "")))
-                environmentDao.insertLocationWifi(com.suseoaa.locationspoofer.data.db.LocationWifi(locId, bssid, obj.optInt("level", 0)))
+            val wifiObj = org.json.JSONObject(wifiJson)
+            val isConnected = wifiObj.optBoolean("isConnected", false)
+            if (isConnected && wifiObj.has("connectedWifi")) {
+                val conn = wifiObj.getJSONObject("connectedWifi")
+                val connWifi = com.suseoaa.locationspoofer.data.db.LocationConnectedWifi(
+                    locationId = locId,
+                    bssid = conn.optString("bssid"),
+                    ssid = conn.optString("ssid"),
+                    vendor = conn.optString("vendor"),
+                    macAddress = conn.optString("macAddress"),
+                    frequency = conn.optInt("frequency"),
+                    linkSpeed = conn.optInt("linkSpeed"),
+                    level = conn.optInt("level"),
+                    capabilities = conn.optString("capabilities"),
+                    networkId = conn.optInt("networkId"),
+                    wifiStandard = conn.optInt("wifiStandard")
+                )
+                environmentDao.insertConnectedWifi(connWifi)
             }
-        } catch (e: Exception) {}
+            
+            val nearbyArr = wifiObj.optJSONArray("nearbyWifi")
+            if (nearbyArr != null) {
+                for (i in 0 until nearbyArr.length()) {
+                    val obj = nearbyArr.getJSONObject(i)
+                    val bssid = obj.optString("bssid")
+                    if (bssid.isEmpty()) continue
+                    environmentDao.insertWifiDevice(
+                        com.suseoaa.locationspoofer.data.db.WifiDevice(
+                            bssid = bssid,
+                            ssid = obj.optString("ssid", ""),
+                            frequency = obj.optInt("frequency", 0),
+                            capabilities = obj.optString("capabilities", ""),
+                            vendor = obj.optString("vendor", "")
+                        )
+                    )
+                    environmentDao.insertLocationWifi(
+                        com.suseoaa.locationspoofer.data.db.LocationWifi(
+                            locationId = locId,
+                            bssid = bssid,
+                            level = obj.optInt("level", 0)
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         try {
             val cellArr = org.json.JSONArray(cellJson)
@@ -1236,7 +1274,7 @@ class MainViewModel(
     }
 
     private fun locationToJson(records: List<com.suseoaa.locationspoofer.data.db.CompleteLocation>, targetLat: Double, targetLng: Double): Triple<String, String, String> {
-        if (records.isEmpty()) return Triple("[]", "[]", "[]")
+        if (records.isEmpty()) return Triple("{}", "[]", "[]")
 
         val weights = records.map {
             val rLat = Math.toRadians(it.location.lat - targetLat)
@@ -1247,6 +1285,29 @@ class MainViewModel(
             1.0 / (safeDist * safeDist)
         }
 
+        // 1. Reconstruct connected Wi-Fi using the closest record's connectedWi-Fi
+        val closestRecord = records.firstOrNull()
+        val hasConnected = closestRecord?.connectedWifi != null
+        val connectedObj = if (hasConnected) {
+            val cw = closestRecord!!.connectedWifi!!
+            org.json.JSONObject().apply {
+                put("ssid", cw.ssid)
+                put("bssid", cw.bssid)
+                put("vendor", cw.vendor)
+                put("macAddress", cw.macAddress)
+                put("frequency", cw.frequency)
+                put("channel", com.suseoaa.locationspoofer.utils.MacVendorHelper.frequencyToChannel(cw.frequency))
+                put("linkSpeed", cw.linkSpeed)
+                put("level", cw.level)
+                put("capabilities", cw.capabilities)
+                put("networkId", cw.networkId)
+                put("wifiStandard", cw.wifiStandard)
+            }
+        } else {
+            null
+        }
+
+        // 2. Interpolate nearby Wi-Fis
         val wifiMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithWifi>()
         val wifiLevels = mutableMapOf<String, Double>()
         val wifiWeights = mutableMapOf<String, Double>()
@@ -1260,18 +1321,29 @@ class MainViewModel(
             }
         }
         
-        val wifiArr = org.json.JSONArray()
+        val nearbyArr = org.json.JSONArray()
         wifiMap.forEach { (bssid, rw) ->
             val w = wifiWeights[bssid]!!
             val interpolatedLevel = (wifiLevels[bssid]!! / w).toInt()
-            val obj = org.json.JSONObject()
-            obj.put("bssid", bssid)
-            obj.put("ssid", rw.device.ssid)
-            obj.put("frequency", rw.device.frequency)
-            obj.put("capabilities", rw.device.capabilities)
-            obj.put("level", interpolatedLevel)
-            wifiArr.put(obj)
+            val obj = org.json.JSONObject().apply {
+                put("bssid", bssid)
+                put("ssid", rw.device.ssid)
+                put("vendor", rw.device.vendor)
+                put("frequency", rw.device.frequency)
+                put("channel", com.suseoaa.locationspoofer.utils.MacVendorHelper.frequencyToChannel(rw.device.frequency))
+                put("capabilities", rw.device.capabilities)
+                put("level", interpolatedLevel)
+            }
+            nearbyArr.put(obj)
         }
+
+        val wifiResultObj = org.json.JSONObject().apply {
+            put("isConnected", hasConnected)
+            put("connectedWifi", connectedObj ?: org.json.JSONObject.NULL)
+            put("nearbyWifi", nearbyArr)
+        }
+        val wifiArr = wifiResultObj // Just assign it to match the rest of the method variables if needed, or we return wifiResultObj.toString()
+
         
         val cellMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithCell>()
         val cellDbms = mutableMapOf<String, Double>()
@@ -1361,6 +1433,10 @@ class MainViewModel(
                     val locations: List<com.suseoaa.locationspoofer.data.db.CompleteLocation> = kotlinx.serialization.json.Json.decodeFromString(jsonStr)
                     locations.forEach { cl ->
                         val locId = environmentDao.insertLocation(cl.location)
+                        cl.connectedWifi?.let { cw ->
+                            val newCw = cw.copy(locationId = locId)
+                            environmentDao.insertConnectedWifi(newCw)
+                        }
                         cl.wifis.forEach { w ->
                             environmentDao.insertWifiDevice(w.device)
                             val lw = w.locationWifi.copy(locationId = locId)

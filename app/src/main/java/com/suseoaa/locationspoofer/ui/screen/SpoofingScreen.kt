@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -649,19 +650,153 @@ fun SpoofingScreen(
                                 Spacer(Modifier.height(8.dp))
                             }
                             
-                            val wifiArray = try { org.json.JSONArray(uiState.collectedWifiJson) } catch (e: Exception) { org.json.JSONArray() }
-                            for (i in 0 until Math.min(wifiArray.length(), 10)) {
-                                val obj = wifiArray.optJSONObject(i)
+                            val wifiObj = try { org.json.JSONObject(uiState.collectedWifiJson) } catch (e: Exception) { null }
+                            val isConnected = wifiObj?.optBoolean("isConnected", false) ?: false
+                            val connectedWifi = if (isConnected) wifiObj?.optJSONObject("connectedWifi") else null
+                            val nearbyArray = if (wifiObj != null) {
+                                wifiObj.optJSONArray("nearbyWifi") ?: org.json.JSONArray()
+                            } else {
+                                try { org.json.JSONArray(uiState.collectedWifiJson) } catch (e: Exception) { org.json.JSONArray() }
+                            }
+
+                            // 已连接 Wi-Fi 部分
+                            item {
+                                Text(
+                                    text = if (isConnected) "已连接 Wi-Fi" else "已连接 Wi-Fi: 未连接",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isConnected) AccentGreen else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                )
+                                Spacer(Modifier.height(6.dp))
+                            }
+
+                            if (connectedWifi != null) {
                                 item {
-                                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(obj?.optString("ssid", "Unknown") ?: "Unknown", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
-                                        Text("${obj?.optInt("level", 0)} dBm", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.6f))
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 12.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = AccentGreen.copy(alpha = 0.08f)
+                                        ),
+                                        border = BorderStroke(1.dp, AccentGreen.copy(alpha = 0.2f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Wifi,
+                                                    contentDescription = null,
+                                                    tint = AccentGreen,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    text = connectedWifi.optString("ssid", "Unknown"),
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onBackground
+                                                )
+                                            }
+                                            Spacer(Modifier.height(8.dp))
+                                            
+                                            val details = listOf(
+                                                "BSSID" to connectedWifi.optString("bssid", "Unknown"),
+                                                "厂商" to connectedWifi.optString("vendor", "Unknown"),
+                                                "客户端 MAC" to connectedWifi.optString("macAddress", "Unknown"),
+                                                "信道" to "${connectedWifi.optInt("channel", 0)} (${connectedWifi.optInt("frequency", 0)} MHz)",
+                                                "连接速度" to "${connectedWifi.optInt("linkSpeed", 0)} Mbps",
+                                                "信号强度" to "${connectedWifi.optInt("level", 0)} dBm"
+                                            )
+                                            
+                                            details.forEach { (label, value) ->
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                                                    Text(value, fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (!isConnected) {
+                                item {
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+
+                            // 周边 Wi-Fi 部分
+                            item {
+                                Text(
+                                    text = stringResource(R.string.wifi_hotspots, nearbyArray.length()),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AccentBlue
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+
+                            for (i in 0 until Math.min(nearbyArray.length(), 15)) {
+                                val obj = nearbyArray.optJSONObject(i)
+                                if (obj != null) {
+                                    item {
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                            )
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = obj.optString("ssid", "Unknown"),
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onBackground
+                                                    )
+                                                    Text(
+                                                        text = "${obj.optInt("level", 0)} dBm",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                                Spacer(Modifier.height(4.dp))
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = "BSSID: ${obj.optString("bssid", "Unknown")} (${obj.optString("vendor", "Unknown")})",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                    )
+                                                    Text(
+                                                        text = "信道: ${obj.optInt("channel", 0)}",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            if (wifiArray.length() > 10) {
+                            if (nearbyArray.length() > 15) {
                                 item {
-                                    Text(stringResource(R.string.and_n_more, wifiArray.length()), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha=0.5f))
+                                    Text(
+                                        text = stringResource(R.string.and_n_more, nearbyArray.length() - 15),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                    )
                                 }
                             }
                             

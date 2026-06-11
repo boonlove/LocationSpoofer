@@ -30,7 +30,7 @@ class EnvironmentScanner(private val context: Context) {
     suspend fun scanWifi(): String = withContext(Dispatchers.IO) {
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-        val jsonArray = JSONArray()
+        val resultObj = JSONObject()
         try {
             var isWifiConnected = false
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -51,19 +51,16 @@ class EnvironmentScanner(private val context: Context) {
                 isWifiConnected = activeNetwork != null && activeNetwork.type == android.net.ConnectivityManager.TYPE_WIFI && activeNetwork.isConnected
             }
 
-            if (!isWifiConnected) {
-                // 如果没有连接 Wi-Fi，则不采集 Wi-Fi 列表，返回空数组
-                return@withContext "[]"
-            }
+            resultObj.put("isConnected", isWifiConnected)
 
-            // 1. 优先提取当前正在连接的 Wi-Fi 信息，并置于数组首位
             val connectionInfo = wifiManager.connectionInfo
-            val connectedBssid = connectionInfo?.bssid
-            val results = wifiManager.scanResults
+            val connectedBssid = if (isWifiConnected) connectionInfo?.bssid else null
+            val results = wifiManager.scanResults ?: emptyList()
 
-            if (connectedBssid != null && connectedBssid != "02:00:00:00:00:00") {
-                val obj = JSONObject()
-                obj.put("bssid", connectedBssid)
+            // 1. 优先提取当前正在连接的 Wi-Fi 信息
+            if (isWifiConnected && connectedBssid != null && connectedBssid != "02:00:00:00:00:00") {
+                val connObj = JSONObject()
+                connObj.put("bssid", connectedBssid)
                 val rawSsid = connectionInfo.ssid
                 var cleanSsid = if (rawSsid != null && rawSsid.startsWith("\"") && rawSsid.endsWith("\"")) {
                     rawSsid.substring(1, rawSsid.length - 1)
@@ -71,43 +68,60 @@ class EnvironmentScanner(private val context: Context) {
                     rawSsid ?: ""
                 }
                 
+                val match = results.find { it.BSSID == connectedBssid }
                 // 如果是 unknown ssid 或为空，尝试从扫描结果中恢复真实 SSID
                 if (cleanSsid == "<unknown ssid>" || cleanSsid.isEmpty()) {
-                    val match = results.find { it.BSSID == connectedBssid }
                     if (match != null && !match.SSID.isNullOrEmpty()) {
                         cleanSsid = match.SSID
                     }
                 }
                 
-                obj.put("ssid", if (cleanSsid == "<unknown ssid>") "" else cleanSsid)
-                obj.put("level", connectionInfo.rssi)
-                obj.put("frequency", connectionInfo.frequency)
-                obj.put("capabilities", "[WPA2-PSK-CCMP][ESS]") // 兜底 capability
-                try { obj.put("macAddress", connectionInfo.macAddress) } catch(e:Throwable){}
-                try { obj.put("linkSpeed", connectionInfo.linkSpeed) } catch(e:Throwable){}
-                try { obj.put("networkId", connectionInfo.networkId) } catch(e:Throwable){}
+                connObj.put("ssid", if (cleanSsid == "<unknown ssid>") "" else cleanSsid)
+                connObj.put("vendor", MacVendorHelper.getVendor(connectedBssid))
+                connObj.put("level", connectionInfo.rssi)
+                connObj.put("frequency", connectionInfo.frequency)
+                connObj.put("channel", MacVendorHelper.frequencyToChannel(connectionInfo.frequency))
+                connObj.put("capabilities", match?.capabilities ?: "[WPA2-PSK-CCMP][ESS]")
+                try { connObj.put("macAddress", connectionInfo.macAddress) } catch(e:Throwable){}
+                try { connObj.put("linkSpeed", connectionInfo.linkSpeed) } catch(e:Throwable){}
+                try { connObj.put("networkId", connectionInfo.networkId) } catch(e:Throwable){}
                 if (android.os.Build.VERSION.SDK_INT >= 30) {
-                    try { obj.put("wifiStandard", connectionInfo.wifiStandard) } catch(e:Throwable){}
+                    try { connObj.put("wifiStandard", connectionInfo.wifiStandard) } catch(e:Throwable){}
                 }
-                jsonArray.put(obj)
+                resultObj.put("connectedWifi", connObj)
+            } else {
+                resultObj.put("connectedWifi", JSONObject.NULL)
             }
 
-            // 2. 提取周围扫描到的其他 Wi-Fi（去重）
+            // 2. 提取周围扫描到的其他 Wi-Fi（去重，不包含当前已连接的）
+            val nearbyArray = JSONArray()
+            val seenBssids = mutableSetOf<String>()
+            if (isWifiConnected && connectedBssid != null) {
+                seenBssids.add(connectedBssid)
+            }
             results.forEach { scanResult ->
-                if (scanResult.BSSID != connectedBssid) {
+                val bssid = scanResult.BSSID
+                if (bssid != null && !seenBssids.contains(bssid)) {
+                    seenBssids.add(bssid)
                     val obj = JSONObject()
-                    obj.put("bssid", scanResult.BSSID)
-                    obj.put("ssid", scanResult.SSID)
+                    obj.put("bssid", bssid)
+                    obj.put("ssid", scanResult.SSID ?: "")
+                    obj.put("vendor", MacVendorHelper.getVendor(bssid))
                     obj.put("level", scanResult.level)
-                    obj.put("capabilities", scanResult.capabilities)
+                    obj.put("capabilities", scanResult.capabilities ?: "")
                     obj.put("frequency", scanResult.frequency)
-                    jsonArray.put(obj)
+                    obj.put("channel", MacVendorHelper.frequencyToChannel(scanResult.frequency))
+                    nearbyArray.put(obj)
                 }
             }
+            resultObj.put("nearbyWifi", nearbyArray)
         } catch (e: Exception) {
             e.printStackTrace()
+            resultObj.put("isConnected", false)
+            resultObj.put("connectedWifi", JSONObject.NULL)
+            resultObj.put("nearbyWifi", JSONArray())
         }
-        jsonArray.toString()
+        resultObj.toString()
     }
 
     @SuppressLint("MissingPermission")

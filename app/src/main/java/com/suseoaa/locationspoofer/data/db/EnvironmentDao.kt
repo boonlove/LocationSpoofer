@@ -7,6 +7,9 @@ interface EnvironmentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLocation(record: LocationRecord): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConnectedWifi(wifi: LocationConnectedWifi)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertWifiDevice(device: WifiDevice)
 

@@ -27,7 +27,34 @@ data class WifiDevice(
     @PrimaryKey val bssid: String,
     val ssid: String,
     val frequency: Int,
-    val capabilities: String
+    val capabilities: String,
+    val vendor: String = ""
+)
+
+@Serializable
+@Entity(
+    tableName = "location_connected_wifi",
+    foreignKeys = [
+        ForeignKey(
+            entity = LocationRecord::class,
+            parentColumns = ["id"],
+            childColumns = ["locationId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class LocationConnectedWifi(
+    @PrimaryKey val locationId: Long,
+    val bssid: String,
+    val ssid: String,
+    val vendor: String,
+    val macAddress: String,
+    val frequency: Int,
+    val linkSpeed: Int,
+    val level: Int,
+    val capabilities: String,
+    val networkId: Int,
+    val wifiStandard: Int
 )
 
 @Entity(
@@ -165,6 +192,8 @@ data class LocationWithCell(
 @Serializable
 data class CompleteLocation(
     @Embedded val location: LocationRecord,
+    @Relation(parentColumn = "id", entityColumn = "locationId")
+    val connectedWifi: LocationConnectedWifi?,
     @Relation(entity = LocationWifi::class, parentColumn = "id", entityColumn = "locationId")
     val wifis: List<LocationWithWifi>,
     @Relation(entity = LocationBluetooth::class, parentColumn = "id", entityColumn = "locationId")
