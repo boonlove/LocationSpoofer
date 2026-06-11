@@ -103,6 +103,7 @@ class MainViewModel(
                 fetchCurrentLocation(context)
             }
             refreshRecordCount()
+            loadManageData()
         }
 
         viewModelScope.launch {
@@ -411,16 +412,73 @@ class MainViewModel(
     // 坐标输入
 
     fun updateLongitude(value: String) {
-        if (isValidCoord(value)) _uiState.update { it.copy(longitudeInput = value, showCoordinateError = false) }
+        if (isValidCoord(value)) {
+            _uiState.update { it.copy(longitudeInput = value, showCoordinateError = false) }
+            evaluateMockCapabilities()
+        }
     }
 
     fun updateLatitude(value: String) {
-        if (isValidCoord(value)) _uiState.update { it.copy(latitudeInput = value, showCoordinateError = false) }
+        if (isValidCoord(value)) {
+            _uiState.update { it.copy(latitudeInput = value, showCoordinateError = false) }
+            evaluateMockCapabilities()
+        }
     }
 
     private fun isValidCoord(value: String): Boolean {
         if (value.isEmpty() || value == "-") return true
         return value.toDoubleOrNull() != null
+    }
+    
+    private fun evaluateMockCapabilities() {
+        val state = _uiState.value
+        val lat = state.latitudeInput.toDoubleOrNull()
+        val lng = state.longitudeInput.toDoubleOrNull()
+        
+        if (lat == null || lng == null) {
+            _uiState.update { 
+                it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false, 
+                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
+            }
+            return
+        }
+        
+        val allRecords = state.manageDataList
+        val validRecords = mutableListOf<com.suseoaa.locationspoofer.data.db.CompleteLocation>()
+        
+        for (record in allRecords) {
+            val loc = record.location
+            val dLat = Math.toRadians(lat - loc.lat)
+            val dLng = Math.toRadians(lng - loc.lng)
+            val a = kotlin.math.sin(dLat / 2).let { it * it } + 
+                    kotlin.math.cos(Math.toRadians(loc.lat)) * 
+                    kotlin.math.cos(Math.toRadians(lat)) * 
+                    kotlin.math.sin(dLng / 2).let { it * it }
+            val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+            
+            if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
+                validRecords.add(record)
+            }
+        }
+        
+        if (validRecords.isEmpty()) {
+            _uiState.update { 
+                it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false,
+                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
+            }
+        } else {
+            val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
+            val hasW = wifiJson != "[]"
+            val hasC = cellJson != "[]"
+            val hasB = btJson != "[]"
+            
+            _uiState.update { 
+                it.copy(
+                    canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
+                    collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson
+                ) 
+            }
+        }
     }
 
     // 定点模拟
@@ -455,9 +513,9 @@ class MainViewModel(
                 state.collectedWifiJson,
                 state.collectedCellJson,
                 state.collectedBluetoothJson,
-                state.mockWifi,
-                state.mockCell,
-                state.mockBluetooth,
+                state.mockWifi && state.canMockWifi,
+                state.mockCell && state.canMockCell,
+                state.mockBluetooth && state.canMockBluetooth,
                 state.enableJitter
             )
             _uiState.update {
@@ -1002,6 +1060,7 @@ class MainViewModel(
             val list = environmentDao.getAllCompleteLocations()
             withContext(Dispatchers.Main) {
                 _uiState.update { it.copy(manageDataList = list, manageDataIsLoading = false) }
+                evaluateMockCapabilities()
             }
         }
     }
@@ -1019,6 +1078,13 @@ class MainViewModel(
             environmentDao.deleteLocation(id)
             loadManageData()
             refreshRecordCount()
+        }
+    }
+
+    fun updateManageDataMetadata(id: Long, placeName: String, remark: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            environmentDao.updateMetadata(id, placeName, remark)
+            loadManageData()
         }
     }
 

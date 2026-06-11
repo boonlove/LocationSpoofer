@@ -149,4 +149,14 @@
     <string name="mock_bluetooth_data">Mock Bluetooth Data</string>
     <string name="enable_slight_jitter">Enable Slight Jitter</string>
     <string name="app_package_name">App Package Name</string>
+    
+    <string name="no_data_collected">No data collected.</string>
+    <string name="edit_location_data">Edit Location Data</string>
+    <string name="place_name">Place Name</string>
+    <string name="remark_note">Remark/Note</string>
+    <string name="clear_all_data">Clear All Data</string>
+    <string name="clear_all_data_confirm">Are you sure you want to delete all collected environment data? This cannot be undone.</string>
+    <string name="clear_all">Clear All</string>
+    <string name="selected_items">%d Selected</string>
+    <string name="select_all">Select All</string>
 </resources>

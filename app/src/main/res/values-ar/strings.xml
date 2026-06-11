@@ -140,8 +140,16 @@
     <string name="spoofing_options_title">خيارات المحاكاة</string>
     <string name="spoofing_options_desc">يرجى تحديد بيانات البيئة التي سيتم تزييفها لمحاكاة هذه النقطة. سيتم حظر العناصر غير المحددة بالكامل (أي لا يمكن للتطبيق الحصول على بياناتك الحقيقية). يتم تضمين محاكاة خطوط الطول والعرض افتراضيًا.</string>
     <string name="mock_wifi_data">محاكاة بيانات Wi-Fi</string>
-    <string name="mock_cell_data">محاكاة بيانات الخلية</string>
+    <string name="mock_cell_data">محاكاة بيانات أبراج الاتصالات</string>
     <string name="mock_bluetooth_data">محاكاة بيانات البلوتوث</string>
-    <string name="enable_slight_jitter">تمكين الاهتزاز الخفيف</string>
+    <string name="enable_slight_jitter">تفعيل الارتعاش الخفيف</string>
     <string name="app_package_name">اسم حزمة التطبيق</string>
+    
+    <string name="no_data_collected">لم يتم جمع أي بيانات.</string>
+    <string name="edit_location_data">تعديل بيانات الموقع</string>
+    <string name="place_name">اسم المكان</string>
+    <string name="remark_note">ملاحظة</string>
+    <string name="clear_all_data">مسح جميع البيانات</string>
+    <string name="clear_all_data_confirm">هل أنت متأكد أنك تريد حذف جميع بيانات البيئة المجمعة؟ لا يمكن التراجع عن هذا الإجراء.</string>
+    <string name="clear_all">مسح الكل</string>
 </resources>

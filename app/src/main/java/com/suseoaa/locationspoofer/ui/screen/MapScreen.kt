@@ -89,10 +89,13 @@ fun FullScreenMapPage(
 
     // 同步路点标记和折线到地图
     var liveMarker by remember { mutableStateOf<AppMapMarker?>(null) }
-    LaunchedEffect(routePoints, mapRef) {
+    LaunchedEffect(routePoints, mapRef, uiState.manageDataList) {
         val map = mapRef ?: return@LaunchedEffect
         map.clear()
         liveMarker = null
+        val locations = uiState.manageDataList.map { it.location }
+        com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(map, locations)
+
         if (routePoints.size >= 2) {
             map.addPolyline(
                 routePoints.map { Pair(it.lat, it.lng) },

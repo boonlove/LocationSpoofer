@@ -36,11 +36,7 @@ fun ScannerMapScreen(
         controller.clear()
         
         // Draw circles for coverage
-        val fillColor = android.graphics.Color.argb(50, 46, 204, 113) // AccentGreen with alpha
-        val strokeColor = android.graphics.Color.argb(100, 46, 204, 113)
-        locations.forEach { loc ->
-            controller.addCircle(loc.lat, loc.lng, 20.0, fillColor, strokeColor, 2f)
-        }
+        com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(controller, locations)
         
         // Move camera to latest record if exists
         if (locations.isNotEmpty()) {

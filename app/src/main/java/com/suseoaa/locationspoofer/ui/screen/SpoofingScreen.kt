@@ -128,7 +128,7 @@ fun SpoofingScreen(
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showCustomCoordDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
-    val topBarBg = AppColors.surface(isDark)
+    val topBarBg = AppColors.topBarBackground(isDark)
     val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
@@ -142,7 +142,7 @@ fun SpoofingScreen(
         showSearchResults = false
     }
 
-    // 请求当前位置（仅在坐标为空时）
+    // 请求当前位置（仅在坐标为空时），并确保本地采集数据已加载
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(
                 context, Manifest.permission.ACCESS_FINE_LOCATION
@@ -150,6 +150,8 @@ fun SpoofingScreen(
         ) {
             viewModel.fetchCurrentLocation(context)
         }
+        // 强制在界面展示时再加载一次数据，防止因启动时序导致的数据未及时注入
+        viewModel.loadManageData()
     }
 
     // 小地图实例，用于响应坐标更新
@@ -160,6 +162,13 @@ fun SpoofingScreen(
         if (lat != null && lng != null) {
             smallMapRef?.animateCamera(lat, lng)
         }
+    }
+
+    LaunchedEffect(smallMapRef, uiState.manageDataList) {
+        val map = smallMapRef ?: return@LaunchedEffect
+        map.clear()
+        val locations = uiState.manageDataList.map { it.location }
+        com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(map, locations)
     }
 
     Column(
@@ -410,7 +419,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { showAppCoordinateScreen = true }
             ) {
@@ -440,7 +449,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { 
                     onExpandScannerMap()
@@ -475,7 +484,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable {
                     viewModel.toggleManageDataScreen(true)
@@ -503,7 +512,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
@@ -591,6 +600,7 @@ fun SpoofingScreen(
     if (showStartSpoofingDialog) {
         StartSpoofingDialog(
             uiState = uiState,
+            isDark = isDark,
             onDismiss = { showStartSpoofingDialog = false },
             onConfirm = {
                 viewModel.startSpoofing()
@@ -1404,6 +1414,7 @@ fun LocalizedDialog(
 @Composable
 fun StartSpoofingDialog(
     uiState: AppState,
+    isDark: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     onToggleWifi: () -> Unit,
@@ -1414,7 +1425,7 @@ fun StartSpoofingDialog(
     LocalizedDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface
+            color = AppColors.cardBackground(isDark)
         ) {
             Column(
                 modifier = Modifier
@@ -1436,22 +1447,28 @@ fun StartSpoofingDialog(
                 Spacer(Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Wifi, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                    val tintW = if (uiState.canMockWifi) AccentBlue else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                    val colorW = if (uiState.canMockWifi) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    Icon(Icons.Outlined.Wifi, null, tint = tintW, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_wifi_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Switch(checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() })
+                    Text(stringResource(R.string.mock_wifi_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorW)
+                    Switch(checked = uiState.mockWifi && uiState.canMockWifi, onCheckedChange = { onToggleWifi() }, enabled = uiState.canMockWifi)
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.CellTower, null, tint = AccentOrange, modifier = Modifier.size(20.dp))
+                    val tintC = if (uiState.canMockCell) AccentOrange else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                    val colorC = if (uiState.canMockCell) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    Icon(Icons.Outlined.CellTower, null, tint = tintC, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_cell_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Switch(checked = uiState.mockCell, onCheckedChange = { onToggleCell() })
+                    Text(stringResource(R.string.mock_cell_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorC)
+                    Switch(checked = uiState.mockCell && uiState.canMockCell, onCheckedChange = { onToggleCell() }, enabled = uiState.canMockCell)
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Bluetooth, null, tint = AccentGreen, modifier = Modifier.size(20.dp))
+                    val tintB = if (uiState.canMockBluetooth) AccentGreen else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                    val colorB = if (uiState.canMockBluetooth) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    Icon(Icons.Outlined.Bluetooth, null, tint = tintB, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_bluetooth_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
-                    Switch(checked = uiState.mockBluetooth, onCheckedChange = { onToggleBluetooth() })
+                    Text(stringResource(R.string.mock_bluetooth_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorB)
+                    Switch(checked = uiState.mockBluetooth && uiState.canMockBluetooth, onCheckedChange = { onToggleBluetooth() }, enabled = uiState.canMockBluetooth)
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.GraphicEq, null, tint = AccentBlue, modifier = Modifier.size(20.dp))

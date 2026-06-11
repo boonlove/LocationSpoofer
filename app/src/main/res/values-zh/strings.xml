@@ -144,8 +144,17 @@
     <string name="spoofing_options_title">模拟选项</string>
     <string name="spoofing_options_desc">请选择本次定点模拟需要伪造的环境数据。未勾选的项将被彻底屏蔽（即App无法获取您的真实数据）。默认包含经纬度伪造。</string>
     <string name="mock_wifi_data">伪造 Wi-Fi 数据</string>
-    <string name="mock_cell_data">伪造基站数据</string>
-    <string name="mock_bluetooth_data">伪造蓝牙数据</string>
+    <string name="mock_cell_data">模拟基站数据</string>
+    <string name="mock_bluetooth_data">模拟蓝牙数据</string>
     <string name="enable_slight_jitter">开启轻微抖动</string>
-    <string name="app_package_name">软件包名</string>
+    <string name="app_package_name">应用包名</string>
+    <string name="no_data_collected">暂无采集数据</string>
+    <string name="edit_location_data">编辑位置数据</string>
+    <string name="place_name">地名</string>
+    <string name="remark_note">备注</string>
+    <string name="clear_all_data">清除所有数据</string>
+    <string name="clear_all_data_confirm">您确定要删除所有采集的环境数据吗？此操作无法撤销。</string>
+    <string name="clear_all">全部清除</string>
+    <string name="selected_items">已选择 %d 项</string>
+    <string name="select_all">全选</string>
 </resources>

@@ -16,6 +16,7 @@ val TextSecondaryDark = Color(0xFF8B949E)
 val LightBg = Color(0xFFF6F8FA)
 val SurfaceLight = Color(0xFFFFFFFF)
 val SurfaceCardLight = Color(0xFFFFFFFF)
+val SurfaceCardCustomLight = Color(0xFFF3F6F9) // Custom color overriding MD3 default
 val DividerColorLight = Color(0xFFD0D7DE)
 val TextPrimaryLight = Color(0xFF24292F)
 val TextSecondaryLight = Color(0xFF57606A)
@@ -55,4 +56,7 @@ val AppColorSchemeLight = lightColorScheme(
 object AppColors {
     fun textSecondary(isDark: Boolean) = if (isDark) TextSecondaryDark else TextSecondaryLight
     fun surface(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceLight
+    fun cardBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardCustomLight
+    fun topBarBackground(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceCardCustomLight
+    fun background(isDark: Boolean) = if (isDark) DarkBg else LightBg
 }

@@ -51,4 +51,7 @@ interface EnvironmentDao {
 
     @Query("DELETE FROM location_records WHERE id IN (:ids)")
     suspend fun deleteLocations(ids: List<Long>)
+
+    @Query("UPDATE location_records SET placeName = :placeName, remark = :remark WHERE id = :id")
+    suspend fun updateMetadata(id: Long, placeName: String, remark: String)
 }

@@ -83,6 +83,9 @@ data class AppState(
     val mockCell: Boolean = true,
     val mockBluetooth: Boolean = true,
     val enableJitter: Boolean = true,
+    val canMockWifi: Boolean = false,
+    val canMockCell: Boolean = false,
+    val canMockBluetooth: Boolean = false,
     
     // Data Management
     val isManageDataScreen: Boolean = false,

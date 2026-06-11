@@ -16,7 +16,9 @@ data class LocationRecord(
     val id: Long = 0,
     val lat: Double,
     val lng: Double,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val placeName: String = "",
+    val remark: String = ""
 )
 
 @Serializable
