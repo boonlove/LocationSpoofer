@@ -165,4 +165,6 @@
     <string name="fixes_header">Bug Fixes</string>
     <string name="others_header">Other Changes</string>
     <string name="merged_updates_badge">Includes %1$d versions of updates</string>
+    <string name="brand_github">GitHub</string>
+    <string name="brand_telegram">Telegram</string>
 </resources>

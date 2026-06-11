@@ -592,6 +592,67 @@ fun SpoofingScreen(
                     }
                 }
             }
+            
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                
+                // GitHub Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF181717)) // Official GitHub brand color background
+                        .clickable { uriHandler.openUri("https://github.com/boonlove/LocationSpoofer") }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(R.drawable.ic_github),
+                            contentDescription = stringResource(R.string.brand_github),
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.brand_github),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.width(16.dp))
+                
+                // Telegram Button
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isDark) Color(0xFF24A1DE).copy(alpha = 0.2f) else Color(0xFFE8F4FA))
+                        .clickable { uriHandler.openUri("https://t.me/+CsxZGItXdW40ZWVl") }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(R.drawable.ic_telegram),
+                            contentDescription = stringResource(R.string.brand_telegram),
+                            tint = Color.Unspecified, // Use natural brand color
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.brand_telegram),
+                            color = Color(0xFF24A1DE),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

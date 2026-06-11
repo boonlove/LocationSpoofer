@@ -163,4 +163,6 @@
     <string name="fixes_header">缺陷修复</string>
     <string name="others_header">其他更新</string>
     <string name="merged_updates_badge">包含 %1$d 个版本的更新</string>
+    <string name="brand_github">GitHub</string>
+    <string name="brand_telegram">Telegram</string>
 </resources>
