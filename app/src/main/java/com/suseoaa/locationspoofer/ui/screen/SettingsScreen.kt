@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
+import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 
@@ -40,6 +41,7 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
     ) {
         // Header
         Row(
@@ -179,8 +181,78 @@ fun SettingsScreen(
             ) {
                 Text(stringResource(R.string.save), modifier = Modifier.padding(vertical = 4.dp))
             }
-            
+
             Spacer(Modifier.height(24.dp))
+
+            // 地图服务切换
+            Text(
+                stringResource(R.string.map_provider),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(8.dp))
+
+            Map_Provider_LIST.forEach { mapProvider ->
+                MapProviderItem(
+                    option = mapProvider,
+                    isSelected = uiState.mapProvider == mapProvider.value,
+                    onClick = {
+                        when (mapProvider.value) {
+                            AppMapProvider.GOOGLE_MAPS -> {
+                                if (com.suseoaa.locationspoofer.BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank()) {
+                                    viewModel.setMapProvider(mapProvider.value)
+                                } else {
+                                    Toast.makeText(context, context.getString(R.string.google_maps_api_key_not_configured), Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            else -> {
+                                viewModel.setMapProvider(mapProvider.value)
+                            }
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+data class MapProviderOption(val nameResId: Int, val value: AppMapProvider)
+
+val Map_Provider_LIST = listOf(
+    MapProviderOption(R.string.amap, AppMapProvider.AMAP),
+    MapProviderOption(R.string.google_map, AppMapProvider.GOOGLE_MAPS)
+)
+
+@Composable
+fun MapProviderItem(
+    option: MapProviderOption,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, AccentBlue) else null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(option.nameResId),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isSelected) AccentBlue else MaterialTheme.colorScheme.onBackground
+                )
+            }
+            if (isSelected) {
+                RadioButton(selected = true, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = AccentBlue))
+            }
         }
     }
 }

@@ -19,12 +19,12 @@ import com.suseoaa.locationspoofer.data.model.AppMapType
 
 import com.google.android.gms.maps.CameraUpdateFactory as GCameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
-import com.google.android.libraries.places.api.Places
 import com.google.android.gms.maps.MapView as GMapView
 import com.google.android.gms.maps.model.BitmapDescriptorFactory as GBitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng as GLatLng
 import com.google.android.gms.maps.model.MarkerOptions as GMarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions as GPolylineOptions
+import com.suseoaa.locationspoofer.data.model.AppMapProvider
 
 interface AppMapMarker {
     fun setPosition(lat: Double, lng: Double)
@@ -254,73 +254,76 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
 }
 
 @Composable
-fun AppMapView(isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
+fun AppMapView(mapProvider: AppMapProvider, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    if (isDomestic || ! Places.isInitialized()) {
-        val amapView = remember { 
-            val view = TextureMapView(context)
-            view.onCreate(Bundle())
-            view
-        }
-        DisposableEffect(lifecycle, amapView) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME  -> amapView.onResume()
-                    Lifecycle.Event.ON_PAUSE   -> amapView.onPause()
-                    Lifecycle.Event.ON_DESTROY -> amapView.onDestroy()
-                    else -> {}
+    when (mapProvider) {
+        AppMapProvider.AMAP -> {
+            val amapView = remember {
+                val view = TextureMapView(context)
+                view.onCreate(Bundle())
+                view
+            }
+            DisposableEffect(lifecycle, amapView) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> amapView.onResume()
+                        Lifecycle.Event.ON_PAUSE -> amapView.onPause()
+                        Lifecycle.Event.ON_DESTROY -> amapView.onDestroy()
+                        else -> {}
+                    }
+                }
+                lifecycle.addObserver(observer)
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) amapView.onResume()
+                onDispose {
+                    lifecycle.removeObserver(observer)
+                    amapView.onPause()
+                    amapView.onDestroy()
                 }
             }
-            lifecycle.addObserver(observer)
-            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) amapView.onResume()
-            onDispose {
-                lifecycle.removeObserver(observer)
-                amapView.onPause()
-                amapView.onDestroy()
-            }
+            AndroidView(
+                factory = {
+                    amapView.apply {
+                        setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                        map.setOnMapLoadedListener { onMapReady(AMapControllerImpl(map)) }
+                    }
+                },
+                modifier = modifier
+            )
         }
-        AndroidView(
-            factory = {
-                amapView.apply {
-                    setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                    map.setOnMapLoadedListener { onMapReady(AMapControllerImpl(map)) }
+        AppMapProvider.GOOGLE_MAPS -> {
+            val gmapView = remember {
+                val view = GMapView(context)
+                view.onCreate(Bundle())
+                view
+            }
+            DisposableEffect(lifecycle, gmapView) {
+                val observer = LifecycleEventObserver { _, event ->
+                    when (event) {
+                        Lifecycle.Event.ON_RESUME -> gmapView.onResume()
+                        Lifecycle.Event.ON_PAUSE -> gmapView.onPause()
+                        Lifecycle.Event.ON_DESTROY -> gmapView.onDestroy()
+                        else -> {}
+                    }
                 }
-            },
-            modifier = modifier
-        )
-    } else {
-        val gmapView = remember { 
-            val view = GMapView(context)
-            view.onCreate(Bundle())
-            view
-        }
-        DisposableEffect(lifecycle, gmapView) {
-            val observer = LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME  -> gmapView.onResume()
-                    Lifecycle.Event.ON_PAUSE   -> gmapView.onPause()
-                    Lifecycle.Event.ON_DESTROY -> gmapView.onDestroy()
-                    else -> {}
+                lifecycle.addObserver(observer)
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) gmapView.onResume()
+                onDispose {
+                    lifecycle.removeObserver(observer)
+                    gmapView.onPause()
+                    gmapView.onDestroy()
                 }
             }
-            lifecycle.addObserver(observer)
-            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) gmapView.onResume()
-            onDispose {
-                lifecycle.removeObserver(observer)
-                gmapView.onPause()
-                gmapView.onDestroy()
-            }
+            AndroidView(
+                factory = {
+                    gmapView.apply {
+                        setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                        getMapAsync { map -> onMapReady(GMapControllerImpl(map)) }
+                    }
+                },
+                modifier = modifier
+            )
         }
-        AndroidView(
-            factory = {
-                gmapView.apply {
-                    setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                    getMapAsync { map -> onMapReady(GMapControllerImpl(map)) }
-                }
-            },
-            modifier = modifier
-        )
     }
 }

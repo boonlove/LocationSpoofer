@@ -39,6 +39,11 @@ enum class RouteRunMode {
     LOOP
 }
 
+enum class AppMapProvider {
+    AMAP,
+    GOOGLE_MAPS
+}
+
 enum class AppMapType {
     NORMAL,
     SATELLITE,
@@ -78,6 +83,8 @@ data class AppState(
     val amapApiKey: String = "",
     val appSha1: String = "",
     val appCoordinateSystems: Map<String, String> = emptyMap(),
+    /** 当前使用的地图类型 */
+    val mapProvider: AppMapProvider = AppMapProvider.AMAP,
     val isContinuousScanning: Boolean = false,
     val environmentRecordCount: Int = 0,
     val hookedApps: List<AppInfoItem> = emptyList(),

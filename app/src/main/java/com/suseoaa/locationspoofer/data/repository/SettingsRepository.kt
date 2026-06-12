@@ -36,6 +36,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.amapApiKey = value
     }
 
+    fun getMapProvider(): String = settingsManager.mapProvider
+
+    fun setMapProvider(value: String) {
+        settingsManager.mapProvider = value
+    }
+
     fun getMapType(): String = settingsManager.mapType
 
     fun setMapType(value: String) {

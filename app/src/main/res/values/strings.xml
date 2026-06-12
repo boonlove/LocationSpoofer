@@ -85,6 +85,10 @@
     <string name="copy">Copy</string>
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="restart_required_hint">Changes to the API Key require restarting the app to take full effect.</string>
+    <string name="map_provider">Map Provider</string>
+    <string name="amap">AMap</string>
+    <string name="google_map">Google Maps</string>
+    <string name="google_maps_api_key_not_configured">Google Maps API key not configured. Cannot switch map provider.</string>
     <string name="check_updates">Check for Updates</string>
     <string name="check_updates_desc">Get latest version from GitHub</string>
     <string name="update_dialog_title">Version Updates</string>

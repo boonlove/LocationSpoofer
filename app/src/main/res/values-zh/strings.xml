@@ -84,6 +84,10 @@
     <string name="copy">复制</string>
     <string name="copied_to_clipboard">已复制到剪贴板</string>
     <string name="restart_required_hint">修改 API Key 后需重启应用才能完全生效。</string>
+    <string name="map_provider">地图服务</string>
+    <string name="amap">高德地图</string>
+    <string name="google_map">谷歌地图</string>
+    <string name="google_maps_api_key_not_configured">未配置有效的谷歌地图API KEY，无法切换地图服务</string>
     <string name="check_updates">检查更新</string>
     <string name="check_updates_desc">从 GitHub 获取最新版本</string>
     <string name="update_dialog_title">版本更新</string>

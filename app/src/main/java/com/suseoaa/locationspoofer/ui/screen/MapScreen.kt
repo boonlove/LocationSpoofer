@@ -45,6 +45,7 @@ import com.suseoaa.locationspoofer.ui.components.AppMapMarker
 import com.suseoaa.locationspoofer.ui.components.MarkerType
 import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.R
+import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.AppMapType
 import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
@@ -70,10 +71,10 @@ fun FullScreenMapPage(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    val mapProvider = uiState.mapProvider
     var mapRef by remember { mutableStateOf<AppMapController?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
     var showMapTypeDialog by remember { mutableStateOf(false) }
-    val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
@@ -148,7 +149,7 @@ fun FullScreenMapPage(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 地图
-        AppMapView(isDomestic = isDomestic, modifier = Modifier.fillMaxSize()) { map ->
+        AppMapView(mapProvider = uiState.mapProvider, modifier = Modifier.fillMaxSize()) { map ->
             mapRef = map
             map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
@@ -203,10 +204,10 @@ fun FullScreenMapPage(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             focusManager.clearFocus()
-                            if (uiState.amapApiKey.isBlank()) {
+                            if (uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) {
                                 showApiKeyWarning = true
                             } else if (searchQuery.isNotBlank()) {
-                                performPoiSearch(context, searchQuery, isDomestic) { r ->
+                                performPoiSearch(context, searchQuery, mapProvider) { r ->
                                     searchResults = r
                                     showSearchResults = r.isNotEmpty()
                                 }

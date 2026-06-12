@@ -56,7 +56,7 @@ fun ScannerMapScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         AppMapView(
-            isDomestic = uiState.currentLanguage == "zh",
+            mapProvider = uiState.mapProvider,
             modifier = Modifier.fillMaxSize(),
             onMapReady = { controller ->
                 mapController = controller

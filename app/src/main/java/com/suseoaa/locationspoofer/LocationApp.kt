@@ -5,6 +5,7 @@ import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
 import com.google.android.libraries.places.api.Places
+import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -31,21 +32,27 @@ class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
         }
 
         val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
+
+        // 高德定位 SDK 隐私声明（定位功能始终需要）
+        AMapLocationClient.updatePrivacyShow(this, true, true)
+        AMapLocationClient.updatePrivacyAgree(this, true)
+        // 高德地图 SDK
         MapsInitializer.updatePrivacyShow(this, true, true)
         MapsInitializer.updatePrivacyAgree(this, true)
         ServiceSettings.updatePrivacyShow(this, true, true)
         ServiceSettings.updatePrivacyAgree(this, true)
-        AMapLocationClient.updatePrivacyShow(this, true, true)
-        AMapLocationClient.updatePrivacyAgree(this, true)
 
         val customApiKey = prefs.getString("amap_api_key", "")
         if (!customApiKey.isNullOrEmpty()) {
             MapsInitializer.setApiKey(customApiKey)
-            AMapLocationClient.setApiKey(customApiKey)
             ServiceSettings.getInstance().setApiKey(customApiKey)
+
+            // 高德定位 API Key（定位功能始终需要）
+            AMapLocationClient.setApiKey(customApiKey)
         }
 
-        if (!Places.isInitialized() && BuildConfig.GOOGLE_MAPS_API_KEY.isNotEmpty()) {
+        // 谷歌地图 SDK
+        if (!Places.isInitialized() && BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank()) {
             Places.initialize(this, BuildConfig.GOOGLE_MAPS_API_KEY)
         }
 
