@@ -105,6 +105,8 @@
     <string name="search_success_results">Search Success: %1$d results</string>
     <string name="search_error">Search Error: %s</string>
     <string name="search_catch_error">Search Catch Error: %s</string>
+    <string name="api_key_required_title">API Key Required</string>
+    <string name="api_key_required_message">POI search requires a custom AMap API Key. Please configure it in Settings \u003e AMap Configuration.</string>
     <string name="spoofing_service_title">Location Spoofer</string>
     <string name="spoofing_service_content">Spoofing location: %1$s, %2$s</string>
     <string name="spoofing_service_channel_name">Location Spoofer Service</string>

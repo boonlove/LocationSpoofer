@@ -132,6 +132,7 @@ fun SpoofingScreen(
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    var showApiKeyWarning by remember { mutableStateOf(false) }
 
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
@@ -219,7 +220,9 @@ fun SpoofingScreen(
             onQueryChange = { searchQuery = it },
             onSearch = {
                 focusManager.clearFocus()
-                if (searchQuery.isNotBlank()) {
+                if (uiState.amapApiKey.isBlank()) {
+                    showApiKeyWarning = true
+                } else if (searchQuery.isNotBlank()) {
                     performPoiSearch(context, searchQuery, isDomestic) { results ->
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
@@ -479,6 +482,10 @@ fun SpoofingScreen(
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showApiKeyWarning) {
+        ApiKeyWarningDialog { showApiKeyWarning = false }
     }
 
     if (showSaveDialog) {
@@ -1025,6 +1032,42 @@ fun SectionHeader(icon: ImageVector, title: String, isDark: Boolean) {
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 0.8.sp
         )
+    }
+}
+
+// API Key 警告弹窗
+
+@Composable
+fun ApiKeyWarningDialog(
+    onDismiss: () -> Unit
+) {
+    LocalizedDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
+                Text(
+                    stringResource(R.string.api_key_required_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.api_key_required_message)
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.ok))
+                    }
+                }
+            }
+        }
     }
 }
 

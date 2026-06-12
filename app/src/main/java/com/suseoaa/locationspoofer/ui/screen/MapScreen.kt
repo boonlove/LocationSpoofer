@@ -75,6 +75,7 @@ fun FullScreenMapPage(
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    var showApiKeyWarning by remember { mutableStateOf(false) }
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
     BackHandler(enabled = showSearchResults) {
@@ -191,7 +192,9 @@ fun FullScreenMapPage(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             focusManager.clearFocus()
-                            if (searchQuery.isNotBlank()) {
+                            if (uiState.amapApiKey.isBlank()) {
+                                showApiKeyWarning = true
+                            } else if (searchQuery.isNotBlank()) {
                                 performPoiSearch(context, searchQuery, isDomestic) { r ->
                                     searchResults = r
                                     showSearchResults = r.isNotEmpty()
@@ -331,6 +334,13 @@ fun FullScreenMapPage(
                 onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
             )
         }
+    }
+
+    // API Key 警告弹窗
+    if (showApiKeyWarning) {
+        ApiKeyWarningDialog(
+            onDismiss = { showApiKeyWarning = false }
+        )
     }
 
     // 配置弹窗

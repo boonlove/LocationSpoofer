@@ -45,7 +45,7 @@ class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
             ServiceSettings.getInstance().setApiKey(customApiKey)
         }
 
-        if (!Places.isInitialized()) {
+        if (!Places.isInitialized() && BuildConfig.GOOGLE_MAPS_API_KEY.isNotEmpty()) {
             Places.initialize(this, BuildConfig.GOOGLE_MAPS_API_KEY)
         }
 

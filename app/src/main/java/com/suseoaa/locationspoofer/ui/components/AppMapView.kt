@@ -18,6 +18,7 @@ import com.amap.api.maps.model.PolylineOptions as AMapPolylineOptions
 
 import com.google.android.gms.maps.CameraUpdateFactory as GCameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.libraries.places.api.Places
 import com.google.android.gms.maps.MapView as GMapView
 import com.google.android.gms.maps.model.BitmapDescriptorFactory as GBitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng as GLatLng
@@ -178,7 +179,7 @@ fun AppMapView(isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    if (isDomestic) {
+    if (isDomestic || ! Places.isInitialized()) {
         val amapView = remember { 
             val view = TextureMapView(context)
             view.onCreate(Bundle())

@@ -104,6 +104,8 @@
     <string name="search_success_results">搜索成功：%1$d 个结果</string>
     <string name="search_error">搜索错误：%s</string>
     <string name="search_catch_error">搜索捕获错误：%s</string>
+    <string name="api_key_required_title">需要高德地图 API Key</string>
+    <string name="api_key_required_message">POI 搜索需要自定义高德地图 API Key，请在 设置 \u003e 高德地图配置 中进行设置。</string>
     <string name="spoofing_service_title">位置模拟器</string>
     <string name="spoofing_service_content">正在模拟位置: %1$s, %2$s</string>
     <string name="spoofing_service_channel_name">位置模拟服务</string>
