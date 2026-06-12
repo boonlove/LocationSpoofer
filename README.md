@@ -2,8 +2,8 @@
 
 <h1>LocationSpoofer</h1>
 
-<p>基于 KernelSU + LSPosed 的高保真 Android 系统级虚拟定位模块</p>
-<p>High-fidelity Android system-level location spoofing module based on KernelSU + LSPosed</p>
+<p>基于 KernelSU + LSPosed 的高保真 Android 系统级虚拟定位与无线环境伪装模块</p>
+<p>High-fidelity Android system-level location spoofing and wireless environment simulation module based on KernelSU + LSPosed</p>
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
@@ -17,69 +17,84 @@
 
 ---
 
+> **📢 本项目由 [`HuangZhuoRui/LocationSpoofer`](https://github.com/HuangZhuoRui/LocationSpoofer) 分叉而来**。<br>
 > **📢 加入我们的 [Telegram 交流群](https://t.me/+CsxZGItXdW40ZWVl) ，虽然我也不知道为什么要有一个TG群，但是大家都想要，而且别人也有，那我也要有！**
 
 ---
 
 ## ✨ 功能特性
 
-| 功能 | 说明 |
+| 功能模块 | 技术细节与核心优势 |
 |---|---|
-| 🌍 **多语言与双地图** | 支持 **中文**、**English**、**العربية**，国内自动使用高德地图，海外自动无缝切换至 **Google Maps** |
-| 🗺️ **地图可视化选点** | 集成高德 3D 地图，支持准星拖拽、搜索历史位置及收藏夹 |
-| 🔀 **路线规划系统** | 状态机驱动的多路点规划，支持撤销、重置及实时预览 |
-| 🕹️ **虚拟摇杆控制** | 手动模拟模式下可通过浮动摇杆实时控制位置移动，支持平滑方位角过渡 |
-| 🔄 **自动循环模拟** | 支持沿预设路线自动往返，可自定义步行、跑步、骑行、驾车等多种速度 |
-| 🛰️ **高保真 GPS 劫持** | Hook `Location` 全层级方法，集成**步频模拟**与**卫星漂移抖动**，规避静态位置检测 |
-| 📶 **Wi-Fi 环境克隆** | 基于 WiGLE API 实时拉取目标坐标周围的真实热点指纹（BSSID/SSID）并注入 |
-| 🔵 **BLE 信标屏蔽** | 拦截蓝牙扫描，防止通过 iBeacon 等室内定位技术泄露真实位置 |
-| 🏗️ **基站信息伪造** | 模拟 Cell Location 信息，提供完整的地理位置欺骗链路 |
-| 🕵️ **深度反检测** | 抹除 `isMock` 标志位及高德 SDK 内部 Mock 检测，覆盖 Android 13+ 字段 |
-| 🔐 **安全集成与 CI/CD** | API 密钥与代码完全隔离，本地通过 `local.yml` 读取，云端基于 GitHub Actions Secrets 自动注入打包发布 |
+| 🌍 **多语言与双地图** | • 支持 **中文 (简体)**、**English**、**العربية** 语言界面。<br>• 国内设备自动使用高德 3D 地图，海外无缝切换至 **Google Maps** 进行可视化操作。 |
+| 🗺️ **地图可视化选点** | • 集成高德 3D / 谷歌地图，支持十字准星拖拽微调、搜索历史以及常用位置收藏夹。 |
+| 🔀 **路线规划系统** | • 状态机驱动的多路点路线规划，支持撤销、重置、起终点交换以及路线轨迹实时预览。 |
+| 🕹️ **虚拟摇杆控制** | • 悬浮窗虚拟摇杆可实时微调模拟位置，支持平滑的方位角过渡与转向阻尼。 |
+| 🔄 **自动循环模拟** | • 沿预设路线自动往返/循环运行。支持步行、跑步、骑行、驾车等多种档位速度，可实时调节。 |
+| 🛰️ **高保真 GPS 劫持** | • Hook 系统 `Location` 全层级 API。<br>• 集成**步频物理模拟**（带正交方向抖动）与**高斯海拔起伏**，打破静态坐标检测。 |
+| 📶 **Wi-Fi 环境克隆** | • 伪造当前连接的 Wi-Fi（BSSID/SSID/RSSI/频率/WiFi标准），按需拉取或自动生成周边 Wi-Fi 列表。<br>• 针对反作弊 SDK，采用**主流品牌路由器真实 OUI 前缀匹配**，非随机伪造。 |
+| 🏗️ **基站信息伪造** | • 深度伪造 Cell Location，支持 GSM、WCDMA、CDMA、4G LTE 甚至 **5G NR 移动基站** 完整蜂窝指纹（MCC/MNC/LAC/CID/TAC/PCI/NCI）注入。 |
+| 🔵 **BLE 蓝牙信标屏蔽** | • 拦截系统 BLE 扫描，防止 App 通过室内 iBeacon 或附近蓝牙设备定位技术泄露真实位置。 |
+| 📍 **独立应用坐标系适配** | • **解决偏移痛点**：支持为目标 App 单独指定 `GCJ-02` (高德/腾讯)、`WGS-84` (GPS) 或 `BD-09` (百度) 坐标系。<br>• 集中式预计算，避免每次 Hook 产生高额三角函数计算开销。 |
+| 🕵️‍♂️ **实地环境扫街采集** | • **实景克隆**：支持开启背景扫描，自动记录移动路径下的真实基站、Wi-Fi 及蓝牙特征。<br>• 采集数据自动存储于 Room 本地数据库，支持在地图上以热力图展示覆盖范围。<br>• 支持 **JSON 导入/导出**，用户可一键分享或备份特定物理空间的无线电环境。 |
+| 🛡️ **深度反检测机制** | • **堆栈清洗**：动态拦截 `Throwable.getStackTrace` 并抹除所有与 Xposed/LSPosed 相关的调用帧。<br>• **防 Mock 抹除**：彻底清除 API 中的 `isMock` 标志位，覆盖 Android 13+ 底层 `mMock` 内部字段。<br>• **接口隐藏**：隐藏 LocationManager 中的 "mock" / "test" 提供者名，强制将其汇报为原生 "gps" 信号。 |
 
 ---
 
 ## 🏛️ 系统架构
 
-本项目采用 **MVVM** 架构，配合 **State-Machine** 处理复杂的路线规划流程：
+本项目采用 **MVVM** 架构，并利用 Root 权限规避了 Android 11+ 的沙盒可见性隔离，实现零权限跨进程配置传递：
 
 ```
-┌─────────────────────────────────────────┐
-│            LocationSpoofer (App)         │
-│  ┌──────────┐  ┌──────────────────────┐ │
-│  │ Dual-Map │  │  RouteStateMachine   │ │
-│  │(高德/谷歌)│  │  (IDLE/READY/RUN...) │ │
-│  └────┬─────┘  └──────────┬───────────┘ │
-│       │                   │             │
-│  ┌────▼───────────────────▼───────────┐ │
-│  │         SpooferProvider            │ │
-│  │     (ContentProvider IPC 桥)       │ │
-│  └────────────────────────────────────┘ │
-│  ┌──────────────────────────────────┐   │
-│  │        SpoofingService           │   │
-│  │    (前台服务 & 轨迹计算引擎)         │   │
-│  └──────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-              ↓ LSPosed 注入
-┌─────────────────────────────────────────┐
-│           目标 App 进程                  │
-│  ┌──────────────────────────────────┐   │
-│  │         LocationHooker           │   │
-│  │  • GPS/BDS/GLONASS 劫持          │   │
-│  │  • Wifi/Cell/Bluetooth 注入      │   │
-│  │  • Anti-Mock & SDK 检测绕过       │   │
-│  └──────────────────────────────────┘   │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│            LocationSpoofer (宿主 App)       │
+│  ┌──────────┐  ┌──────────────────────────┐ │
+│  │ Dual-Map │  │    RouteStateMachine     │ │
+│  │(高德/谷歌)│  │    (IDLE/READY/RUN...)   │ │
+│  └────┬─────┘  └────────────┬─────────────┘ │
+│       │                     │               │
+│  ┌────▼─────────────────────▼─────────────┐ │
+│  │            ConfigManager                 │ │
+│  │  (将配置序列化，通过 Root 权限写入 Temp)   │ │
+│  └──────────────────┬───────────────────────┘ │
+│  ┌──────────────────▼─────────────────────┐ │
+│  │           SpoofingService               │ │
+│  │       (前台通知服务 & 轨迹计算引擎)       │ │
+│  └────────────────────────────────────────┘ │
+└─────────────────────┬───────────────────────┘
+                      │ (写入配置 JSON)
+                      ▼
+        ┌───────────────────────────┐
+        │ /data/local/tmp/ 配置文件  │
+        │    (chmod 777 + chcon)    │
+        └─────────────┬─────────────┘
+                      │ (读取配置，800ms 内存缓存)
+                      ▼ LSPosed 注入
+┌─────────────────────────────────────────────┐
+│              目标 App 进程                  │
+│  ┌────────────────────────────────────────┐  │
+│  │            LocationHooker              │  │
+│  │  • Location API / Baidu / Tencent SDK  │  │
+│  │  • WiFi & 蜂窝基站 (2G-5G NR) 环境注入    │  │
+│  │  • 蓝牙 BLE 扫描过滤                    │  │
+│  │  • Anti-Mock & Xposed 堆栈清洗反检测   │  │
+│  └────────────────────────────────────────┘  │
+└─────────────────────────────────────────────┘
 ```
+
+> [!NOTE]
+> **关于跨进程通信 (IPC) 的设计决策**：
+> 目标 App 进程在沙盒内运行时，无法通过 `ContentProvider` 直接访问外部宿主 App（常因 Android 11+ 包可见性及 SELinux 策略导致 `Failed to find provider info` 错误）。
+> 因此，宿主 App 借助 Root 权限将配置以 JSON 格式写入 `/data/local/tmp/locationspoofer_config.json`，并赋予 `777` 权限及 `shell_data_file` SELinux 上下文。所有沙盒内注入的目标 App 均可直接免权限同步读取，极大提升了跨进程的稳定性与兼容性。
 
 ---
 
 ## 📋 环境要求
 
-- **Android 8.0 (API 26)** 及以上
-- [**KernelSU**](https://kernelsu.org) / Magisk (需要 Root 权限)
-- [**LSPosed**](https://github.com/LSPosed/LSPosed) 框架
-- 在 LSPosed 管理器中启用模块并勾选需要伪装的目标应用
+- **Android 8.0 (API 26)** 及以上系统
+- 已获取 Root 权限，推荐使用 [**KernelSU**](https://kernelsu.org) / APatch / Magisk
+- 已安装 [**LSPosed**](https://github.com/LSPosed/LSPosed) 框架
+- 在 LSPosed 管理器中启用本模块，并勾选需要进行定位伪装的目标应用
 
 ---
 
@@ -90,46 +105,43 @@
 ```bash
 # 克隆仓库
 git clone https://github.com/your-username/LocationSpoofer.git
-# 编译并安装
+
+# 编译并安装到设备
 ./gradlew installDebug
 ```
 
-### 2. 配置说明
+### 2. 基础配置指南
 
-1. 在 **KernelSU** 中授予 Root 权限。
-2. 在 **LSPosed** 中激活模块，建议勾选以下常用应用：
+1. 启动应用，在 **KernelSU** / Magisk 管理器中授予其 Root 权限（用于管理本地 JSON 配置文件）。
+2. 在 **LSPosed** 管理器中激活此模块，并勾选你需要伪装的目标应用，例如：
    - 微信 (`com.tencent.mm`)
    - 超星学习通 (`com.chaoxing.mobile`)
    - 钉钉 (`com.alibaba.android.rimet`)
-3. **强制停止**目标应用后重新打开。
+3. 激活后，**强制停止**目标应用并重新打开以使其生效。
 
 ### 3. 使用技巧
 
-- **定点模式**：直接在地图选点，点击“启动”即可。
-- **路线模式**：
-  1. 点击“路线规划”，在地图上依次点击标记路点。
-  2. 选择“手动（摇杆）”或“自动循环”。
-  3. 点击“开始模拟”。
-
-### 4. 自定义高德地图 API Key（可选）
-
-为避免默认的 API Key 达到调用上限，建议您申请并使用自己的高德 API Key：
-1. 打开应用点击右上角“设置”按钮，在“AMap 配置”一栏中点击**复制应用 SHA1 签名**。
-2. 前往 [高德开放平台控制台](https://console.amap.com/dev/key/app)，创建一个新应用，并添加 **Android 平台** 的 Key。
-3. 填写包名（默认为 `com.suseoaa.locationspoofer.fork`），并粘贴刚才复制的 **SHA1 签名**。
-4. 生成 Key 后，将其复制并填入应用的“自定义高德地图 API Key”输入框中，点击最下方的“确定”保存。
-5. **完全退出并重启应用**，新的 API Key 即可生效。
+- **定点伪装**：在地图上拖动或通过上方搜索栏搜索地点，点击“启动模拟”即可。
+- **路线模拟**：
+  1. 点击地图下方的“路线规划”进入规划模式，在地图上依次点击放置多个路点。
+  2. 选定移动速度（步行、跑步、骑行、驾车）。
+  3. 点击“开始模拟”，可切换至自动循环或使用手动摇杆控制移动。
+- **防止偏移**：如果发现微信、学习通等应用定位产生几百米偏移，请进入应用主页，点击右上角进入 **坐标系适配**，为对应应用单独将默认的 `GCJ-02` 坐标系切换为 `WGS-84` (原生 GPS 坐标系) 或 `BD-09` (百度地图坐标系) 即可。
+- **Wi-Fi 与基站伪装**：
+  - **云端查询模式**：可配合 WiGLE 开发者 Token，自动拉取指定定位周边的真实 Wi-Fi 热点。
+  - **实地扫街模式**：点击“环境扫街采集”并在物理世界中移动，本应用会自动在背景记录真实的无线网络和基站信息。之后定位至该点时，可完美重现当时的无线信号指纹。
 
 ---
 
 ## 🛠️ 技术栈
 
-- **Language**: Kotlin
-- **UI**: Jetpack Compose + Material 3 (Material Design 3)
-- **Framework**: LSPosed / Xposed API 93
-- **Map**: AMap 3DMap SDK / Google Maps SDK / FusedLocationProvider
-- **Data**: Koin (DI), OkHttp 4, Coroutines Flow
-- **Simulation**: TrajectorySimulator (Haversine 算法 + 方位角插值)
+- **开发语言**: Kotlin (100%)
+- **界面开发**: Jetpack Compose + Material Design 3
+- **依赖注入**: Koin
+- **数据持久化**: Room Database (SQLite)
+- **Xposed 框架**: LSPosed API 93 / libxposed
+- **地图服务**: AMap 3DMap SDK (中国大陆) / Google Maps SDK & Google Places SDK (海外)
+- **模拟算法**: TrajectorySimulator (Haversine 距离算法 + 航向角平滑插值 + 步数正交抖动)
 
 ---
 
@@ -141,8 +153,9 @@ git clone https://github.com/your-username/LocationSpoofer.git
 
 ## ⚠️ 免责声明
 
-本项目**仅供学习和技术研究使用**。请勿将本工具用于任何违法违规活动（包括但不限于虚假打卡、作弊等）。
-用户在使用本工具时应遵守当地法律法规，作者不对因使用本工具导致的任何账号封禁、法律责任或损失承担责任。
+本项目**仅供学习研究、技术交流以及个人合法合规测试使用**。
+请勿将本工具用于任何违法违规或违反服务协议的活动（包括但不限于虚假打卡、考试作弊、商业欺诈等）。
+使用本模块造成的任何账号封禁、数据丢失、法律纠纷或其他直接/间接损失，均由使用者自行承担，作者不对此承担任何责任。
 
 ---
 
