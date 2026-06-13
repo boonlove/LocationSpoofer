@@ -785,6 +785,47 @@ class LocationHooker : XposedModule() {
                 XposedBridge.log(e)
             }
 
+            // ★ NMEA-0183 报文劫持
+            try {
+                val addNmeaListenerHook = object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config == null || !config.optBoolean("active", false)) return
+                        
+                        val args = param.args
+                        for (i in args.indices) {
+                            val arg = args[i] ?: continue
+                            
+                            // Check if it implements OnNmeaMessageListener
+                            val isOnNmea = try {
+                                val clazz = classLoader.loadClass("android.location.OnNmeaMessageListener")
+                                clazz.isInstance(arg)
+                            } catch (e: Exception) {
+                                false
+                            }
+                            
+                            // Check if it implements GpsStatus.NmeaListener
+                            val isGpsNmea = try {
+                                val clazz = classLoader.loadClass("android.location.GpsStatus\$NmeaListener")
+                                clazz.isInstance(arg)
+                            } catch (e: Exception) {
+                                false
+                            }
+                            
+                            if (isOnNmea) {
+                                args[i] = createOnNmeaMessageListenerProxy(arg, classLoader)
+                            } else if (isGpsNmea) {
+                                args[i] = createGpsStatusNmeaListenerProxy(arg, classLoader)
+                            }
+                        }
+                    }
+                }
+                val locationManagerClazz = XposedHelpers.findClass("android.location.LocationManager", classLoader)
+                XposedBridge.hookAllMethods(locationManagerClazz, "addNmeaListener", addNmeaListenerHook)
+            } catch (e: Throwable) {
+                XposedBridge.log(e)
+            }
+
             // ── 高德SDK专属Hook(含抖动,与原生Location保持同步) ──
             // 使用findClassIfExists安全探测: 微信小程序子进程(:appbrand0等)不加载高德SDK,
             // 直接findAndHookMethod会抛出ClassNotFoundError,中断整个hookLocationAPIs执行流。
@@ -2651,6 +2692,147 @@ class LocationHooker : XposedModule() {
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun createOnNmeaMessageListenerProxy(original: Any, classLoader: ClassLoader): Any {
+        val interfaceClass = classLoader.loadClass("android.location.OnNmeaMessageListener")
+        return java.lang.reflect.Proxy.newProxyInstance(
+            classLoader,
+            arrayOf(interfaceClass),
+            object : java.lang.reflect.InvocationHandler {
+                override fun invoke(proxy: Any, method: java.lang.reflect.Method, args: Array<out Any>?): Any? {
+                    if (method.name == "onNmeaMessage" && args != null && args.size >= 1) {
+                        val originalMsg = args[0] as? String
+                        if (originalMsg != null) {
+                            val spoofedMsg = spoofNmeaMessage(originalMsg)
+                            val newArgs = arrayOfNulls<Any>(args.size)
+                            for (i in args.indices) {
+                                newArgs[i] = if (i == 0) spoofedMsg else args[i]
+                            }
+                            return method.invoke(original, *newArgs)
+                        }
+                    }
+                    val methodArgs = if (args == null) emptyArray<Any>() else Array(args.size) { i -> args[i] }
+                    return method.invoke(original, *methodArgs)
+                }
+            }
+        )
+    }
+
+    private fun createGpsStatusNmeaListenerProxy(original: Any, classLoader: ClassLoader): Any {
+        val interfaceClass = classLoader.loadClass("android.location.GpsStatus\$NmeaListener")
+        return java.lang.reflect.Proxy.newProxyInstance(
+            classLoader,
+            arrayOf(interfaceClass),
+            object : java.lang.reflect.InvocationHandler {
+                override fun invoke(proxy: Any, method: java.lang.reflect.Method, args: Array<out Any>?): Any? {
+                    if (method.name == "onNmeaReceived" && args != null && args.size >= 2) {
+                        val originalMsg = args[1] as? String
+                        if (originalMsg != null) {
+                            val spoofedMsg = spoofNmeaMessage(originalMsg)
+                            val newArgs = arrayOfNulls<Any>(args.size)
+                            for (i in args.indices) {
+                                newArgs[i] = if (i == 1) spoofedMsg else args[i]
+                            }
+                            return method.invoke(original, *newArgs)
+                        }
+                    }
+                    val methodArgs = if (args == null) emptyArray<Any>() else Array(args.size) { i -> args[i] }
+                    return method.invoke(original, *methodArgs)
+                }
+            }
+        )
+    }
+
+    private fun spoofNmeaMessage(sentence: String): String {
+        try {
+            val config = readConfig() ?: return sentence
+            if (!config.optBoolean("active", false)) return sentence
+            
+            val targetLat = config.optDouble("wgs84_lat", 0.0)
+            val targetLng = config.optDouble("wgs84_lng", 0.0)
+            if (targetLat == 0.0 && targetLng == 0.0) return sentence
+            
+            val parts = sentence.split("*")
+            val mainPart = parts[0]
+            val fields = mainPart.split(",").toMutableList()
+            if (fields.isEmpty()) return sentence
+            
+            val type = fields[0]
+            var modified = false
+            
+            if (type.endsWith("RMC") && fields.size >= 7) {
+                val (latStr, latDir) = convertToNmeaLatitude(targetLat)
+                val (lngStr, lngDir) = convertToNmeaLongitude(targetLng)
+                fields[3] = latStr
+                fields[4] = latDir
+                fields[5] = lngStr
+                fields[6] = lngDir
+                modified = true
+            } else if (type.endsWith("GGA") && fields.size >= 6) {
+                val (latStr, latDir) = convertToNmeaLatitude(targetLat)
+                val (lngStr, lngDir) = convertToNmeaLongitude(targetLng)
+                fields[2] = latStr
+                fields[3] = latDir
+                fields[4] = lngStr
+                fields[5] = lngDir
+                modified = true
+            } else if (type.endsWith("GLL") && fields.size >= 5) {
+                val (latStr, latDir) = convertToNmeaLatitude(targetLat)
+                val (lngStr, lngDir) = convertToNmeaLongitude(targetLng)
+                fields[1] = latStr
+                fields[2] = latDir
+                fields[3] = lngStr
+                fields[4] = lngDir
+                modified = true
+            }
+            
+            if (!modified) return sentence
+            
+            val newMainPart = fields.joinToString(",")
+            val newChecksum = calculateNmeaChecksum(newMainPart)
+            
+            val tail = if (parts.size > 1) {
+                val rawTail = parts[1]
+                val lineEnding = rawTail.substring(Math.min(2, rawTail.length))
+                "*$newChecksum$lineEnding"
+            } else {
+                "*$newChecksum"
+            }
+            return newMainPart + tail
+        } catch (e: Exception) {
+            XposedBridge.log(e)
+            return sentence
+        }
+    }
+
+    private fun convertToNmeaLatitude(lat: Double): Pair<String, String> {
+        val absLat = Math.abs(lat)
+        val degrees = absLat.toInt()
+        val minutes = (absLat - degrees) * 60.0
+        val latStr = String.format(java.util.Locale.US, "%02d%08.5f", degrees, minutes)
+        val dir = if (lat >= 0) "N" else "S"
+        return Pair(latStr, dir)
+    }
+
+    private fun convertToNmeaLongitude(lng: Double): Pair<String, String> {
+        val absLng = Math.abs(lng)
+        val degrees = absLng.toInt()
+        val minutes = (absLng - degrees) * 60.0
+        val lngStr = String.format(java.util.Locale.US, "%03d%08.5f", degrees, minutes)
+        val dir = if (lng >= 0) "E" else "W"
+        return Pair(lngStr, dir)
+    }
+
+    private fun calculateNmeaChecksum(sentence: String): String {
+        var checksum = 0
+        val startIndex = if (sentence.startsWith("$")) 1 else 0
+        val endIndex = sentence.indexOf('*')
+        val limit = if (endIndex != -1) endIndex else sentence.length
+        for (i in startIndex until limit) {
+            checksum = checksum xor sentence[i].code
+        }
+        return String.format(java.util.Locale.US, "%02X", checksum)
     }
 
 }
