@@ -458,14 +458,6 @@ fun SpoofingScreen(
                 Spacer(Modifier.height(16.dp))
             }
 
-            SectionHeader(Icons.Outlined.SystemUpdateAlt, stringResource(R.string.check_updates), isDark)
-            Spacer(Modifier.height(8.dp))
-            UpdateCheckCard(isDark, onCheckClick = { 
-                updateViewModel.fetchReleases()
-                showUpdateDialog = true 
-            })
-            Spacer(Modifier.height(16.dp))
-
             SectionHeader(Icons.Rounded.Extension, stringResource(R.string.custom_coordinate_algo), isDark)
             Spacer(Modifier.height(8.dp))
             Card(
@@ -592,8 +584,17 @@ fun SpoofingScreen(
                     }
                 }
             }
-            
             Spacer(Modifier.height(16.dp))
+
+            // 检查更新卡片
+            SectionHeader(Icons.Outlined.SystemUpdateAlt, stringResource(R.string.check_updates), isDark)
+            Spacer(Modifier.height(8.dp))
+            UpdateCheckCard(isDark, onCheckClick = {
+                updateViewModel.fetchReleases()
+                showUpdateDialog = true
+            })
+            Spacer(Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 horizontalArrangement = Arrangement.Center,
