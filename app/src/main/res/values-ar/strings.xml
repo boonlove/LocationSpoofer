@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">LocationSpoofer</string>
+    <string name="map_type_label">نوع الخريطة</string>
+    <string name="map_type_standard">خريطة قياسية</string>
+    <string name="map_type_satellite">خريطة القمر الصناعي</string>
+    <string name="map_type_3d">خريطة ثلاثية الأبعاد</string>
     <string name="current_location">الموقع الحالي</string>
     <string name="search_location_hint">البحث عن موقع</string>
     <string name="locate_to_current">تحديد الموقع الحالي</string>

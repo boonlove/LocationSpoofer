@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">LocationSpoofer</string>
+    <string name="map_type_label">地图类型</string>
+    <string name="map_type_standard">标准地图</string>
+    <string name="map_type_satellite">卫星地图</string>
+    <string name="map_type_3d">3D 地图</string>
     <string name="current_location">当前位置</string>
     <string name="search_location_hint">搜索地点</string>
     <string name="locate_to_current">定位到当前位置</string>

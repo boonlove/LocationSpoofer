@@ -39,7 +39,14 @@ enum class RouteRunMode {
     LOOP
 }
 
+enum class AppMapType {
+    NORMAL,
+    SATELLITE,
+    MAP_3D
+}
+
 data class AppState(
+    val mapType: AppMapType = AppMapType.NORMAL,
     val isInitializing: Boolean = true,
     val isLanguageSet: Boolean = true, // Default to true to avoid flicker if not needed
     val currentLanguage: String = "",

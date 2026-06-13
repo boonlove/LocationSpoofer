@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">LocationSpoofer</string>
+    <string name="map_type_label">Map Type</string>
+    <string name="map_type_standard">Standard</string>
+    <string name="map_type_satellite">Satellite</string>
+    <string name="map_type_3d">3D Map</string>
     <string name="app_description" translatable="false">Location Spoofer Module</string>
     <string name="current_location">Current Location</string>
     <string name="search_location_hint">Search location</string>

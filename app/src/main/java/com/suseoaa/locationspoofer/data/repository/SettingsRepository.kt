@@ -36,6 +36,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.amapApiKey = value
     }
 
+    fun getMapType(): String = settingsManager.mapType
+
+    fun setMapType(value: String) {
+        settingsManager.mapType = value
+    }
+
     fun getIgnoredVersion(): String = settingsManager.ignoredVersion
 
     fun setIgnoredVersion(value: String) {

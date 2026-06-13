@@ -12,6 +12,7 @@ import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.SimMode
+import com.suseoaa.locationspoofer.data.model.AppMapType
 import com.suseoaa.locationspoofer.data.repository.LocationRepository
 import com.suseoaa.locationspoofer.data.repository.SettingsRepository
 import com.suseoaa.locationspoofer.provider.SpooferProvider
@@ -42,6 +43,11 @@ class MainViewModel(
 
     private val _uiState = MutableStateFlow(
         AppState(
+            mapType = try {
+                AppMapType.valueOf(settingsRepository.getMapType())
+            } catch (e: Exception) {
+                AppMapType.NORMAL
+            },
             savedLocations = settingsRepository.getSavedLocations(),
             currentLanguage = settingsRepository.getLanguage(),
             isLanguageSet = settingsRepository.isLanguageSet(),
@@ -121,6 +127,11 @@ class MainViewModel(
     fun updateLanguage(langCode: String) {
         settingsRepository.setLanguage(langCode)
         _uiState.update { it.copy(currentLanguage = langCode) }
+    }
+
+    fun setMapType(type: AppMapType) {
+        settingsRepository.setMapType(type.name)
+        _uiState.update { it.copy(mapType = type) }
     }
 
     fun setSearchMode(mode: com.suseoaa.locationspoofer.data.model.SearchMode) {

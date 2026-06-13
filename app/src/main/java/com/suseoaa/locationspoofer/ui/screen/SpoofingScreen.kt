@@ -71,6 +71,9 @@ import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.WifiLoadStatus
 import com.suseoaa.locationspoofer.ui.components.AppMapView
 import com.suseoaa.locationspoofer.ui.components.AppMapController
+import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
+import androidx.compose.material.icons.rounded.Layers
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -114,6 +117,7 @@ fun SpoofingScreen(
     var showAppCoordinateScreen by remember { mutableStateOf(false) }
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showStartSpoofingDialog by remember { mutableStateOf(false) }
+    var showMapTypeDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(
@@ -213,6 +217,10 @@ fun SpoofingScreen(
         if (lat != null && lng != null) {
             smallMapRef?.animateCamera(lat, lng)
         }
+    }
+
+    LaunchedEffect(smallMapRef, uiState.mapType) {
+        smallMapRef?.setMapType(uiState.mapType)
     }
 
     LaunchedEffect(smallMapRef, uiState.manageDataList) {
@@ -389,6 +397,26 @@ fun SpoofingScreen(
                 }
             }
             
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 12.dp, bottom = 72.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                    .clickable {
+                        showMapTypeDialog = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Layers,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -949,6 +977,14 @@ fun SpoofingScreen(
                 }
             }
         }
+    }
+
+    if (showMapTypeDialog) {
+        MapTypeDialog(
+            currentMapType = uiState.mapType,
+            onMapTypeSelected = { viewModel.setMapType(it) },
+            onDismiss = { showMapTypeDialog = false }
+        )
     }
 }
 

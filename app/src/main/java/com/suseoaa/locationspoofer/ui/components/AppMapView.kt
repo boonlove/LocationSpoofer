@@ -15,6 +15,7 @@ import com.amap.api.maps.model.BitmapDescriptorFactory
 import com.amap.api.maps.model.LatLng as AMapLatLng
 import com.amap.api.maps.model.MarkerOptions as AMapMarkerOptions
 import com.amap.api.maps.model.PolylineOptions as AMapPolylineOptions
+import com.suseoaa.locationspoofer.data.model.AppMapType
 
 import com.google.android.gms.maps.CameraUpdateFactory as GCameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -42,6 +43,7 @@ interface AppMapController {
     val cameraTargetLng: Double?
     fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit)
     fun disableUiControls()
+    fun setMapType(type: AppMapType)
 }
 
 class AMapControllerImpl(private val map: AMap) : AppMapController {
@@ -107,6 +109,44 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
         map.uiSettings.isCompassEnabled = false
         map.uiSettings.setAllGesturesEnabled(true)
     }
+    
+    override fun setMapType(type: AppMapType) {
+        when (type) {
+            AppMapType.NORMAL -> {
+                map.mapType = AMap.MAP_TYPE_NORMAL
+                val cameraPosition = map.cameraPosition ?: return
+                val newCam = com.amap.api.maps.model.CameraPosition(
+                    cameraPosition.target,
+                    cameraPosition.zoom,
+                    0f,
+                    cameraPosition.bearing
+                )
+                map.moveCamera(CameraUpdateFactory.newCameraPosition(newCam))
+            }
+            AppMapType.SATELLITE -> {
+                map.mapType = AMap.MAP_TYPE_SATELLITE
+                val cameraPosition = map.cameraPosition ?: return
+                val newCam = com.amap.api.maps.model.CameraPosition(
+                    cameraPosition.target,
+                    cameraPosition.zoom,
+                    0f,
+                    cameraPosition.bearing
+                )
+                map.moveCamera(CameraUpdateFactory.newCameraPosition(newCam))
+            }
+            AppMapType.MAP_3D -> {
+                map.mapType = AMap.MAP_TYPE_NORMAL
+                val cameraPosition = map.cameraPosition ?: return
+                val newCam = com.amap.api.maps.model.CameraPosition(
+                    cameraPosition.target,
+                    cameraPosition.zoom,
+                    45f,
+                    cameraPosition.bearing
+                )
+                map.moveCamera(CameraUpdateFactory.newCameraPosition(newCam))
+            }
+        }
+    }
 }
 
 class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
@@ -171,6 +211,45 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
         map.uiSettings.isMyLocationButtonEnabled = false
         map.uiSettings.isCompassEnabled = false
         map.uiSettings.setAllGesturesEnabled(true)
+    }
+
+    override fun setMapType(type: AppMapType) {
+        when (type) {
+            AppMapType.NORMAL -> {
+                map.mapType = GoogleMap.MAP_TYPE_NORMAL
+                val cameraPosition = map.cameraPosition
+                val newCam = com.google.android.gms.maps.model.CameraPosition.builder()
+                    .target(cameraPosition.target)
+                    .zoom(cameraPosition.zoom)
+                    .tilt(0f)
+                    .bearing(cameraPosition.bearing)
+                    .build()
+                map.moveCamera(GCameraUpdateFactory.newCameraPosition(newCam))
+            }
+            AppMapType.SATELLITE -> {
+                map.mapType = GoogleMap.MAP_TYPE_HYBRID
+                val cameraPosition = map.cameraPosition
+                val newCam = com.google.android.gms.maps.model.CameraPosition.builder()
+                    .target(cameraPosition.target)
+                    .zoom(cameraPosition.zoom)
+                    .tilt(0f)
+                    .bearing(cameraPosition.bearing)
+                    .build()
+                map.moveCamera(GCameraUpdateFactory.newCameraPosition(newCam))
+            }
+            AppMapType.MAP_3D -> {
+                map.mapType = GoogleMap.MAP_TYPE_NORMAL
+                map.isBuildingsEnabled = true
+                val cameraPosition = map.cameraPosition
+                val newCam = com.google.android.gms.maps.model.CameraPosition.builder()
+                    .target(cameraPosition.target)
+                    .zoom(cameraPosition.zoom)
+                    .tilt(45f)
+                    .bearing(cameraPosition.bearing)
+                    .build()
+                map.moveCamera(GCameraUpdateFactory.newCameraPosition(newCam))
+            }
+        }
     }
 }
 

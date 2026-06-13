@@ -46,6 +46,8 @@ import com.suseoaa.locationspoofer.ui.components.MarkerType
 import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
+import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
@@ -70,6 +72,7 @@ fun FullScreenMapPage(
     val context = LocalContext.current
     var mapRef by remember { mutableStateOf<AppMapController?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
+    var showMapTypeDialog by remember { mutableStateOf(false) }
     val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
@@ -86,6 +89,11 @@ fun FullScreenMapPage(
     val isRunning = stage == RoutePlanStage.RUNNING
     val isManual = uiState.routeRunMode == RouteRunMode.MANUAL
     val routePoints = uiState.routePoints
+
+    // 同步地图类型
+    LaunchedEffect(mapRef, uiState.mapType) {
+        mapRef?.setMapType(uiState.mapType)
+    }
 
     // 同步路点标记和折线到地图
     var liveMarker by remember { mutableStateOf<AppMapMarker?>(null) }
@@ -265,11 +273,20 @@ fun FullScreenMapPage(
             }
         }
 
-        // 右侧定位按钮
+        // 右侧定位和图层按钮
         Column(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            MapFab(
+                icon = Icons.Rounded.Layers,
+                contentDescription = stringResource(R.string.map_type_label),
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = AccentBlue
+            ) {
+                showMapTypeDialog = true
+            }
+
             MapFab(
                 icon = Icons.Rounded.MyLocation,
                 contentDescription = stringResource(R.string.locate_to_current),
@@ -364,6 +381,14 @@ fun FullScreenMapPage(
             onRunModeChange = viewModel::setRouteRunMode,
             onSpeedChange = viewModel::setRouteSimMode,
             onCustomSpeedChange = viewModel::setCustomSpeedMs
+        )
+    }
+
+    if (showMapTypeDialog) {
+        MapTypeDialog(
+            currentMapType = uiState.mapType,
+            onMapTypeSelected = { viewModel.setMapType(it) },
+            onDismiss = { showMapTypeDialog = false }
         )
     }
 }

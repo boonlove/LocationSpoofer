@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Radar
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.ui.components.AppMapController
 import com.suseoaa.locationspoofer.ui.components.AppMapView
+import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
@@ -28,6 +31,12 @@ fun ScannerMapScreen(
     onClose: () -> Unit
 ) {
     var mapController by remember { mutableStateOf<AppMapController?>(null) }
+    var showMapTypeDialog by remember { mutableStateOf(false) }
+    
+    // 同步地图类型
+    LaunchedEffect(mapController, uiState.mapType) {
+        mapController?.setMapType(uiState.mapType)
+    }
     
     // Draw heat map circles when map is ready and records count changes
     LaunchedEffect(mapController, uiState.environmentRecordCount) {
@@ -112,5 +121,29 @@ fun ScannerMapScreen(
                 Icon(Icons.Rounded.Radar, null)
             }
         }
+        
+        // Floating button on the right side
+        Column(
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(
+                onClick = { showMapTypeDialog = true },
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                    .size(44.dp)
+            ) {
+                Icon(Icons.Rounded.Layers, "Map Type", tint = AccentGreen)
+            }
+        }
+    }
+
+    if (showMapTypeDialog) {
+        MapTypeDialog(
+            currentMapType = uiState.mapType,
+            onMapTypeSelected = { viewModel.setMapType(it) },
+            onDismiss = { showMapTypeDialog = false }
+        )
     }
 }

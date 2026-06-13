@@ -50,6 +50,10 @@ fun ManageDataScreen(
 
     val dataList = uiState.manageDataList
     
+    LaunchedEffect(mapController, uiState.mapType) {
+        mapController?.setMapType(uiState.mapType)
+    }
+
     LaunchedEffect(mapController, dataList) {
         val controller = mapController ?: return@LaunchedEffect
         controller.clear()
