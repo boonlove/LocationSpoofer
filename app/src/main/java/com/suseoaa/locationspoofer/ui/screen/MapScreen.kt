@@ -204,7 +204,7 @@ fun FullScreenMapPage(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             focusManager.clearFocus()
-                            if (uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) {
+                            if ((uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) || (uiState.baiduMapsApiKey.isBlank() && uiState.mapProvider == AppMapProvider.BAIDU_MAPS)) {
                                 showApiKeyWarning = true
                             } else if (searchQuery.isNotBlank()) {
                                 performPoiSearch(context, searchQuery, mapProvider) { r ->
@@ -359,9 +359,7 @@ fun FullScreenMapPage(
 
     // API Key 警告弹窗
     if (showApiKeyWarning) {
-        ApiKeyWarningDialog(
-            onDismiss = { showApiKeyWarning = false }
-        )
+        ApiKeyWarningDialog(uiState.mapProvider) { showApiKeyWarning = false }
     }
 
     // 配置弹窗

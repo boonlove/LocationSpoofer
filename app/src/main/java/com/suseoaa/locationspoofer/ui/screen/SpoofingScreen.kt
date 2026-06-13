@@ -212,11 +212,17 @@ fun SpoofingScreen(
 
     // 小地图实例，用于响应坐标更新
     var smallMapRef by remember { mutableStateOf<AppMapController?>(null) }
+    // 标记坐标更新是否来自地图手势(拖拽/滑动)，若是则不触发 animateCamera 避免打断惯性动画
+    var fromMapGesture by remember { mutableStateOf(false) }
     val lat = uiState.latitudeInput.toDoubleOrNull()
     val lng = uiState.longitudeInput.toDoubleOrNull()
     LaunchedEffect(lat, lng, smallMapRef) {
         if (lat != null && lng != null) {
-            smallMapRef?.animateCamera(lat, lng)
+            if (fromMapGesture) {
+                fromMapGesture = false // 手势引发的坐标更新，不做 animateCamera 以免打断惯性
+            } else {
+                smallMapRef?.animateCamera(lat, lng)
+            }
         }
     }
 
@@ -313,7 +319,7 @@ fun SpoofingScreen(
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
                     }
-                } else if (uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) {
+                } else if ((uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) || (uiState.baiduMapsApiKey.isBlank() && uiState.mapProvider == AppMapProvider.BAIDU_MAPS)) {
                     showApiKeyWarning = true
                 } else if (searchQuery.isNotBlank()) {
                     performPoiSearch(context, searchQuery, mapProvider) { results ->
@@ -371,6 +377,7 @@ fun SpoofingScreen(
 
                 // 移动地图即选点
                 map.setOnCameraChangeListener { lat, lng ->
+                    fromMapGesture = true
                     viewModel.confirmMapPoint(lat, lng)
                 }
             }
@@ -688,7 +695,7 @@ fun SpoofingScreen(
     }
 
     if (showApiKeyWarning) {
-        ApiKeyWarningDialog { showApiKeyWarning = false }
+        ApiKeyWarningDialog(uiState.mapProvider) { showApiKeyWarning = false }
     }
 
     if (showSaveDialog) {
@@ -1494,8 +1501,15 @@ fun SectionHeader(icon: ImageVector, title: String, isDark: Boolean) {
 
 @Composable
 fun ApiKeyWarningDialog(
+    mapProvider: AppMapProvider,
     onDismiss: () -> Unit
 ) {
+    val mapProviderName = when (mapProvider) {
+        AppMapProvider.AMAP -> stringResource(R.string.amap)
+        AppMapProvider.BAIDU_MAPS -> stringResource(R.string.baidu_maps)
+        else -> ""
+    }
+
     LocalizedDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
@@ -1510,7 +1524,7 @@ fun ApiKeyWarningDialog(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    stringResource(R.string.api_key_required_message)
+                    stringResource(R.string.api_key_required_message, mapProviderName, stringResource(R.string.map_provider_api_kry_config))
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(
@@ -1740,6 +1754,51 @@ fun performPoiSearch(
                     override fun onPoiItemSearched(item: PoiItem?, rCode: Int) {}
                 })
                 search.searchPOIAsyn()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onResult(emptyList())
+            }
+        }
+        AppMapProvider.BAIDU_MAPS -> {
+            try {
+                val poiSearch = com.baidu.mapapi.search.poi.PoiSearch.newInstance()
+                poiSearch.setOnGetPoiSearchResultListener(object : com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener {
+                    override fun onGetPoiResult(poiResult: com.baidu.mapapi.search.poi.PoiResult?) {
+                        if (poiResult != null && poiResult.error == com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR) {
+                            onResult(poiResult.allPoi?.mapNotNull { poi ->
+                                val location = poi.location ?: return@mapNotNull null
+                                AppPoiItem(
+                                    title = poi.name ?: "",
+                                    snippet = poi.address ?: poi.city ?: "",
+                                    lat = location.latitude,
+                                    lng = location.longitude
+                                )
+                            } ?: emptyList())
+                        } else {
+                            onResult(emptyList())
+                        }
+                    }
+
+                    override fun onGetPoiDetailResult(detailResult: com.baidu.mapapi.search.poi.PoiDetailSearchResult?) {
+                        // Not used for basic POI search
+                    }
+
+                    override fun onGetPoiIndoorResult(indoorResult: com.baidu.mapapi.search.poi.PoiIndoorResult?) {
+                        // Not used for basic POI search
+                    }
+
+                    @Deprecated("Deprecated in Java", ReplaceWith(""))
+                    override fun onGetPoiDetailResult(detailResult: com.baidu.mapapi.search.poi.PoiDetailResult?) {
+                        // Deprecated method, not used
+                    }
+                })
+
+                poiSearch.searchInCity(com.baidu.mapapi.search.poi.PoiCitySearchOption()
+                    .keyword(keyword)
+                    .pageNum(0)
+                    .pageCapacity(10)
+                    .city(context.getString(R.string.baidu_poi_search_city)) // 全国搜索
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
                 onResult(emptyList())

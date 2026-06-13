@@ -33,6 +33,7 @@ android {
     val googleMapsApiKey =
         System.getenv("GOOGLE_MAPS_API_KEY") ?: getLocalConfig("GOOGLE_MAPS_API_KEY") ?: ""
     val amapApiKey = System.getenv("AMAP_API_KEY") ?: getLocalConfig("AMAP_API_KEY") ?: ""
+    val baiduMapApiKey = System.getenv("BAIDU_MAP_API_KEY") ?: getLocalConfig("BAIDU_MAP_API_KEY") ?: ""
 
     fun getSigningConfig(key: String): String? {
         val properties = Properties()
@@ -70,6 +71,7 @@ android {
 
         manifestPlaceholders["googleMapsApiKey"] = googleMapsApiKey
         manifestPlaceholders["amapApiKey"] = amapApiKey
+        manifestPlaceholders["baiduMapApiKey"] = baiduMapApiKey
 
         buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"$googleMapsApiKey\"")
     }
@@ -145,6 +147,9 @@ dependencies {
     implementation(libs.koin.androidx.compose)
     implementation(libs.amap.map)
     implementation(libs.amap.search)
+    implementation(libs.baidu.map)
+    implementation(libs.baidu.search)
+    implementation(libs.baidu.location)
     implementation(libs.google.maps)
     implementation(libs.google.places)
     implementation("com.google.android.gms:play-services-maps:18.2.0")

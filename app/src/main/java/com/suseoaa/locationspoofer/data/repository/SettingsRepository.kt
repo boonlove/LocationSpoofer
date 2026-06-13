@@ -36,6 +36,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.amapApiKey = value
     }
 
+    fun getBaiduMapsApiKey(): String = settingsManager.baiduMapsApiKey
+
+    fun setBaiduMapsApiKey(value: String) {
+        settingsManager.baiduMapsApiKey = value
+    }
+
     fun getMapProvider(): String = settingsManager.mapProvider
 
     fun setMapProvider(value: String) {

@@ -35,7 +35,11 @@
         <meta-data
             android:name="com.amap.api.v2.apikey"
             android:value="${amapApiKey}" />
-        
+
+        <meta-data
+            android:name="com.baidu.lbsapi.API_KEY"
+            android:value="${baiduMapApiKey}" />
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${googleMapsApiKey}" />
@@ -50,6 +54,9 @@
             </intent-filter>
         </activity>
         <service android:name="com.amap.api.location.APSService" />
+        <service android:name="com.baidu.location.f"
+            android:enabled="true"
+            android:process=":remote"/>
         <service
             android:name=".service.SpoofingService"
             android:enabled="true"

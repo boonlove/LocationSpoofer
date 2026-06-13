@@ -4,8 +4,10 @@ import android.app.Application
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
+import com.baidu.location.LocationClient
+import com.baidu.mapapi.CoordType
+import com.baidu.mapapi.SDKInitializer
 import com.google.android.libraries.places.api.Places
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -50,6 +52,21 @@ class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
             // 高德定位 API Key（定位功能始终需要）
             AMapLocationClient.setApiKey(customApiKey)
         }
+
+        // 百度地图 隐私政策
+        SDKInitializer.setAgreePrivacy(this, true)
+        LocationClient.setAgreePrivacy(true)
+        // 百度定位 API Key
+        val customBaiduApiKey = prefs.getString("baidu_maps_api_key", "")
+        if (!customBaiduApiKey.isNullOrEmpty()) {
+            SDKInitializer.setApiKey(customBaiduApiKey)
+            LocationClient.setKey(customBaiduApiKey)
+        }
+        // 百度地图 SDK
+        if (!SDKInitializer.isInitialized()) {
+            SDKInitializer.initialize(this)
+        }
+        SDKInitializer.setCoordType(CoordType.GCJ02)
 
         // 谷歌地图 SDK
         if (!Places.isInitialized() && BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank()) {

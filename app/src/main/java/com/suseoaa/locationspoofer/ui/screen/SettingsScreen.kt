@@ -34,6 +34,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
+    var localBaiduMapsApiKey by remember(uiState.baiduMapsApiKey) { mutableStateOf(uiState.baiduMapsApiKey) }
     val clipboardManager = LocalClipboardManager.current
 
     Column(
@@ -101,7 +102,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                stringResource(R.string.amap_config),
+                stringResource(R.string.map_provider_api_kry_config),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
@@ -168,11 +169,28 @@ fun SettingsScreen(
                     unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             )
+            Spacer(Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = localBaiduMapsApiKey,
+                onValueChange = { localBaiduMapsApiKey = it },
+                label = { Text(stringResource(R.string.custom_baidu_maps_key)) },
+                placeholder = { Text(stringResource(R.string.custom_amap_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentBlue,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedLabelColor = AccentBlue,
+                    unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+            )
 
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = {
                     viewModel.setAmapApiKey(localAmapApiKey)
+                    viewModel.setBaiduMapsKey(localBaiduMapsApiKey)
                     Toast.makeText(context, context.getString(R.string.restart_required_hint), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -222,6 +240,7 @@ data class MapProviderOption(val nameResId: Int, val value: AppMapProvider)
 
 val Map_Provider_LIST = listOf(
     MapProviderOption(R.string.amap, AppMapProvider.AMAP),
+    MapProviderOption(R.string.baidu_maps, AppMapProvider.BAIDU_MAPS),
     MapProviderOption(R.string.google_map, AppMapProvider.GOOGLE_MAPS)
 )
 

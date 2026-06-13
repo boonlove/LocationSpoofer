@@ -78,7 +78,7 @@
     <string name="app_settings">إعدادات النظام</string>
     <string name="ignore_this_version">تجاهل هذا الإصدار</string>
     <string name="still">ثابت</string>
-    <string name="amap_restricted_fallback">تقييد AMap، محاولة استخدام GPS/الشبكة...</string>
+    <string name="amap_restricted_fallback">تقييد %s، محاولة استخدام GPS/الشبكة...</string>
     <string name="waiting_gps_signal">لا يوجد موقع مخزن، في انتظار إشارة GPS (قد يكون بطيئًا/غير متاح بالداخل)</string>
     <string name="native_location_success">نجاح تحديد الموقع الأصلي!</string>
     <string name="location_permission_denied">لم يتم منح إذن تحديد الموقع الدقيق، لا يمكن جلب الموقع</string>
@@ -96,7 +96,7 @@
     <string name="spoofing_service_content">محاكاة الموقع: %1$s, %2$s</string>
     <string name="spoofing_service_channel_name">خدمة محاكي الموقع</string>
     <string name="close_joystick">إغلاق عصا التحكم</string>
-    <string name="amap_config">إعدادات AMap</string>
+    <string name="map_provider_api_kry_config">إعدادات مزود الخرائط</string>
     <string name="app_sha1">توقيع App SHA1</string>
     <string name="custom_amap_key">مفتاح AMap API مخصص</string>
     <string name="custom_amap_key_hint">اتركه فارغًا لاستخدام الافتراضي</string>

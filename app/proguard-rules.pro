@@ -13,6 +13,12 @@
 -dontwarn com.amap.api.**
 -dontwarn com.autonavi.**
 
+# Baidu Maps SDK
+-keep class com.baidu.** {*;}
+-keep class vi.com.** {*;}
+-keep class com.baidu.vi.** {*;}
+-dontwarn com.baidu.**
+
 # Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}

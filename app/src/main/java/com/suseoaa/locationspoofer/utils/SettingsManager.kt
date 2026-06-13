@@ -27,6 +27,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("amap_api_key", "") ?: ""
         set(value) = prefs.edit().putString("amap_api_key", value).apply()
 
+    var baiduMapsApiKey: String
+        get() = prefs.getString("baidu_maps_api_key", "") ?: ""
+        set(value) = prefs.edit().putString("baidu_maps_api_key", value).apply()
+
     var mapProvider: String
         get() = prefs.getString("map_provider", "AMAP") ?: "AMAP"
         set(value) = prefs.edit().putString("map_provider", value).apply()
