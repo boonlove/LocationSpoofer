@@ -264,7 +264,7 @@ class MainViewModel(
     @android.annotation.SuppressLint("MissingPermission")
     private fun fallbackToNativeLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)?, convertToGcj: Boolean) {
         try {
-            if (forceCallback != null) {
+            if (forceCallback != null && convertToGcj) {
                 android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.amap_restricted_fallback), android.widget.Toast.LENGTH_SHORT).show()
             }
             val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
