@@ -229,8 +229,23 @@ class MainViewModel(
         return uiState.value.mapProvider
     }
 
+   //  判断设备是否开启了位置服务（GPS/网络定位）
+
+    fun isLocationEnabled(ctx: Context): Boolean {
+        val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+        return locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+               locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+    }
+
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.Main) {
+            if (!isLocationEnabled(ctx)) {
+                // 定位服务不可用
+                if (forceCallback != null) {
+                    android.widget.Toast.makeText(ctx, ctx.getString(com.suseoaa.locationspoofer.R.string.location_services_unavailable), android.widget.Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
             val mapProvider = isDomesticEnvironment()
             when (mapProvider) {
                 AppMapProvider.AMAP -> {
@@ -401,6 +416,11 @@ class MainViewModel(
     }
 
     private suspend fun fetchRealLocationSilent(ctx: Context): Pair<Double, Double>? = suspendCoroutine { cont ->
+        if (!isLocationEnabled(ctx)) {
+            // 定位服务不可用
+            cont.resume(null)
+            return@suspendCoroutine
+        }
         val mapProvider = isDomesticEnvironment()
         when (mapProvider) {
             AppMapProvider.AMAP -> {

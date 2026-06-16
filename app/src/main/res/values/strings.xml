@@ -104,6 +104,7 @@
     <string name="no_updates_available">No updates available</string>
     <string name="loading">Loading...</string>
     <string name="still">Still</string>
+    <string name="location_services_unavailable">Location services are unavailable. Please enable location services.</string>
     <string name="amap_restricted_fallback">%s restricted, trying native GPS/Network...</string>
     <string name="waiting_gps_signal">No cached location, waiting for GPS signal (may be slow/unavailable indoors)</string>
     <string name="native_location_success">Native location success!</string>

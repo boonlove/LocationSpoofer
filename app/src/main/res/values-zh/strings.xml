@@ -103,6 +103,7 @@
     <string name="no_updates_available">暂无更新</string>
     <string name="loading">加载中...</string>
     <string name="still">静止</string>
+    <string name="location_services_unavailable">位置服务不可用，请打开系统定位开关</string>
     <string name="amap_restricted_fallback">%s定位受限，正在尝试原生GPS/基站定位...</string>
     <string name="waiting_gps_signal">系统未缓存位置，正在等待GPS信号(室内可能极慢或无信号)</string>
     <string name="native_location_success">原生定位成功！</string>
