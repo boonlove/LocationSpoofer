@@ -38,16 +38,16 @@ fun AppCoordinateScreen(
     }
 
     val milkyWhiteColorScheme = lightColorScheme(
-        background = androidx.compose.ui.graphics.Color(0xFFFDFBF7),
-        surface = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-        onBackground = androidx.compose.ui.graphics.Color(0xFF2C2C2C),
-        onSurface = androidx.compose.ui.graphics.Color(0xFF2C2C2C),
-        surfaceVariant = androidx.compose.ui.graphics.Color(0xFFF5F0E6),
-        onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF4A4A4A),
-        primary = androidx.compose.ui.graphics.Color(0xFFC7A27C),
-        onPrimary = androidx.compose.ui.graphics.Color(0xFFFFFFFF),
-        primaryContainer = androidx.compose.ui.graphics.Color(0xFFF4E5D3),
-        onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFF5E4226)
+        background = MaterialTheme.colorScheme.background,
+        surface = MaterialTheme.colorScheme.surface,
+        onBackground = MaterialTheme.colorScheme.onBackground,
+        onSurface = MaterialTheme.colorScheme.onSurface,
+        surfaceVariant = MaterialTheme.colorScheme.surfaceVariant,
+        onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+        primary = MaterialTheme.colorScheme.primary,
+        onPrimary = MaterialTheme.colorScheme.onPrimary,
+        primaryContainer = MaterialTheme.colorScheme.primaryContainer,
+        onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
     )
 
     MaterialTheme(colorScheme = milkyWhiteColorScheme) {

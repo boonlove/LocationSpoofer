@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.Color
 val DarkBg = Color(0xFF0D1117)
 val SurfaceDark = Color(0xFF161B22)
 val SurfaceCardDark = Color(0xFF1C2333)
+val SurfaceVariantDark = Color(0xFF21262D) // Switch 关闭状态 track
+val OnSurfaceVariantDark = Color(0xFF8B949E) // Switch 关闭状态 thumb
 val DividerColorDark = Color(0xFF30363D)
 val TextPrimaryDark = Color(0xFFE6EDF3)
 val TextSecondaryDark = Color(0xFF8B949E)
@@ -17,6 +19,8 @@ val LightBg = Color(0xFFF6F8FA)
 val SurfaceLight = Color(0xFFFFFFFF)
 val SurfaceCardLight = Color(0xFFFFFFFF)
 val SurfaceCardCustomLight = Color(0xFFF3F6F9) // Custom color overriding MD3 default
+val SurfaceVariantLight = Color(0xFFE6EBF1) // Switch 关闭状态 track
+val OnSurfaceVariantLight = Color(0xFF6E7681) // Switch 关闭状态 thumb
 val DividerColorLight = Color(0xFFD0D7DE)
 val TextPrimaryLight = Color(0xFF24292F)
 val TextSecondaryLight = Color(0xFF57606A)
@@ -36,6 +40,8 @@ val AppColorSchemeDark = darkColorScheme(
     surface = SurfaceCardDark,
     onBackground = TextPrimaryDark,
     onSurface = TextPrimaryDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
     outline = DividerColorDark,
     error = ErrorRed
 )
@@ -49,6 +55,8 @@ val AppColorSchemeLight = lightColorScheme(
     surface = SurfaceCardLight,
     onBackground = TextPrimaryLight,
     onSurface = TextPrimaryLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = OnSurfaceVariantLight,
     outline = DividerColorLight,
     error = Color(0xFFCF222E)
 )
