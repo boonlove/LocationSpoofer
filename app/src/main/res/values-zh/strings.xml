@@ -110,6 +110,7 @@
     <string name="location_permission_denied">未授予精准定位权限，无法获取位置</string>
     <string name="disable_continuous_scan_first">请先关闭“大面积扫街模式”再开启模拟定位</string>
     <string name="disable_continuous_scan_route_first">请先关闭“大面积扫街模式”再开启路线模拟</string>
+    <string name="turn_on_location_services_first">位置服务不可用，请“打开系统定位”再开启扫街模式</string>
     <string name="spoofing_active_cannot_collect">模拟定位已开启，无法采集真实物理环境</string>
     <string name="stop_spoofing_before_scan">请先停止模拟定位再开启扫街模式</string>
     <string name="export_success">导出成功</string>

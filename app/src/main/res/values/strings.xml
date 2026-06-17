@@ -111,6 +111,7 @@
     <string name="location_permission_denied">Precise location permission not granted, cannot fetch location</string>
     <string name="disable_continuous_scan_first">Please disable \'Continuous Scan\' before starting spoofing</string>
     <string name="disable_continuous_scan_route_first">Please disable \'Continuous Scan\' before starting route planning</string>
+    <string name="turn_on_location_services_first">Location services are unavailable. Please enable location services before starting continuous scan.</string>
     <string name="spoofing_active_cannot_collect">Spoofing is active, cannot collect real physical environment</string>
     <string name="stop_spoofing_before_scan">Please stop spoofing before starting continuous scan</string>
     <string name="export_success">Export successful</string>
