@@ -96,7 +96,7 @@
     <string name="spoofing_service_content">محاكاة الموقع: %1$s, %2$s</string>
     <string name="spoofing_service_channel_name">خدمة محاكي الموقع</string>
     <string name="close_joystick">إغلاق عصا التحكم</string>
-    <string name="map_provider_api_kry_config">إعدادات مزود الخرائط</string>
+    <string name="map_config">إعدادات الخريطة</string>
     <string name="app_sha1">توقيع App SHA1</string>
     <string name="custom_amap_key">مفتاح AMap API مخصص</string>
     <string name="custom_amap_key_hint">اتركه فارغًا لاستخدام الافتراضي</string>

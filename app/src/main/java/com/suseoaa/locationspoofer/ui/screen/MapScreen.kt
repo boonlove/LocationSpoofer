@@ -45,9 +45,9 @@ import com.suseoaa.locationspoofer.ui.components.AppMapMarker
 import com.suseoaa.locationspoofer.ui.components.MarkerType
 import androidx.compose.ui.res.stringResource
 import com.suseoaa.locationspoofer.R
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
@@ -71,15 +71,21 @@ fun FullScreenMapPage(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-    val mapProvider = uiState.mapProvider
     var mapRef by remember { mutableStateOf<AppMapController?>(null) }
     var showConfigDialog by remember { mutableStateOf(false) }
     var showMapTypeDialog by remember { mutableStateOf(false) }
+    val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     var showApiKeyWarning by remember { mutableStateOf(false) }
+
+    val activeEngine = if (uiState.mapEngine == MapEngine.AUTO) {
+        if (isDomestic) MapEngine.AMAP else MapEngine.GOOGLE
+    } else {
+        uiState.mapEngine
+    }
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
     BackHandler(enabled = showSearchResults) {
@@ -149,7 +155,7 @@ fun FullScreenMapPage(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 地图
-        AppMapView(mapProvider = uiState.mapProvider, modifier = Modifier.fillMaxSize()) { map ->
+        AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, modifier = Modifier.fillMaxSize()) { map ->
             mapRef = map
             map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
@@ -204,10 +210,13 @@ fun FullScreenMapPage(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             focusManager.clearFocus()
-                            if ((uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) || (uiState.baiduMapsApiKey.isBlank() && uiState.mapProvider == AppMapProvider.BAIDU_MAPS)) {
+                            if ((uiState.amapApiKey.isBlank() && activeEngine == MapEngine.AMAP) ||
+                                (uiState.baiduApiKey.isBlank() && activeEngine == MapEngine.BAIDU) ||
+                                (uiState.googleApiKey.isBlank() && activeEngine == MapEngine.GOOGLE)
+                                ) {
                                 showApiKeyWarning = true
                             } else if (searchQuery.isNotBlank()) {
-                                performPoiSearch(context, searchQuery, mapProvider) { r ->
+                                performPoiSearch(context, uiState.mapEngine, searchQuery, isDomestic) { r ->
                                     searchResults = r
                                     showSearchResults = r.isNotEmpty()
                                 }
@@ -359,7 +368,7 @@ fun FullScreenMapPage(
 
     // API Key 警告弹窗
     if (showApiKeyWarning) {
-        ApiKeyWarningDialog(uiState.mapProvider) { showApiKeyWarning = false }
+        ApiKeyWarningDialog(isDomestic ,uiState.mapEngine) { showApiKeyWarning = false }
     }
 
     // 配置弹窗
@@ -387,6 +396,8 @@ fun FullScreenMapPage(
         MapTypeDialog(
             currentMapType = uiState.mapType,
             onMapTypeSelected = { viewModel.setMapType(it) },
+            currentMapEngine = uiState.mapEngine,
+            onMapEngineSelected = { viewModel.setMapEngine(it) },
             onDismiss = { showMapTypeDialog = false }
         )
     }

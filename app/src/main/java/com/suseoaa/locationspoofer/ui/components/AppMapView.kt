@@ -24,16 +24,6 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory as GBitmapDescr
 import com.google.android.gms.maps.model.LatLng as GLatLng
 import com.google.android.gms.maps.model.MarkerOptions as GMarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions as GPolylineOptions
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
-
-import com.baidu.mapapi.map.BaiduMap
-import com.baidu.mapapi.map.BitmapDescriptorFactory as BBitmapDescriptorFactory
-import com.baidu.mapapi.map.MapStatusUpdateFactory
-import com.baidu.mapapi.map.TextureMapView as BTextureMapView
-import com.baidu.mapapi.map.MarkerOptions as BMarkerOptions
-import com.baidu.mapapi.map.PolylineOptions as BPolylineOptions
-import com.baidu.mapapi.map.CircleOptions as BCircleOptions
-import com.baidu.mapapi.model.LatLng as BLatLng
 
 interface AppMapMarker {
     fun setPosition(lat: Double, lng: Double)
@@ -291,31 +281,51 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
 }
 
 class BaiduMapControllerImpl(
-    private val baiduMap: BaiduMap,
+    private val map: com.baidu.mapapi.map.BaiduMap,
+    private val mapView: com.baidu.mapapi.map.TextureMapView,
     private val context: android.content.Context
 ) : AppMapController {
-    override fun clear() { baiduMap.clear() }
-    override fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float) {
-        baiduMap.addOverlay(
-            BPolylineOptions().color(colorInt).width(width.toInt()).points(
-                points.map { BLatLng(it.first, it.second) }
-            )
-        )
+    private var isDarkMode: Boolean = false
+    private var currentMapType: AppMapType = AppMapType.NORMAL
+
+    override fun setDarkMode(isDark: Boolean, context: android.content.Context) {
+        isDarkMode = isDark
+        val customStyleId = ""
+        val customStyleOptions = com.baidu.mapapi.map.MapCustomStyleOptions()
+        if (isDark && customStyleId.isNotBlank()) {
+            customStyleOptions.customStyleId(customStyleId)
+            mapView.setMapCustomStyle(customStyleOptions, object : com.baidu.mapapi.map.CustomMapStyleCallBack {
+                override fun onPreLoadLastCustomMapStyle(p0: String?): Boolean = false
+                override fun onCustomMapStyleLoadSuccess(p0: Boolean, p1: String?): Boolean = true
+                override fun onCustomMapStyleLoadFailed(p0: Int, p1: String?, p2: String?): Boolean = false
+            })
+            mapView.setMapCustomStyleEnable(true)
+        } else {
+            mapView.setMapCustomStyleEnable(false)
+        }
+        setMapType(currentMapType)
     }
 
-    override fun addCircle(
-        lat: Double, lng: Double, radius: Double,
-        fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float
-    ) {
-        baiduMap.addOverlay(
-            BCircleOptions()
-                .center(BLatLng(lat, lng))
+    override fun clear() { map.clear() }
+    override fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float) {
+        if (points.size < 2) return
+        val latLngList = points.map { com.baidu.mapapi.model.LatLng(it.first, it.second) }
+        map.addOverlay(
+            com.baidu.mapapi.map.PolylineOptions()
+                .color(colorInt)
+                .width(width.toInt())
+                .points(latLngList)
+        )
+    }
+    override fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float) {
+        map.addOverlay(
+            com.baidu.mapapi.map.CircleOptions()
+                .center(com.baidu.mapapi.model.LatLng(lat, lng))
                 .radius(radius.toInt())
                 .fillColor(fillColorInt)
                 .stroke(com.baidu.mapapi.map.Stroke(strokeWidth.toInt(), strokeColorInt))
         )
     }
-
     override fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker {
         // 以下所使用 png 资源来自于高德地图，构建时自动打包到 assets
         val icon = when(type) {
@@ -324,19 +334,18 @@ class BaiduMapControllerImpl(
             MarkerType.ORANGE -> bitmapDescriptorFromAssets(context, "ORANGE.png")
             else -> bitmapDescriptorFromAssets(context, "RED.png")
         }
-        val marker = (baiduMap.addOverlay(
-            BMarkerOptions()
-                .position(BLatLng(lat, lng))
+        val marker = map.addOverlay(
+            com.baidu.mapapi.map.MarkerOptions()
+                .position(com.baidu.mapapi.model.LatLng(lat, lng))
                 .title(title)
                 .icon(icon)
-        ) as? com.baidu.mapapi.map.Marker)
+        ) as? com.baidu.mapapi.map.Marker
         return object : AppMapMarker {
             override fun setPosition(lat: Double, lng: Double) {
-                marker?.position = BLatLng(lat, lng)
+                marker?.position = com.baidu.mapapi.model.LatLng(lat, lng)
             }
         }
     }
-
     private fun bitmapDescriptorFromAssets(
         context: android.content.Context,
         assetPath: String
@@ -344,84 +353,63 @@ class BaiduMapControllerImpl(
         val inputStream = context.assets.open(assetPath)
         val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
         inputStream.close()
-        val descriptor = BBitmapDescriptorFactory.fromBitmap(bitmap)
+        val descriptor = com.baidu.mapapi.map.BitmapDescriptorFactory.fromBitmap(bitmap)
         bitmap.recycle()
         return descriptor
     }
-
     override fun animateCamera(lat: Double, lng: Double, zoom: Float?) {
-        if (zoom != null)
-            baiduMap.animateMapStatus(MapStatusUpdateFactory.newLatLngZoom(BLatLng(lat, lng), zoom))
-        else
-            baiduMap.animateMapStatus(MapStatusUpdateFactory.newLatLng(BLatLng(lat, lng)))
+        val update = if (zoom != null) com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(com.baidu.mapapi.model.LatLng(lat, lng), zoom)
+        else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(com.baidu.mapapi.model.LatLng(lat, lng))
+        map.animateMapStatus(update)
     }
-
     override fun moveCamera(lat: Double, lng: Double, zoom: Float?) {
-        if (zoom != null)
-            baiduMap.setMapStatus(MapStatusUpdateFactory.newLatLngZoom(BLatLng(lat, lng), zoom))
-        else
-            baiduMap.setMapStatus(MapStatusUpdateFactory.newLatLng(BLatLng(lat, lng)))
+        val update = if (zoom != null) com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(com.baidu.mapapi.model.LatLng(lat, lng), zoom)
+        else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(com.baidu.mapapi.model.LatLng(lat, lng))
+        map.setMapStatus(update)
     }
-
-    override val cameraTargetLat: Double? get() = baiduMap.mapStatus?.target?.latitude
-    override val cameraTargetLng: Double? get() = baiduMap.mapStatus?.target?.longitude
+    override val cameraTargetLat: Double? get() = map.mapStatus?.target?.latitude
+    override val cameraTargetLng: Double? get() = map.mapStatus?.target?.longitude
 
     override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
-        baiduMap.setOnMapStatusChangeListener(object : BaiduMap.OnMapStatusChangeListener {
-            private var isFromGesture = false
-
-            override fun onMapStatusChangeStart(mapStatus: com.baidu.mapapi.map.MapStatus?) {}
-            override fun onMapStatusChangeStart(mapStatus: com.baidu.mapapi.map.MapStatus?, reason: Int) {
-                // REASON_GESTURE = 用户手势拖拽, REASON_API_ANIMATION = animateMapStatus, REASON_API_SET = setMapStatus
-                isFromGesture = (reason == BaiduMap.OnMapStatusChangeListener.REASON_GESTURE)
+        map.setOnMapStatusChangeListener(object : com.baidu.mapapi.map.BaiduMap.OnMapStatusChangeListener {
+            private var lastReason: Int = 0
+            override fun onMapStatusChangeStart(p0: com.baidu.mapapi.map.MapStatus?) {}
+            override fun onMapStatusChangeStart(p0: com.baidu.mapapi.map.MapStatus?, p1: Int) {
+                lastReason = p1
             }
-            override fun onMapStatusChange(mapStatus: com.baidu.mapapi.map.MapStatus?) {}
-            override fun onMapStatusChangeFinish(mapStatus: com.baidu.mapapi.map.MapStatus?) {
-                // 只对用户手势触发回调, 防止 animateCamera → onMapStatusChangeFinish → LaunchedEffect → animateCamera 的反馈循环
-                if (isFromGesture) {
-                    mapStatus?.target?.let { onFinish(it.latitude, it.longitude) }
+            override fun onMapStatusChange(p0: com.baidu.mapapi.map.MapStatus?) {}
+            override fun onMapStatusChangeFinish(p0: com.baidu.mapapi.map.MapStatus?) {
+                if (lastReason == com.baidu.mapapi.map.BaiduMap.OnMapStatusChangeListener.REASON_GESTURE) {
+                    p0?.target?.let { onFinish(it.latitude, it.longitude) }
                 }
             }
         })
     }
-
     override fun disableUiControls() {
-        baiduMap.uiSettings.setAllGesturesEnabled(true)
+        map.uiSettings.isZoomGesturesEnabled = true
+        map.uiSettings.isScrollGesturesEnabled = true
+        map.uiSettings.isOverlookingGesturesEnabled = true
+        map.uiSettings.isRotateGesturesEnabled = true
     }
 
     override fun setMapType(type: AppMapType) {
+        currentMapType = type
         when (type) {
             AppMapType.NORMAL -> {
-                baiduMap.mapType = BaiduMap.MAP_TYPE_NORMAL
-                baiduMap.isBuildingsEnabled = false
-                resetOverlook()
+                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_NORMAL
             }
             AppMapType.SATELLITE -> {
-                baiduMap.mapType = BaiduMap.MAP_TYPE_SATELLITE
-                resetOverlook()
+                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_SATELLITE
             }
             AppMapType.MAP_3D -> {
-                baiduMap.mapType = BaiduMap.MAP_TYPE_NORMAL
-                baiduMap.isBuildingsEnabled = true
-                val status = baiduMap.mapStatus ?: return
-                val builder = com.baidu.mapapi.map.MapStatus.Builder(status)
-                    .overlook(45f)
-                baiduMap.setMapStatus(MapStatusUpdateFactory.newMapStatus(builder.build()))
+                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_NORMAL
             }
-        }
-    }
-
-    private fun resetOverlook() {
-        val status = baiduMap.mapStatus ?: return
-        if (status.overlook != 0f) {
-            val builder = com.baidu.mapapi.map.MapStatus.Builder(status).overlook(0f)
-            baiduMap.setMapStatus(MapStatusUpdateFactory.newMapStatus(builder.build()))
         }
     }
 }
 
 @Composable
-fun AppMapView(mapProvider: AppMapProvider, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
+fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
@@ -431,123 +419,148 @@ fun AppMapView(mapProvider: AppMapProvider, modifier: Modifier = Modifier, onMap
         mapController?.setDarkMode(isDark, context)
     }
 
-    when (mapProvider) {
-        AppMapProvider.AMAP -> {
-            val amapView = remember {
-                val view = TextureMapView(context)
-                view.onCreate(Bundle())
-                view
-            }
-            DisposableEffect(lifecycle, amapView) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_RESUME  -> amapView.onResume()
-                        Lifecycle.Event.ON_PAUSE   -> amapView.onPause()
-                        Lifecycle.Event.ON_DESTROY -> amapView.onDestroy()
-                        else -> {}
+    val activeEngine = if (mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AUTO) {
+        if (isDomestic) com.suseoaa.locationspoofer.data.model.MapEngine.AMAP else com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE
+    } else {
+        mapEngine
+    }
+
+    if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP) {
+        val amapView = remember {
+            val view = TextureMapView(context)
+            view.onCreate(Bundle())
+            view
+        }
+        DisposableEffect(lifecycle, amapView) {
+            var isDestroyed = false
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME  -> amapView.onResume()
+                    Lifecycle.Event.ON_PAUSE   -> amapView.onPause()
+                    Lifecycle.Event.ON_DESTROY -> {
+                        if (!isDestroyed) {
+                            isDestroyed = true
+                            amapView.onDestroy()
+                        }
                     }
+                    else -> {}
                 }
-                lifecycle.addObserver(observer)
-                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) amapView.onResume()
-                onDispose {
-                    lifecycle.removeObserver(observer)
+            }
+            lifecycle.addObserver(observer)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) amapView.onResume()
+            onDispose {
+                lifecycle.removeObserver(observer)
+                if (!isDestroyed) {
+                    isDestroyed = true
                     amapView.onPause()
                     amapView.onDestroy()
                 }
             }
-            AndroidView(
-                factory = {
-                    amapView.apply {
-                        setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                        map.setOnMapLoadedListener {
-                            val controller = AMapControllerImpl(map)
-                            mapController = controller
-                            controller.setDarkMode(isDark, context)
-                            onMapReady(controller)
+        }
+        AndroidView(
+            factory = {
+                amapView.apply {
+                    setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                    map.setOnMapLoadedListener {
+                        val controller = AMapControllerImpl(map)
+                        mapController = controller
+                        controller.setDarkMode(isDark, context)
+                        onMapReady(controller)
+                    }
+                }
+            },
+            modifier = modifier
+        )
+    } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
+        val baiduMapView = remember {
+            val view = com.baidu.mapapi.map.TextureMapView(context)
+            view
+        }
+        DisposableEffect(lifecycle, baiduMapView) {
+            var isDestroyed = false  //  // 防止 Back 键导致 onDestroy 被双次调用，Activity 重建后新 BMapView 无法正确初始化
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME  -> baiduMapView.onResume()
+                    Lifecycle.Event.ON_PAUSE   -> baiduMapView.onPause()
+                    Lifecycle.Event.ON_DESTROY -> {
+                        if (!isDestroyed) {
+                            isDestroyed = true
+                            baiduMapView.onDestroy()
                         }
                     }
-                },
-                modifier = modifier
-            )
-        }
-        AppMapProvider.BAIDU_MAPS -> {
-            val mapView = remember {
-                val view = BTextureMapView(context)
-                view.onCreate(context, Bundle())
-                view
+                    else -> {}
+                }
             }
-            DisposableEffect(lifecycle, mapView) {
-                var destroyed = false
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                        Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                        Lifecycle.Event.ON_DESTROY -> {
-                            if (!destroyed) {
-                                destroyed = true  // 防止 Back 键导致 onDestroy 被双次调用，Activity 重建后新 BMapView 无法正确初始化
-                                mapView.onDestroy()
-                            }
+            lifecycle.addObserver(observer)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) baiduMapView.onResume()
+            onDispose {
+                lifecycle.removeObserver(observer)
+                if (!isDestroyed) {
+                    isDestroyed = true
+                    baiduMapView.onPause()
+                    baiduMapView.onDestroy()
+                }
+            }
+        }
+        AndroidView(
+            factory = {
+                baiduMapView.apply {
+                    setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                    map.setOnMapLoadedCallback {
+                        val controller = BaiduMapControllerImpl(map, this, context)
+                        mapController = controller
+                        controller.setDarkMode(isDark, context)
+                        onMapReady(controller) 
+                    }
+                }
+            },
+            modifier = modifier
+        )
+    } else {
+        val gmapView = remember { 
+            val view = GMapView(context)
+            view.onCreate(Bundle())
+            view
+        }
+        DisposableEffect(lifecycle, gmapView) {
+            var isDestroyed = false
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME  -> gmapView.onResume()
+                    Lifecycle.Event.ON_PAUSE   -> gmapView.onPause()
+                    Lifecycle.Event.ON_DESTROY -> {
+                        if (!isDestroyed) {
+                            isDestroyed = true
+                            gmapView.onDestroy()
                         }
-                        else -> {}
                     }
-                }
-                lifecycle.addObserver(observer)
-                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onResume()
-                onDispose {
-                    lifecycle.removeObserver(observer)
-                    if (!destroyed) {
-                        mapView.onPause()
-                        mapView.onDestroy()
-                    }
+                    else -> {}
                 }
             }
-            AndroidView(
-                factory = {
-                    mapView.apply {
-                        setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                        map.setOnMapLoadedCallback { onMapReady(BaiduMapControllerImpl(map, context)) }
-                    }
-                },
-                modifier = modifier
-            )
-        }
-        AppMapProvider.GOOGLE_MAPS -> {
-            val gmapView = remember {
-                val view = GMapView(context)
-                view.onCreate(Bundle())
-                view
-            }
-            DisposableEffect(lifecycle, gmapView) {
-                val observer = LifecycleEventObserver { _, event ->
-                    when (event) {
-                        Lifecycle.Event.ON_RESUME  -> gmapView.onResume()
-                        Lifecycle.Event.ON_PAUSE   -> gmapView.onPause()
-                        Lifecycle.Event.ON_DESTROY -> gmapView.onDestroy()
-                        else -> {}
-                    }
-                }
-                lifecycle.addObserver(observer)
-                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) gmapView.onResume()
-                onDispose {
-                    lifecycle.removeObserver(observer)
+            lifecycle.addObserver(observer)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) gmapView.onResume()
+            onDispose {
+                lifecycle.removeObserver(observer)
+                if (!isDestroyed) {
+                    isDestroyed = true
                     gmapView.onPause()
                     gmapView.onDestroy()
                 }
             }
-            AndroidView(
-                factory = {
-                    gmapView.apply {
-                        setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
-                        getMapAsync { map ->
-                            val controller = GMapControllerImpl(map)
-                            mapController = controller
-                            controller.setDarkMode(isDark, context)
-                            onMapReady(controller)
-                        }
-                    }
-                },
-                modifier = modifier
-            )
         }
+        AndroidView(
+            factory = {
+                gmapView.apply {
+                    setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
+                    getMapAsync { map -> 
+                        val controller = GMapControllerImpl(map)
+                        mapController = controller
+                        controller.setDarkMode(isDark, context)
+                        onMapReady(controller) 
+                    }
+                }
+            },
+            modifier = modifier
+        )
     }
 }

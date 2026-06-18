@@ -4,9 +4,6 @@ import android.app.Application
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.maps.MapsInitializer
 import com.amap.api.services.core.ServiceSettings
-import com.baidu.location.LocationClient
-import com.baidu.mapapi.CoordType
-import com.baidu.mapapi.SDKInitializer
 import com.google.android.libraries.places.api.Places
 import com.suseoaa.locationspoofer.di.appModule
 import org.koin.android.ext.koin.androidContext
@@ -34,43 +31,38 @@ class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
         }
 
         val prefs = getSharedPreferences("app_settings", MODE_PRIVATE)
-
-        // 高德定位 SDK 隐私声明（定位功能始终需要）
-        AMapLocationClient.updatePrivacyShow(this, true, true)
-        AMapLocationClient.updatePrivacyAgree(this, true)
-        // 高德地图 SDK
         MapsInitializer.updatePrivacyShow(this, true, true)
         MapsInitializer.updatePrivacyAgree(this, true)
         ServiceSettings.updatePrivacyShow(this, true, true)
         ServiceSettings.updatePrivacyAgree(this, true)
+        AMapLocationClient.updatePrivacyShow(this, true, true)
+        AMapLocationClient.updatePrivacyAgree(this, true)
 
         val customApiKey = prefs.getString("amap_api_key", "")
         if (!customApiKey.isNullOrEmpty()) {
             MapsInitializer.setApiKey(customApiKey)
-            ServiceSettings.getInstance().setApiKey(customApiKey)
-
-            // 高德定位 API Key（定位功能始终需要）
             AMapLocationClient.setApiKey(customApiKey)
+            ServiceSettings.getInstance().setApiKey(customApiKey)
         }
 
-        // 百度地图 隐私政策
-        SDKInitializer.setAgreePrivacy(this, true)
-        LocationClient.setAgreePrivacy(true)
-        // 百度定位 API Key
-        val customBaiduApiKey = prefs.getString("baidu_maps_api_key", "")
-        if (!customBaiduApiKey.isNullOrEmpty()) {
-            SDKInitializer.setApiKey(customBaiduApiKey)
-            LocationClient.setKey(customBaiduApiKey)
+        val baiduApiKey = prefs.getString("baidu_api_key", "")
+        if (!baiduApiKey.isNullOrEmpty()) {
+            com.baidu.mapapi.SDKInitializer.setApiKey(baiduApiKey)
+            com.baidu.location.LocationClient.setKey(baiduApiKey)
         }
-        // 百度地图 SDK
-        if (!SDKInitializer.isInitialized()) {
-            SDKInitializer.initialize(this)
-        }
-        SDKInitializer.setCoordType(CoordType.GCJ02)
 
-        // 谷歌地图 SDK
-        if (!Places.isInitialized() && BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank()) {
-            Places.initialize(this, BuildConfig.GOOGLE_MAPS_API_KEY)
+        try {
+            com.baidu.mapapi.SDKInitializer.setAgreePrivacy(this, true)
+            com.baidu.location.LocationClient.setAgreePrivacy(true)
+            com.baidu.mapapi.SDKInitializer.setCoordType(com.baidu.mapapi.CoordType.GCJ02)
+            com.baidu.mapapi.SDKInitializer.initialize(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        val googleApiKey = prefs.getString("google_api_key", "")
+        if (!Places.isInitialized() && !googleApiKey.isNullOrEmpty()) {
+            Places.initialize(this, googleApiKey)
         }
 
         startKoin {

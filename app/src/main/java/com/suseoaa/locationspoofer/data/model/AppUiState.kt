@@ -39,12 +39,6 @@ enum class RouteRunMode {
     LOOP
 }
 
-enum class AppMapProvider {
-    AMAP,
-    BAIDU_MAPS,
-    GOOGLE_MAPS
-}
-
 enum class AppMapType {
     NORMAL,
     SATELLITE,
@@ -53,6 +47,7 @@ enum class AppMapType {
 
 data class AppState(
     val mapType: AppMapType = AppMapType.NORMAL,
+    val mapEngine: MapEngine = MapEngine.AUTO,
     val isInitializing: Boolean = true,
     val isLanguageSet: Boolean = true, // Default to true to avoid flicker if not needed
     val currentLanguage: String = "",
@@ -82,11 +77,10 @@ data class AppState(
     /** 首页地图已确认的选点（点击地图后出现确认按钮，确认后填充坐标） */
     val mapConfirmedPoint: Pair<Double, Double>? = null,
     val amapApiKey: String = "",
-    val baiduMapsApiKey: String = "",
+    val baiduApiKey: String = "",
+    val googleApiKey: String = "",
     val appSha1: String = "",
     val appCoordinateSystems: Map<String, String> = emptyMap(),
-    /** 当前使用的地图类型 */
-    val mapProvider: AppMapProvider = AppMapProvider.AMAP,
     val isContinuousScanning: Boolean = false,
     val environmentRecordCount: Int = 0,
     val hookedApps: List<AppInfoItem> = emptyList(),

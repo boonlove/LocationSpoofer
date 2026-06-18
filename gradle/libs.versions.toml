@@ -13,13 +13,13 @@ amapLocation = "6.4.9"
 amapSearch = "9.7.0"
 baiduMap = "7.6.4"
 baiduLocation = "9.6.4"
-baiduSearch = "7.6.4"
 okhttp = "4.12.0"
-googleMaps = "18.2.0"
+googleMaps = "20.0.0"
 playServicesLocation = "21.2.0"
 places = "3.4.0"
 room = "2.6.1"
 ksp = "1.9.23-1.0.20"
+kotlinxSerializationJson = "1.6.3"
 
 [libraries]
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
@@ -28,12 +28,13 @@ amap-location = { module = "com.amap.api:location", version.ref = "amapLocation"
 amap-search = { module = "com.amap.api:search", version.ref = "amapSearch" }
 baidu-map = { module = "com.baidu.lbsyun:BaiduMapSDK_Map", version.ref = "baiduMap" }
 baidu-location = { module = "com.baidu.lbsyun:BaiduMapSDK_Location", version.ref = "baiduLocation" }
-baidu-search = { module = "com.baidu.lbsyun:BaiduMapSDK_Search", version.ref = "baiduSearch" }
+baidu-search = { module = "com.baidu.lbsyun:BaiduMapSDK_Search", version.ref = "baiduMap" }
 xposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
 xposed-service = { group = "io.github.libxposed", name = "service", version.ref = "libxposedService" }
 google-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "googleMaps" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 google-places = { group = "com.google.android.libraries.places", name = "places", version.ref = "places" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.6.1" }

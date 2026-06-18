@@ -83,7 +83,7 @@ import com.suseoaa.locationspoofer.ui.theme.AccentOrange
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.BuildConfig
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
+import com.suseoaa.locationspoofer.data.model.MapEngine
 
 data class AppPoiItem(val title: String, val snippet: String, val lat: Double, val lng: Double)
 
@@ -119,7 +119,7 @@ fun SpoofingScreen(
     var showEnvironmentDialog by remember { mutableStateOf(false) }
     var showStartSpoofingDialog by remember { mutableStateOf(false) }
     var showMapTypeDialog by remember { mutableStateOf(false) }
-
+    
     val context = LocalContext.current
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -143,7 +143,7 @@ fun SpoofingScreen(
     var showCustomCoordDialog by remember { mutableStateOf(false) }
     val updateUiState by updateViewModel.uiState.collectAsState()
     val topBarBg = AppColors.topBarBackground(isDark)
-    val mapProvider = uiState.mapProvider
+    val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
     var showSearchResults by remember { mutableStateOf(false) }
@@ -151,6 +151,12 @@ fun SpoofingScreen(
     var showApiKeyWarning by remember { mutableStateOf(false) }
 
     var hasAutoCheckedUpdates by remember { mutableStateOf(false) }
+
+    val activeEngine = if (uiState.mapEngine == MapEngine.AUTO) {
+        if (isDomestic) MapEngine.AMAP else MapEngine.GOOGLE
+    } else {
+        uiState.mapEngine
+    }
 
     LaunchedEffect(Unit) {
         if (!hasAutoCheckedUpdates) {
@@ -319,10 +325,13 @@ fun SpoofingScreen(
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
                     }
-                } else if ((uiState.amapApiKey.isBlank() && uiState.mapProvider == AppMapProvider.AMAP) || (uiState.baiduMapsApiKey.isBlank() && uiState.mapProvider == AppMapProvider.BAIDU_MAPS)) {
+                } else if ( (uiState.amapApiKey.isBlank() && activeEngine == MapEngine.AMAP) ||
+                    (uiState.baiduApiKey.isBlank() && activeEngine == MapEngine.BAIDU) ||
+                    (uiState.googleApiKey.isBlank() && activeEngine == MapEngine.GOOGLE)
+                    ) {
                     showApiKeyWarning = true
                 } else if (searchQuery.isNotBlank()) {
-                    performPoiSearch(context, searchQuery, mapProvider) { results ->
+                    performPoiSearch(context, uiState.mapEngine, searchQuery, isDomestic) { results ->
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
                     }
@@ -368,7 +377,7 @@ fun SpoofingScreen(
 
         // 地图缩略图
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
-            AppMapView(mapProvider = uiState.mapProvider, modifier = Modifier.fillMaxSize()) { map ->
+            AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, modifier = Modifier.fillMaxSize()) { map ->
                 smallMapRef = map
                 map.disableUiControls()
                 val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
@@ -566,7 +575,7 @@ fun SpoofingScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
                 elevation = CardDefaults.cardElevation(0.dp),
-                modifier = Modifier.clickable {
+                modifier = Modifier.clickable { 
                     viewModel.toggleManageDataScreen(true)
                 }
             ) {
@@ -696,7 +705,7 @@ fun SpoofingScreen(
     }
 
     if (showApiKeyWarning) {
-        ApiKeyWarningDialog(uiState.mapProvider) { showApiKeyWarning = false }
+        ApiKeyWarningDialog(isDomestic ,uiState.mapEngine) { showApiKeyWarning = false }
     }
 
     if (showSaveDialog) {
@@ -993,6 +1002,8 @@ fun SpoofingScreen(
         MapTypeDialog(
             currentMapType = uiState.mapType,
             onMapTypeSelected = { viewModel.setMapType(it) },
+            currentMapEngine = uiState.mapEngine,
+            onMapEngineSelected = { viewModel.setMapEngine(it) },
             onDismiss = { showMapTypeDialog = false }
         )
     }
@@ -1503,13 +1514,15 @@ fun SectionHeader(icon: ImageVector, title: String, isDark: Boolean) {
 
 @Composable
 fun ApiKeyWarningDialog(
-    mapProvider: AppMapProvider,
+    isDomestic: Boolean,
+    mapEngine: MapEngine,
     onDismiss: () -> Unit
 ) {
-    val mapProviderName = when (mapProvider) {
-        AppMapProvider.AMAP -> stringResource(R.string.amap)
-        AppMapProvider.BAIDU_MAPS -> stringResource(R.string.baidu_maps)
-        else -> ""
+    val mapProviderName = when (mapEngine) {
+        MapEngine.AMAP -> stringResource(R.string.app_amap)
+        MapEngine.BAIDU -> stringResource(R.string.app_baidumap)
+        MapEngine.GOOGLE -> stringResource(R.string.app_googlemap)
+        MapEngine.AUTO -> { if (isDomestic) stringResource(R.string.app_amap) else stringResource(R.string.app_googlemap) }
     }
 
     LocalizedDialog(onDismissRequest = onDismiss) {
@@ -1526,7 +1539,7 @@ fun ApiKeyWarningDialog(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    stringResource(R.string.api_key_required_message, mapProviderName, stringResource(R.string.map_provider_api_kry_config))
+                    stringResource(R.string.api_key_required_message, mapProviderName, stringResource(R.string.map_config))
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(
@@ -1609,7 +1622,7 @@ fun HomeSearchBar(
             val isNetwork = searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK
             val activeColor = AccentBlue
             val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
-
+            
             Button(
                 onClick = { onSearchModeChange(com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK) },
                 shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
@@ -1726,196 +1739,133 @@ private var cachedPlacesClient: com.google.android.libraries.places.api.net.Plac
 
 fun performPoiSearch(
     context: android.content.Context,
+    mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
     keyword: String,
-    mapProvider: AppMapProvider,
+    isDomestic: Boolean,
     onResult: (List<AppPoiItem>) -> Unit
 ) {
-    when (mapProvider) {
-        AppMapProvider.AMAP -> {
-            try {
-                val query = PoiSearch.Query(keyword, "", "")
-                query.pageSize = 10
-                query.pageNum = 0
-                val search = PoiSearch(context, query)
-                search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
-                    override fun onPoiSearched(
-                        result: com.amap.api.services.poisearch.PoiResult?,
-                        rCode: Int
-                    ) {
-                        if (rCode == 1000 && result != null) {
-                            onResult(result.pois?.map {
-                                AppPoiItem(
-                                    it.title ?: "",
-                                    it.snippet ?: "",
-                                    it.latLonPoint.latitude,
-                                    it.latLonPoint.longitude
-                                )
-                            } ?: emptyList())
-                        } else {
-                            onResult(emptyList())
-                        }
+    if (mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
+        try {
+            val mPoiSearch = com.baidu.mapapi.search.poi.PoiSearch.newInstance()
+            mPoiSearch.setOnGetPoiSearchResultListener(object : com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener {
+                override fun onGetPoiResult(result: com.baidu.mapapi.search.poi.PoiResult?) {
+                    if (result == null || result.error != com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR) {
+                        onResult(emptyList())
+                        mPoiSearch.destroy()
+                        return
                     }
-                    override fun onPoiItemSearched(item: PoiItem?, rCode: Int) {}
-                })
-                search.searchPOIAsyn()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onResult(emptyList())
-            }
+                    val items = result.allPoi?.map {
+                        AppPoiItem(it.name ?: "", it.address ?: "", it.location.latitude, it.location.longitude)
+                    } ?: emptyList()
+                    onResult(items)
+                    mPoiSearch.destroy()
+                }
+                override fun onGetPoiDetailResult(p0: com.baidu.mapapi.search.poi.PoiDetailResult?) {}
+                override fun onGetPoiDetailResult(p0: com.baidu.mapapi.search.poi.PoiDetailSearchResult?) {}
+                override fun onGetPoiIndoorResult(p0: com.baidu.mapapi.search.poi.PoiIndoorResult?) {}
+            })
+            val option = com.baidu.mapapi.search.poi.PoiCitySearchOption()
+                .city("全国")
+                .keyword(keyword)
+                .pageNum(0)
+                .pageCapacity(20)
+            mPoiSearch.searchInCity(option)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onResult(emptyList())
         }
-        AppMapProvider.BAIDU_MAPS -> {
-            try {
-                val poiSearch = com.baidu.mapapi.search.poi.PoiSearch.newInstance()
-                poiSearch.setOnGetPoiSearchResultListener(object : com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener {
-                    override fun onGetPoiResult(poiResult: com.baidu.mapapi.search.poi.PoiResult?) {
-                        if (poiResult != null && poiResult.error == com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR) {
-                            onResult(poiResult.allPoi?.mapNotNull { poi ->
-                                val location = poi.location ?: return@mapNotNull null
-                                AppPoiItem(
-                                    title = poi.name ?: "",
-                                    snippet = poi.address ?: poi.city ?: "",
-                                    lat = location.latitude,
-                                    lng = location.longitude
-                                )
-                            } ?: emptyList())
-                        } else {
-                            onResult(emptyList())
-                        }
-                    }
-
-                    override fun onGetPoiDetailResult(detailResult: com.baidu.mapapi.search.poi.PoiDetailSearchResult?) {
-                        // Not used for basic POI search
-                    }
-
-                    override fun onGetPoiIndoorResult(indoorResult: com.baidu.mapapi.search.poi.PoiIndoorResult?) {
-                        // Not used for basic POI search
-                    }
-
-                    @Deprecated("Deprecated in Java", ReplaceWith(""))
-                    override fun onGetPoiDetailResult(detailResult: com.baidu.mapapi.search.poi.PoiDetailResult?) {
-                        // Deprecated method, not used
-                    }
-                })
-
-                poiSearch.searchInCity(com.baidu.mapapi.search.poi.PoiCitySearchOption()
-                    .keyword(keyword)
-                    .pageNum(0)
-                    .pageCapacity(10)
-                    .city(context.getString(R.string.baidu_poi_search_city)) // 全国搜索
-                )
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onResult(emptyList())
-            }
-        }
-        AppMapProvider.GOOGLE_MAPS -> {
-            try {
-                val placesClient = cachedPlacesClient
-                    ?: com.google.android.libraries.places.api.Places.createClient(context.applicationContext)
-                        .also {
-                            cachedPlacesClient = it
-                        }
-                // 使用 Autocomplete 接口：全球关键词搜索，不限制国家/地区
-                // 通过 sessionToken 分组请求，避免重复计费；不设置 country 限制以支持全球搜索
-                val sessionToken =
-                    com.google.android.libraries.places.api.model.AutocompleteSessionToken.newInstance()
-                // 设置覆盖全球的矩形偏移，阻止服务器根据 IP 推断区域，实现真正全球搜索
-                val worldBounds =
-                    com.google.android.libraries.places.api.model.RectangularBounds.newInstance(
-                        com.google.android.gms.maps.model.LatLng(-90.0, -180.0),
-                        com.google.android.gms.maps.model.LatLng(90.0, 180.0)
-                    )
-                val autocompleteRequest =
-                    com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest.builder()
-                        .setQuery(keyword)
-                        .setLocationBias(worldBounds)
-                        .setSessionToken(sessionToken)
-                        .build()
-
-                placesClient.findAutocompletePredictions(autocompleteRequest)
-                    .addOnSuccessListener { autocompleteResponse ->
-                        val predictions = autocompleteResponse.autocompletePredictions
-                        android.util.Log.d(
-                            "SpoofingScreen",
-                            "Autocomplete got ${predictions.size} predictions"
-                        )
-                        if (predictions.isEmpty()) {
-                            android.widget.Toast.makeText(
-                                context,
-                                "No predictions found for: $keyword",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                            onResult(emptyList())
-                            return@addOnSuccessListener
-                        }
-                        // 批量获取前5条预测结果的详情（坐标）
-                        val fetchFields = listOf(
-                            com.google.android.libraries.places.api.model.Place.Field.ID,
-                            com.google.android.libraries.places.api.model.Place.Field.NAME,
-                            com.google.android.libraries.places.api.model.Place.Field.LAT_LNG,
-                            com.google.android.libraries.places.api.model.Place.Field.ADDRESS
-                        )
-                        val resultList = mutableListOf<AppPoiItem>()
-                        val topPredictions = predictions.take(5)
-                        var completedCount = 0
-                        topPredictions.forEach { prediction ->
-                            val fetchRequest =
-                                com.google.android.libraries.places.api.net.FetchPlaceRequest.newInstance(
-                                    prediction.placeId,
-                                    fetchFields
-                                )
-                            placesClient.fetchPlace(fetchRequest)
-                                .addOnSuccessListener { fetchResponse ->
-                                    val place = fetchResponse.place
-                                    val latLng = place.latLng
-                                    if (latLng != null) {
-                                        resultList.add(
-                                            AppPoiItem(
-                                                title = place.name
-                                                    ?: prediction.getPrimaryText(null).toString(),
-                                                snippet = place.address
-                                                    ?: prediction.getSecondaryText(null).toString(),
-                                                lat = latLng.latitude,
-                                                lng = latLng.longitude
-                                            )
-                                        )
-                                    }
-                                }
-                                .addOnCompleteListener {
-                                    completedCount++
-                                    if (completedCount == topPredictions.size) {
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            "Search Success: ${resultList.size} results",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                        onResult(resultList)
-                                    }
-                                }
-                        }
-                    }
-                    .addOnFailureListener { exception ->
-                        android.widget.Toast.makeText(
-                            context,
-                            "Search Error: ${exception.message}",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
-                        android.util.Log.e(
-                            "SpoofingScreen",
-                            "Autocomplete failed: ${exception.message}",
-                            exception
-                        )
+    } else if (isDomestic) {
+        try {
+            val query = PoiSearch.Query(keyword, "", "")
+            query.pageSize = 10
+            query.pageNum = 0
+            val search = PoiSearch(context, query)
+            search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
+                override fun onPoiSearched(result: com.amap.api.services.poisearch.PoiResult?, rCode: Int) {
+                    if (rCode == 1000 && result != null) {
+                        onResult(result.pois?.map { AppPoiItem(it.title ?: "", it.snippet ?: "", it.latLonPoint.latitude, it.latLonPoint.longitude) } ?: emptyList())
+                    } else {
                         onResult(emptyList())
                     }
-            } catch (e: Exception) {
-                android.widget.Toast.makeText(
-                    context,
-                    "Search Catch Error: ${e.message}",
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-                android.util.Log.e("SpoofingScreen", "Places API exception: ${e.message}", e)
-                onResult(emptyList())
+                }
+                override fun onPoiItemSearched(item: PoiItem?, rCode: Int) {}
+            })
+            search.searchPOIAsyn()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onResult(emptyList())
+        }
+    } else {
+        try {
+            val placesClient = cachedPlacesClient ?: com.google.android.libraries.places.api.Places.createClient(context.applicationContext).also {
+                cachedPlacesClient = it
             }
+            // 使用 Autocomplete 接口：全球关键词搜索，不限制国家/地区
+            // 通过 sessionToken 分组请求，避免重复计费；不设置 country 限制以支持全球搜索
+            val sessionToken = com.google.android.libraries.places.api.model.AutocompleteSessionToken.newInstance()
+            // 设置覆盖全球的矩形偏移，阻止服务器根据 IP 推断区域，实现真正全球搜索
+            val worldBounds = com.google.android.libraries.places.api.model.RectangularBounds.newInstance(
+                com.google.android.gms.maps.model.LatLng(-90.0, -180.0),
+                com.google.android.gms.maps.model.LatLng(90.0, 180.0)
+            )
+            val autocompleteRequest = com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest.builder()
+                .setQuery(keyword)
+                .setLocationBias(worldBounds)
+                .setSessionToken(sessionToken)
+                .build()
+
+            placesClient.findAutocompletePredictions(autocompleteRequest)
+                .addOnSuccessListener { autocompleteResponse ->
+                    val predictions = autocompleteResponse.autocompletePredictions
+                    android.util.Log.d("SpoofingScreen", "Autocomplete got ${predictions.size} predictions")
+                    if (predictions.isEmpty()) {
+                        android.widget.Toast.makeText(context, "No predictions found for: $keyword", android.widget.Toast.LENGTH_SHORT).show()
+                        onResult(emptyList())
+                        return@addOnSuccessListener
+                    }
+                    // 批量获取前5条预测结果的详情（坐标）
+                    val fetchFields = listOf(
+                        com.google.android.libraries.places.api.model.Place.Field.ID,
+                        com.google.android.libraries.places.api.model.Place.Field.NAME,
+                        com.google.android.libraries.places.api.model.Place.Field.LAT_LNG,
+                        com.google.android.libraries.places.api.model.Place.Field.ADDRESS
+                    )
+                    val resultList = mutableListOf<AppPoiItem>()
+                    val topPredictions = predictions.take(5)
+                    var completedCount = 0
+                    topPredictions.forEach { prediction ->
+                        val fetchRequest = com.google.android.libraries.places.api.net.FetchPlaceRequest.newInstance(prediction.placeId, fetchFields)
+                        placesClient.fetchPlace(fetchRequest)
+                            .addOnSuccessListener { fetchResponse ->
+                                val place = fetchResponse.place
+                                val latLng = place.latLng
+                                if (latLng != null) {
+                                    resultList.add(AppPoiItem(
+                                        title = place.name ?: prediction.getPrimaryText(null).toString(),
+                                        snippet = place.address ?: prediction.getSecondaryText(null).toString(),
+                                        lat = latLng.latitude,
+                                        lng = latLng.longitude
+                                    ))
+                                }
+                            }
+                            .addOnCompleteListener {
+                                completedCount++
+                                if (completedCount == topPredictions.size) {
+                                    android.widget.Toast.makeText(context, "Search Success: ${resultList.size} results", android.widget.Toast.LENGTH_SHORT).show()
+                                    onResult(resultList)
+                                }
+                            }
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    android.widget.Toast.makeText(context, "Search Error: ${exception.message}", android.widget.Toast.LENGTH_LONG).show()
+                    android.util.Log.e("SpoofingScreen", "Autocomplete failed: ${exception.message}", exception)
+                    onResult(emptyList())
+                }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Search Catch Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            android.util.Log.e("SpoofingScreen", "Places API exception: ${e.message}", e)
+            onResult(emptyList())
         }
     }
 }

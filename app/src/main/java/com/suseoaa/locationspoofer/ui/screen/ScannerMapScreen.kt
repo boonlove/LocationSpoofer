@@ -56,7 +56,8 @@ fun ScannerMapScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         AppMapView(
-            mapProvider = uiState.mapProvider,
+            mapEngine = uiState.mapEngine,
+            isDomestic = uiState.currentLanguage == "zh",
             modifier = Modifier.fillMaxSize(),
             onMapReady = { controller ->
                 mapController = controller
@@ -143,6 +144,8 @@ fun ScannerMapScreen(
         MapTypeDialog(
             currentMapType = uiState.mapType,
             onMapTypeSelected = { viewModel.setMapType(it) },
+            currentMapEngine = uiState.mapEngine,
+            onMapEngineSelected = { viewModel.setMapEngine(it) },
             onDismiss = { showMapTypeDialog = false }
         )
     }

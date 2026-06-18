@@ -5,14 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
+import com.google.android.gms.location.LocationServices
 import com.suseoaa.locationspoofer.data.model.AppState
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.SimMode
 import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.data.repository.LocationRepository
 import com.suseoaa.locationspoofer.data.repository.SettingsRepository
 import com.suseoaa.locationspoofer.provider.SpooferProvider
@@ -28,6 +29,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -42,15 +44,15 @@ class MainViewModel(
 
     private val _uiState = MutableStateFlow(
         AppState(
-            mapProvider = try {
-                AppMapProvider.valueOf(settingsRepository.getMapProvider())
-            } catch (e: Exception) {
-                AppMapProvider.AMAP
-            },
             mapType = try {
                 AppMapType.valueOf(settingsRepository.getMapType())
             } catch (e: Exception) {
                 AppMapType.NORMAL
+            },
+            mapEngine = try {
+                com.suseoaa.locationspoofer.data.model.MapEngine.valueOf(settingsRepository.getMapEngine())
+            } catch (e: Exception) {
+                com.suseoaa.locationspoofer.data.model.MapEngine.AUTO
             },
             savedLocations = settingsRepository.getSavedLocations(),
             currentLanguage = settingsRepository.getLanguage(),
@@ -106,7 +108,8 @@ class MainViewModel(
                     longitudeInput = if (settingsRepository.isSpoofingActive) settingsRepository.lastSpoofedLng else it.longitudeInput,
                     routePlanStage = RoutePlanStage.IDLE,
                     amapApiKey = settingsRepository.getAmapApiKey(),
-                    baiduMapsApiKey = settingsRepository.getBaiduMapsApiKey(),
+                    baiduApiKey = settingsRepository.getBaiduApiKey(),
+                    googleApiKey = settingsRepository.getGoogleApiKey(),
                     appSha1 = getAppSignatureSHA1()
                 )
             }
@@ -134,14 +137,14 @@ class MainViewModel(
         _uiState.update { it.copy(currentLanguage = langCode) }
     }
 
-    fun setMapProvider(type: AppMapProvider) {
-        settingsRepository.setMapProvider(type.name)
-        _uiState.update { it.copy(mapProvider = type) }
-    }
-
     fun setMapType(type: AppMapType) {
         settingsRepository.setMapType(type.name)
         _uiState.update { it.copy(mapType = type) }
+    }
+
+    fun setMapEngine(engine: com.suseoaa.locationspoofer.data.model.MapEngine) {
+        settingsRepository.setMapEngine(engine.name)
+        _uiState.update { it.copy(mapEngine = engine) }
     }
 
     fun setSearchMode(mode: com.suseoaa.locationspoofer.data.model.SearchMode) {
@@ -225,16 +228,23 @@ class MainViewModel(
 
     // 当前位置获取
 
-    fun isDomesticEnvironment(): AppMapProvider {
-        return uiState.value.mapProvider
+    fun isDomesticEnvironment(): Boolean {
+        val lang = getSavedLanguage()
+        return lang == "zh" || (lang.isEmpty() && java.util.Locale.getDefault().language == "zh")
     }
 
-   //  判断设备是否开启了位置服务（GPS/网络定位）
+    //  判断设备是否开启了位置服务（GPS/网络定位）
 
     fun isLocationEnabled(ctx: Context): Boolean {
         val locationManager = ctx.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
         return locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
-               locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+                locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+    }
+
+    private val activeEngine = if (uiState.value.mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AUTO) {
+        if (isDomesticEnvironment()) com.suseoaa.locationspoofer.data.model.MapEngine.AMAP else com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE
+    } else {
+        uiState.value.mapEngine
     }
 
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
@@ -246,106 +256,104 @@ class MainViewModel(
                 }
                 return@launch
             }
-            val mapProvider = isDomesticEnvironment()
-            when (mapProvider) {
-                AppMapProvider.AMAP -> {
-                    if (uiState.value.amapApiKey.isBlank()) {
-                        // 未配置 Api Key 时直接使用原生定位
+            if (activeEngine == MapEngine.AMAP) {
+                if (uiState.value.amapApiKey.isBlank()) {
+                    // 未配置 Api Key 时直接使用原生定位
+                    fallbackToNativeLocation(ctx, forceCallback, true)
+                    return@launch
+                }
+                val client = try {
+                    AMapLocationClient(ctx.applicationContext)
+                } catch (e: Exception) {
+                    return@launch
+                }
+                client.setLocationOption(AMapLocationClientOption().apply {
+                    locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                    isOnceLocation = true
+                    isNeedAddress = false // 禁用逆地理编码，防止因未开通Web服务导致 SERVICE_NOT_EXIST 鉴权错误
+                })
+                client.setLocationListener { loc ->
+                    if (loc != null && loc.errorCode == 0) {
+                        if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
+                            _uiState.update {
+                                it.copy(
+                                    latitudeInput = String.format("%.6f", loc.latitude),
+                                    longitudeInput = String.format("%.6f", loc.longitude),
+                                    showCoordinateError = false
+                                )
+                            }
+                            forceCallback?.invoke(loc.latitude, loc.longitude)
+                        }
+                    } else {
+                        // 如果鉴权失败(如 SERVICE_NOT_EXIST)或其他错误，回退到原生定位
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(
+                                com.suseoaa.locationspoofer.R.string.amap_restricted_fallback,
+                                ctx.getString(com.suseoaa.locationspoofer.R.string.app_amap)
+                            ),
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
                         fallbackToNativeLocation(ctx, forceCallback, true)
-                        return@launch
                     }
-                    val client = try {
-                        AMapLocationClient(ctx.applicationContext)
-                    } catch (e: Exception) {
-                        return@launch
-                    }
-                    client.setLocationOption(AMapLocationClientOption().apply {
-                        locationMode = AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                        isOnceLocation = true
-                        isNeedAddress = false // 禁用逆地理编码，防止因未开通Web服务导致 SERVICE_NOT_EXIST 鉴权错误
-                    })
-                    client.setLocationListener { loc ->
-                        if (loc != null && loc.errorCode == 0) {
+                    client.stopLocation()
+                    client.onDestroy()
+                }
+                client.startLocation()
+            } else if (activeEngine == MapEngine.BAIDU) {
+                if (uiState.value.baiduApiKey.isBlank()) {
+                    // 未配置 Api Key 时直接使用原生定位
+                    fallbackToNativeLocation(ctx, forceCallback, true)
+                    return@launch
+                }
+                val client = try {
+                    com.baidu.location.LocationClient(ctx.applicationContext)
+                } catch (e: Exception) {
+                    return@launch
+                }
+                client.setLocOption(com.baidu.location.LocationClientOption().apply {
+                    openGps = true                          // 打开GPS
+                    coorType = "gcj02"                      // GCJ02坐标(与地图SDK setCoordType一致)
+                    setOnceLocation(true)                   // 单次定位
+                    setIsNeedAddress(false)                 // 不需要地址信息
+                    scanSpan = 0                            // 单次定位间隔
+                    locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
+                })
+                val listener = object : com.baidu.location.BDAbstractLocationListener() {
+                    override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
+                        if (location != null &&
+                            location.locType != com.baidu.location.BDLocation.TypeNone &&
+                            location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
+                            (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
+                        ) {
                             if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
                                 _uiState.update {
                                     it.copy(
-                                        latitudeInput = String.format("%.6f", loc.latitude),
-                                        longitudeInput = String.format("%.6f", loc.longitude),
+                                        latitudeInput = String.format("%.6f", location.latitude),
+                                        longitudeInput = String.format("%.6f", location.longitude),
                                         showCoordinateError = false
                                     )
                                 }
-                                forceCallback?.invoke(loc.latitude, loc.longitude)
+                                forceCallback?.invoke(location.latitude, location.longitude)
                             }
                         } else {
-                            // 如果鉴权失败(如 SERVICE_NOT_EXIST)或其他错误，回退到原生定位
+                            // 百度定位失败，回退到原生定位
                             android.widget.Toast.makeText(
                                 ctx,
-                                ctx.getString(com.suseoaa.locationspoofer.R.string.amap_restricted_fallback, ctx.getString(com.suseoaa.locationspoofer.R.string.amap)),
+                                ctx.getString(com.suseoaa.locationspoofer.R.string.amap_restricted_fallback, ctx.getString(com.suseoaa.locationspoofer.R.string.app_baidumap)),
                                 android.widget.Toast.LENGTH_LONG
                             ).show()
                             fallbackToNativeLocation(ctx, forceCallback, true)
                         }
-                        client.stopLocation()
-                        client.onDestroy()
+                        client.unRegisterLocationListener(this)
+                        client.stop()
                     }
-                    client.startLocation()
                 }
-                AppMapProvider.BAIDU_MAPS -> {
-                    if (uiState.value.baiduMapsApiKey.isBlank()) {
-                        // 未配置 Api Key 时直接使用原生定位
-                        fallbackToNativeLocation(ctx, forceCallback, true)
-                        return@launch
-                    }
-                    val client = try {
-                        com.baidu.location.LocationClient(ctx.applicationContext)
-                    } catch (e: Exception) {
-                        return@launch
-                    }
-                    client.setLocOption(com.baidu.location.LocationClientOption().apply {
-                        openGps = true                          // 打开GPS
-                        coorType = "gcj02"                      // GCJ02坐标(与地图SDK setCoordType一致)
-                        setOnceLocation(true)                   // 单次定位
-                        setIsNeedAddress(false)                 // 不需要地址信息
-                        scanSpan = 0                            // 单次定位间隔
-                        locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
-                    })
-                    val listener = object : com.baidu.location.BDAbstractLocationListener() {
-                        override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
-                            if (location != null &&
-                                location.locType != com.baidu.location.BDLocation.TypeNone &&
-                                location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
-                                (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
-                            ) {
-                                if (_uiState.value.longitudeInput.isEmpty() || _uiState.value.latitudeInput.isEmpty() || forceCallback != null) {
-                                    _uiState.update {
-                                        it.copy(
-                                            latitudeInput = String.format("%.6f", location.latitude),
-                                            longitudeInput = String.format("%.6f", location.longitude),
-                                            showCoordinateError = false
-                                        )
-                                    }
-                                    forceCallback?.invoke(location.latitude, location.longitude)
-                                }
-                            } else {
-                                // 百度定位失败，回退到原生定位
-                                android.widget.Toast.makeText(
-                                    ctx,
-                                    ctx.getString(com.suseoaa.locationspoofer.R.string.amap_restricted_fallback, ctx.getString(com.suseoaa.locationspoofer.R.string.baidu_maps)),
-                                    android.widget.Toast.LENGTH_LONG
-                                ).show()
-                                fallbackToNativeLocation(ctx, forceCallback, true)
-                            }
-                            client.unRegisterLocationListener(this)
-                            client.stop()
-                        }
-                    }
-                    client.registerLocationListener(listener)
-                    client.start()
-                }
-                AppMapProvider.GOOGLE_MAPS -> {
-                    // 海外直接使用原生定位(WGS84)
-                    fallbackToNativeLocation(ctx, forceCallback, false)
-                }
+                client.registerLocationListener(listener)
+                client.start()
+            } else {
+                // 海外直接使用原生定位(WGS84)
+                fallbackToNativeLocation(ctx, forceCallback, false)
             }
         }
     }
@@ -421,69 +429,74 @@ class MainViewModel(
             cont.resume(null)
             return@suspendCoroutine
         }
-        val mapProvider = isDomesticEnvironment()
-        when (mapProvider) {
-            AppMapProvider.AMAP -> {
-                val client = try {
-                    com.amap.api.location.AMapLocationClient(ctx.applicationContext)
-                } catch (e: Exception) {
-                    cont.resume(null)
-                    return@suspendCoroutine
+        if (activeEngine == MapEngine.AMAP) {
+            if (uiState.value.amapApiKey.isBlank()) {
+                // 未配置 Api Key 时直接使用原生定位
+                fallbackToNativeLocationSilent(ctx, true, cont)
+                return@suspendCoroutine
+            }
+            val client = try {
+                com.amap.api.location.AMapLocationClient(ctx.applicationContext)
+            } catch (e: Exception) {
+                cont.resume(null)
+                return@suspendCoroutine
+            }
+            client.setLocationOption(com.amap.api.location.AMapLocationClientOption().apply {
+                locationMode =
+                    com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                isOnceLocation = true
+                isNeedAddress = false
+            })
+            client.setLocationListener { loc ->
+                if (loc != null && loc.errorCode == 0) {
+                    cont.resume(Pair(loc.latitude, loc.longitude))
+                } else {
+                    fallbackToNativeLocationSilent(ctx, true, cont)
                 }
-                client.setLocationOption(com.amap.api.location.AMapLocationClientOption().apply {
-                    locationMode =
-                        com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                    isOnceLocation = true
-                    isNeedAddress = false
-                })
-                client.setLocationListener { loc ->
-                    if (loc != null && loc.errorCode == 0) {
-                        cont.resume(Pair(loc.latitude, loc.longitude))
+                client.stopLocation()
+                client.onDestroy()
+            }
+            client.startLocation()
+        } else if (activeEngine == MapEngine.BAIDU) {
+            if (uiState.value.baiduApiKey.isBlank()) {
+                // 未配置 Api Key 时直接使用原生定位
+                fallbackToNativeLocationSilent(ctx, true, cont)
+                return@suspendCoroutine
+            }
+            val client = try {
+                com.baidu.location.LocationClient(ctx.applicationContext)
+            } catch (e: Exception) {
+                cont.resume(null)
+                return@suspendCoroutine
+            }
+            client.setLocOption(com.baidu.location.LocationClientOption().apply {
+                openGps = true
+                coorType = "gcj02"
+                setOnceLocation(true)
+                setIsNeedAddress(false)
+                scanSpan = 0
+                locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
+            })
+            val listener = object : com.baidu.location.BDAbstractLocationListener() {
+                override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
+                    if (location != null &&
+                        location.locType != com.baidu.location.BDLocation.TypeNone &&
+                        location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
+                        (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
+                    ) {
+                        cont.resume(Pair(location.latitude, location.longitude))
                     } else {
+                        // 百度定位失败，回退到原生定位
                         fallbackToNativeLocationSilent(ctx, true, cont)
                     }
-                    client.stopLocation()
-                    client.onDestroy()
+                    client.unRegisterLocationListener(this)
+                    client.stop()
                 }
-                client.startLocation()
             }
-            AppMapProvider.BAIDU_MAPS -> {
-                val client = try {
-                    com.baidu.location.LocationClient(ctx.applicationContext)
-                } catch (e: Exception) {
-                    cont.resume(null)
-                    return@suspendCoroutine
-                }
-                client.setLocOption(com.baidu.location.LocationClientOption().apply {
-                    openGps = true
-                    coorType = "gcj02"
-                    setOnceLocation(true)
-                    setIsNeedAddress(false)
-                    scanSpan = 0
-                    locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
-                })
-                val listener = object : com.baidu.location.BDAbstractLocationListener() {
-                    override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
-                        if (location != null &&
-                            location.locType != com.baidu.location.BDLocation.TypeNone &&
-                            location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
-                            (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
-                        ) {
-                            cont.resume(Pair(location.latitude, location.longitude))
-                        } else {
-                            // 百度定位失败，回退到原生定位
-                            fallbackToNativeLocationSilent(ctx, true, cont)
-                        }
-                        client.unRegisterLocationListener(this)
-                        client.stop()
-                    }
-                }
-                client.registerLocationListener(listener)
-                client.start()
-            }
-            AppMapProvider.GOOGLE_MAPS -> {
-                fallbackToNativeLocationSilent(ctx, false, cont)
-            }
+            client.registerLocationListener(listener)
+            client.start()
+        } else {
+            fallbackToNativeLocationSilent(ctx, false, cont)
         }
     }
 
@@ -1248,9 +1261,14 @@ class MainViewModel(
         _uiState.update { it.copy(amapApiKey = key) }
     }
 
-    fun setBaiduMapsKey(key: String) {
-        settingsRepository.setBaiduMapsApiKey(key)
-        _uiState.update { it.copy(baiduMapsApiKey = key) }
+    fun setBaiduApiKey(key: String) {
+        settingsRepository.setBaiduApiKey(key)
+        _uiState.update { it.copy(baiduApiKey = key) }
+    }
+
+    fun setGoogleApiKey(key: String) {
+        settingsRepository.setGoogleApiKey(key)
+        _uiState.update { it.copy(googleApiKey = key) }
     }
 
     @Suppress("DEPRECATION")

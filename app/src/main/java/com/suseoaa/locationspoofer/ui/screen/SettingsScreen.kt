@@ -11,8 +11,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -22,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
-import com.suseoaa.locationspoofer.data.model.AppMapProvider
+import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 
@@ -34,7 +38,8 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
-    var localBaiduMapsApiKey by remember(uiState.baiduMapsApiKey) { mutableStateOf(uiState.baiduMapsApiKey) }
+    var localBaiduApiKey by remember(uiState.baiduApiKey) { mutableStateOf(uiState.baiduApiKey) }
+    var localGoogleApiKey by remember(uiState.googleApiKey) { mutableStateOf(uiState.googleApiKey) }
     val clipboardManager = LocalClipboardManager.current
 
     Column(
@@ -42,7 +47,6 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
-            .verticalScroll(rememberScrollState())
     ) {
         // Header
         Row(
@@ -102,7 +106,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                stringResource(R.string.map_provider_api_kry_config),
+                stringResource(R.string.map_config),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
@@ -153,44 +157,90 @@ fun SettingsScreen(
                     unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = localAmapApiKey,
-                onValueChange = { localAmapApiKey = it },
-                label = { Text(stringResource(R.string.custom_amap_key)) },
-                placeholder = { Text(stringResource(R.string.custom_amap_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+            // Map Engine Selection
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentBlue,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedLabelColor = AccentBlue,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val engines = listOf(
+                    MapEngine.AUTO to "自动匹配",
+                    MapEngine.AMAP to "高德",
+                    MapEngine.BAIDU to "百度",
+                    MapEngine.GOOGLE to "谷歌"
                 )
-            )
-            Spacer(Modifier.height(24.dp))
+                engines.forEach { (engine, label) ->
+                    val isSelected = uiState.mapEngine == engine
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
+                            .border(
+                                1.dp,
+                                if (isSelected) AccentBlue else MaterialTheme.colorScheme.outline,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { viewModel.setMapEngine(engine) }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) AccentBlue else MaterialTheme.colorScheme.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
 
-            OutlinedTextField(
-                value = localBaiduMapsApiKey,
-                onValueChange = { localBaiduMapsApiKey = it },
-                label = { Text(stringResource(R.string.custom_baidu_maps_key)) },
-                placeholder = { Text(stringResource(R.string.custom_amap_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentBlue,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedLabelColor = AccentBlue,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            Spacer(Modifier.height(16.dp))
+
+            // Animated Key Inputs
+            AnimatedVisibility(visible = uiState.mapEngine == MapEngine.AMAP) {
+                OutlinedTextField(
+                    value = localAmapApiKey,
+                    onValueChange = { localAmapApiKey = it },
+                    label = { Text(stringResource(R.string.custom_amap_key)) },
+                    placeholder = { Text(stringResource(R.string.custom_amap_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
                 )
-            )
+            }
 
-            Spacer(Modifier.height(24.dp))
+            AnimatedVisibility(visible = uiState.mapEngine == MapEngine.BAIDU) {
+                OutlinedTextField(
+                    value = localBaiduApiKey,
+                    onValueChange = { localBaiduApiKey = it },
+                    label = { Text(stringResource(R.string.custom_baidu_key)) },
+                    placeholder = { Text(stringResource(R.string.custom_baidu_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
+                )
+            }
+
+            AnimatedVisibility(visible = uiState.mapEngine == MapEngine.GOOGLE) {
+                OutlinedTextField(
+                    value = localGoogleApiKey,
+                    onValueChange = { localGoogleApiKey = it },
+                    label = { Text(stringResource(R.string.custom_google_key)) },
+                    placeholder = { Text(stringResource(R.string.custom_google_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
             Button(
                 onClick = {
                     viewModel.setAmapApiKey(localAmapApiKey)
-                    viewModel.setBaiduMapsKey(localBaiduMapsApiKey)
+                    viewModel.setBaiduApiKey(localBaiduApiKey)
+                    viewModel.setGoogleApiKey(localGoogleApiKey)
                     Toast.makeText(context, context.getString(R.string.restart_required_hint), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -199,79 +249,8 @@ fun SettingsScreen(
             ) {
                 Text(stringResource(R.string.save), modifier = Modifier.padding(vertical = 4.dp))
             }
-
+            
             Spacer(Modifier.height(24.dp))
-
-            // 地图服务切换
-            Text(
-                stringResource(R.string.map_provider),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-            Spacer(Modifier.height(8.dp))
-
-            Map_Provider_LIST.forEach { mapProvider ->
-                MapProviderItem(
-                    option = mapProvider,
-                    isSelected = uiState.mapProvider == mapProvider.value,
-                    onClick = {
-                        when (mapProvider.value) {
-                            AppMapProvider.GOOGLE_MAPS -> {
-                                if (com.suseoaa.locationspoofer.BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank()) {
-                                    viewModel.setMapProvider(mapProvider.value)
-                                } else {
-                                    Toast.makeText(context, context.getString(R.string.google_maps_api_key_not_configured), Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                            else -> {
-                                viewModel.setMapProvider(mapProvider.value)
-                            }
-                        }
-                    }
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-        }
-    }
-}
-
-data class MapProviderOption(val nameResId: Int, val value: AppMapProvider)
-
-val Map_Provider_LIST = listOf(
-    MapProviderOption(R.string.amap, AppMapProvider.AMAP),
-    MapProviderOption(R.string.baidu_maps, AppMapProvider.BAIDU_MAPS),
-    MapProviderOption(R.string.google_map, AppMapProvider.GOOGLE_MAPS)
-)
-
-@Composable
-fun MapProviderItem(
-    option: MapProviderOption,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, AccentBlue) else null,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(option.nameResId),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isSelected) AccentBlue else MaterialTheme.colorScheme.onBackground
-                )
-            }
-            if (isSelected) {
-                RadioButton(selected = true, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = AccentBlue))
-            }
         }
     }
 }

@@ -2,10 +2,12 @@
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 
-# Xposed Framework
+# Xposed Framework (Legacy & LibXposed)
 -keep class de.robv.android.xposed.** { *; }
--keep class com.suseoaa.locationspoofer.xposed.LocationHooker { *; }
 -keep interface de.robv.android.xposed.** { *; }
+-keep class io.github.libxposed.** { *; }
+-keep interface io.github.libxposed.** { *; }
+-keep class com.suseoaa.locationspoofer.xposed.LocationHooker { *; }
 
 # AMap 3DMap & Location SDK
 -keep class com.amap.api.** { *; }
@@ -13,16 +15,25 @@
 -dontwarn com.amap.api.**
 -dontwarn com.autonavi.**
 
-# Baidu Maps SDK
--keep class com.baidu.** {*;}
--keep class vi.com.** {*;}
--keep class com.baidu.vi.** {*;}
+# Baidu Map SDK
+-keep class com.baidu.** { *; }
+-keep class mapsdkvi.com.** { *; }
+-keep class vi.com.gdi.bgl.android.** { *; }
 -dontwarn com.baidu.**
 
 # Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 -keep class kotlinx.coroutines.** { *; }
+
+# Kotlinx Serialization
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+-keep @kotlinx.serialization.Serializable class * {
+    *;
+}
 
 # Models / Utils
 -keep class com.suseoaa.locationspoofer.utils.ConfigManager { *; }

@@ -26,6 +26,8 @@ import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 fun MapTypeDialog(
     currentMapType: AppMapType,
     onMapTypeSelected: (AppMapType) -> Unit,
+    currentMapEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
+    onMapEngineSelected: (com.suseoaa.locationspoofer.data.model.MapEngine) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -78,6 +80,64 @@ fun MapTypeDialog(
                         isSelected = currentMapType == AppMapType.MAP_3D,
                         onClick = {
                             onMapTypeSelected(AppMapType.MAP_3D)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
+                Text(
+                    text = "地图引擎",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MapTypeItem(
+                        title = "自动匹配",
+                        icon = Icons.Rounded.Map,
+                        isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AUTO,
+                        onClick = {
+                            onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.AUTO)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    MapTypeItem(
+                        title = "高德地图",
+                        icon = Icons.Rounded.Map,
+                        isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP,
+                        onClick = {
+                            onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.AMAP)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    MapTypeItem(
+                        title = "百度地图",
+                        icon = Icons.Rounded.Map,
+                        isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU,
+                        onClick = {
+                            onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    MapTypeItem(
+                        title = "谷歌地图",
+                        icon = Icons.Rounded.Map,
+                        isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE,
+                        onClick = {
+                            onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE)
                             onDismiss()
                         },
                         modifier = Modifier.weight(1f)
