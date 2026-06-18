@@ -895,22 +895,40 @@ class LocationHooker : XposedModule() {
                     try { XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "isMocked", amapFalseHook) } catch (e: Throwable) {}
                     // 4. getErrorCode() -> 0（非0表示定位失败）
                     XposedHelpers.findAndHookMethod(amapLocClass, classLoader, "getErrorCode", amapZeroHook)
-                    // 5. getLocationType() -> 1（GPS类型，最可信）
+                    // 5. getLocationType() -> 动态保留网络定位类型，否则强制返回GPS类型（1）
                     XposedHelpers.findAndHookMethod(
                         amapLocClass, classLoader, "getLocationType",
                         object : XC_MethodHook() {
                             override fun afterHookedMethod(param: MethodHookParam) {
                                 val config = readConfig()
-                                if (config != null && config.optBoolean("active", false)) param.result = 1 // 1 = GPS定位
+                                if (config != null && config.optBoolean("active", false)) {
+                                    val originalLocationType = param.result as? Int ?: 1
+                                    // 高德地图SDK中：1代表GPS定位，5代表Wifi网络定位，6代表基站网络定位，12代表系统网络定位
+                                    // 为了防止反作弊SDK检测到在室内（无卫星）却返回GPS定位的异常情况，
+                                    // 我们需要保留原有的网络定位类型，使其显得更加真实自然。
+                                    if (originalLocationType == 5 || originalLocationType == 6 || originalLocationType == 12) {
+                                        param.result = originalLocationType
+                                    } else {
+                                        param.result = 1 // 默认强制设置为GPS定位
+                                    }
+                                }
                             }
                         })
-                    // 6. getProvider() -> "gps"
+                    // 6. getProvider() -> 动态保留网络提供者，否则强制返回"gps"
                     XposedHelpers.findAndHookMethod(
                         amapLocClass, classLoader, "getProvider",
                         object : XC_MethodHook() {
                             override fun afterHookedMethod(param: MethodHookParam) {
                                 val config = readConfig()
-                                if (config != null && config.optBoolean("active", false)) param.result = "gps"
+                                if (config != null && config.optBoolean("active", false)) {
+                                    val originalProvider = param.result as? String ?: "gps"
+                                    // 同样为了真实性，如果原始提供者是网络（network）相关的，则保留原样
+                                    if (originalProvider == "network" || originalProvider.contains("wifi", ignoreCase = true)) {
+                                        param.result = originalProvider
+                                    } else {
+                                        param.result = "gps"
+                                    }
+                                }
                             }
                         })
                     // 7. 直接写底层 mock 相关字段（防反射读字段绕过 getter）
@@ -1065,13 +1083,19 @@ class LocationHooker : XposedModule() {
             return
         }
 
-        // getProvider -> "gps"
+        // 动态保留网络定位提供者标识，避免室内强行返回GPS引发风控检测
         try {
             XposedBridge.hookAllMethods(clazz, "getProvider", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        param.result = "gps"
+                        val originalProvider = param.result as? String ?: "gps"
+                        // 腾讯地图SDK的定位提供者通常也是"gps"或者"network"
+                        if (originalProvider == "network" || originalProvider.contains("wifi", ignoreCase = true)) {
+                            param.result = originalProvider
+                        } else {
+                            param.result = "gps" // 默认强制修改为GPS定位
+                        }
                     }
                 }
             })
@@ -1222,12 +1246,20 @@ class LocationHooker : XposedModule() {
             XposedBridge.hookAllMethods(baiduClazz, "getLatitude", baiduCoordHook)
             XposedBridge.hookAllMethods(baiduClazz, "getLongitude", baiduCoordHook)
 
-            // getLocType -> 61(GPS定位)
+            // getLocType -> 动态保留网络定位类型，适配百度SDK的161和601类型，否则强制返回GPS定位(61)
             XposedBridge.hookAllMethods(baiduClazz, "getLocType", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
-                        param.result = 61 // 61 = BDLocation.TypeGpsLocation
+                        val originalLocationType = param.result as? Int ?: 61
+                        // 百度地图SDK中：61代表GPS定位结果，161代表网络定位结果，601代表某些特殊或离线网络定位结果
+                        // 为了避免在室内环境（如没有GPS信号）强行返回61导致应用侧判定为作弊，
+                        // 我们直接放行原有的网络定位类型，由于经纬度已经被修改，这样显得更加真实自然。
+                        if (originalLocationType == 161 || originalLocationType == 601) {
+                            param.result = originalLocationType
+                        } else {
+                            param.result = 61 // 默认强制修改为GPS定位（61）
+                        }
                     }
                 }
             })
@@ -1322,8 +1354,14 @@ class LocationHooker : XposedModule() {
                             try { XposedHelpers.callMethod(bdLoc, "setLongitude", jittered.second) } catch (e: Throwable) {
                                 try { XposedHelpers.setDoubleField(bdLoc, "mLongitude", jittered.second) } catch (e2: Throwable) {}
                             }
-                            // 只修改定位类型，不强制覆盖坐标系类型
-                            try { XposedHelpers.callMethod(bdLoc, "setLocType", 61) } catch (e: Throwable) {}
+                            // 动态设置定位类型：保留网络定位类型（161和601），其余强制覆盖为GPS定位（61）
+                            try {
+                                val currentLocationType = XposedHelpers.callMethod(bdLoc, "getLocType") as? Int ?: 61
+                                // 如果当前回调原本就是网络定位，那么我们不修改类型，只替换了上面的经纬度坐标
+                                if (currentLocationType != 161 && currentLocationType != 601) {
+                                    XposedHelpers.callMethod(bdLoc, "setLocType", 61)
+                                }
+                            } catch (e: Throwable) { /* 忽略反射调用可能出现的异常 */ }
                         }
                     }
                 )
