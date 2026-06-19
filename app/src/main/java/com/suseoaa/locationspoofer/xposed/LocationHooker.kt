@@ -2590,7 +2590,7 @@ class LocationHooker : XposedModule() {
         }
         val svid = when (type) {
             1 -> 1 + (satIndex * 7) % 32 // GPS
-            3 -> 65 + (satIndex * 3) % 24 // GLONASS
+            3 -> 1 + (satIndex * 3) % 24 // GLONASS (GnssStatus standard is 1-24)
             else -> 1 + (satIndex * 5) % 63 // BDS
         }
 
@@ -2913,17 +2913,19 @@ class LocationHooker : XposedModule() {
                 val config = readConfig()
                 if (config == null || !config.optBoolean("active", false)) return
                 
-                try {
-                    val gnssStatusClass = classLoader.loadClass("android.location.GnssStatus")
-                    val unsafeClass = classLoader.loadClass("sun.misc.Unsafe")
-                    val theUnsafeField = unsafeClass.getDeclaredField("theUnsafe")
-                    theUnsafeField.isAccessible = true
-                    val unsafe = theUnsafeField.get(null)
-                    val allocateMethod = unsafeClass.getMethod("allocateInstance", Class::class.java)
-                    val dummyGnssStatus = allocateMethod.invoke(unsafe, gnssStatusClass)
-                    
-                    XposedHelpers.callMethod(callback, "onSatelliteStatusChanged", dummyGnssStatus)
-                } catch (e: Throwable) {}
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        val gnssStatusClass = classLoader.loadClass("android.location.GnssStatus")
+                        val unsafeClass = classLoader.loadClass("sun.misc.Unsafe")
+                        val theUnsafeField = unsafeClass.getDeclaredField("theUnsafe")
+                        theUnsafeField.isAccessible = true
+                        val unsafe = theUnsafeField.get(null)
+                        val allocateMethod = unsafeClass.getMethod("allocateInstance", Class::class.java)
+                        val dummyGnssStatus = allocateMethod.invoke(unsafe, gnssStatusClass)
+                        
+                        XposedHelpers.callMethod(callback, "onSatelliteStatusChanged", dummyGnssStatus)
+                    } catch (e: Throwable) {}
+                }
             }
         }, 1000L, 1000L)
     }
@@ -2941,10 +2943,12 @@ class LocationHooker : XposedModule() {
                 val config = readConfig()
                 if (config == null || !config.optBoolean("active", false)) return
                 
-                try {
-                    // event 4 = GPS_EVENT_SATELLITE_STATUS
-                    XposedHelpers.callMethod(callback, "onGpsStatusChanged", 4)
-                } catch (e: Throwable) {}
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    try {
+                        // event 4 = GPS_EVENT_SATELLITE_STATUS
+                        XposedHelpers.callMethod(callback, "onGpsStatusChanged", 4)
+                    } catch (e: Throwable) {}
+                }
             }
         }, 1000L, 1000L)
     }
@@ -2965,7 +2969,8 @@ class LocationHooker : XposedModule() {
 
             for (i in 0 until count) {
                 val data = generateSatelliteData(i, deltaTimeMin, enableJitter, timeSec)
-                val sat = constructor.newInstance(data.svid)
+                val prn = if (data.type == 3) data.svid + 64 else data.svid
+                val sat = constructor.newInstance(prn)
                 try { XposedHelpers.setBooleanField(sat, "mValid", true) } catch (e: Throwable) {}
                 try { XposedHelpers.setBooleanField(sat, "mHasEphemeris", true) } catch (e: Throwable) {}
                 try { XposedHelpers.setBooleanField(sat, "mHasAlmanac", true) } catch (e: Throwable) {}
@@ -3088,15 +3093,17 @@ class LocationHooker : XposedModule() {
                 
                 // Dispatch all sentences to the listener
                 val timestamp = System.currentTimeMillis()
-                for (sentence in sentences) {
-                    try {
-                        if (methodName == "onNmeaMessage") {
-                            XposedHelpers.callMethod(listener, methodName, sentence, timestamp)
-                        } else {
-                            XposedHelpers.callMethod(listener, methodName, timestamp, sentence)
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    for (sentence in sentences) {
+                        try {
+                            if (methodName == "onNmeaMessage") {
+                                XposedHelpers.callMethod(listener, methodName, sentence, timestamp)
+                            } else {
+                                XposedHelpers.callMethod(listener, methodName, timestamp, sentence)
+                            }
+                        } catch (e: Throwable) {
+                            // Ignore exceptions from closed/destroyed listeners
                         }
-                    } catch (e: Throwable) {
-                        // Ignore exceptions from closed/destroyed listeners
                     }
                 }
             }
@@ -3123,7 +3130,8 @@ class LocationHooker : XposedModule() {
             for (i in startIndex until endIndex) {
                 val sat = sats[i]
                 sb.append(",")
-                sb.append(String.format("%02d", sat.svid))
+                val prn = if (talkerId == "GL") sat.svid + 64 else sat.svid
+                sb.append(String.format("%02d", prn))
                 sb.append(",")
                 sb.append(String.format("%02d", sat.elevation.toInt()))
                 sb.append(",")
