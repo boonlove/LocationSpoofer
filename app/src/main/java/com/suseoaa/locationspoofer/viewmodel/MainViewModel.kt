@@ -630,40 +630,44 @@ class MainViewModel(
             return
         }
         
-        val allRecords = state.manageDataList
-        val validRecords = mutableListOf<com.suseoaa.locationspoofer.data.db.CompleteLocation>()
-        
-        for (record in allRecords) {
-            val loc = record.location
-            val dLat = Math.toRadians(lat - loc.lat)
-            val dLng = Math.toRadians(lng - loc.lng)
-            val a = kotlin.math.sin(dLat / 2).let { it * it } + 
-                    kotlin.math.cos(Math.toRadians(loc.lat)) * 
-                    kotlin.math.cos(Math.toRadians(lat)) * 
-                    kotlin.math.sin(dLng / 2).let { it * it }
-            val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+        viewModelScope.launch(Dispatchers.IO) {
+            val allRecords = environmentDao.getAllCompleteLocations()
+            val validRecords = mutableListOf<com.suseoaa.locationspoofer.data.db.CompleteLocation>()
             
-            if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
-                validRecords.add(record)
+            for (record in allRecords) {
+                val loc = record.location
+                val dLat = Math.toRadians(lat - loc.lat)
+                val dLng = Math.toRadians(lng - loc.lng)
+                val a = kotlin.math.sin(dLat / 2).let { it * it } + 
+                        kotlin.math.cos(Math.toRadians(loc.lat)) * 
+                        kotlin.math.cos(Math.toRadians(lat)) * 
+                        kotlin.math.sin(dLng / 2).let { it * it }
+                val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+                
+                if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
+                    validRecords.add(record)
+                }
             }
-        }
-        
-        if (validRecords.isEmpty()) {
-            _uiState.update { 
-                it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false,
-                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
-            }
-        } else {
-            val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
-            val hasW = wifiJson != "[]"
-            val hasC = cellJson != "[]"
-            val hasB = btJson != "[]"
             
-            _uiState.update { 
-                it.copy(
-                    canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
-                    collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson
-                ) 
+            withContext(Dispatchers.Main) {
+                if (validRecords.isEmpty()) {
+                    _uiState.update { 
+                        it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false,
+                                collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
+                    }
+                } else {
+                    val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
+                    val hasW = wifiJson != "[]"
+                    val hasC = cellJson != "[]"
+                    val hasB = btJson != "[]"
+                    
+                    _uiState.update { 
+                        it.copy(
+                            canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
+                            collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson
+                        ) 
+                    }
+                }
             }
         }
     }
@@ -857,6 +861,7 @@ class MainViewModel(
                 showCoordinateError = false
             )
         }
+        evaluateMockCapabilities()
     }
 
     /** 清除地图选点状态 */
