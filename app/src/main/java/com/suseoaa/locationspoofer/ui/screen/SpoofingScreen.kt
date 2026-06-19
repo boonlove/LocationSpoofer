@@ -2009,29 +2009,31 @@ fun StartSpoofingDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val tintW = if (uiState.canMockWifi) AccentBlue else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                    val colorW = if (uiState.canMockWifi) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                    Icon(Icons.Outlined.Wifi, null, tint = tintW, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_wifi_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorW)
-                    Switch(checked = uiState.mockWifi && uiState.canMockWifi, onCheckedChange = { onToggleWifi() }, enabled = uiState.canMockWifi)
+                if (uiState.canMockWifi) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Wifi, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.mock_wifi_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                        Switch(checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() })
+                    }
                 }
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val tintC = if (uiState.canMockCell) AccentOrange else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                    val colorC = if (uiState.canMockCell) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                    Icon(Icons.Outlined.CellTower, null, tint = tintC, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_cell_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorC)
-                    Switch(checked = uiState.mockCell && uiState.canMockCell, onCheckedChange = { onToggleCell() }, enabled = uiState.canMockCell)
+                
+                if (uiState.canMockCell) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.CellTower, null, tint = AccentOrange, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.mock_cell_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                        Switch(checked = uiState.mockCell, onCheckedChange = { onToggleCell() })
+                    }
                 }
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val tintB = if (uiState.canMockBluetooth) AccentGreen else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                    val colorB = if (uiState.canMockBluetooth) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                    Icon(Icons.Outlined.Bluetooth, null, tint = tintB, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(R.string.mock_bluetooth_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = colorB)
-                    Switch(checked = uiState.mockBluetooth && uiState.canMockBluetooth, onCheckedChange = { onToggleBluetooth() }, enabled = uiState.canMockBluetooth)
+                
+                if (uiState.canMockBluetooth) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Bluetooth, null, tint = AccentGreen, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text(stringResource(R.string.mock_bluetooth_data), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                        Switch(checked = uiState.mockBluetooth, onCheckedChange = { onToggleBluetooth() })
+                    }
                 }
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.GraphicEq, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
