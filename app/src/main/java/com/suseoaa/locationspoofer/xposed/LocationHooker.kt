@@ -2597,7 +2597,7 @@ class LocationHooker : XposedModule() {
         }
         
         // Log satellite generated occasionally or if debugging
-        // XposedBridge.log("[GPS_Spoofer] Generated Sat: type=$type, svid=$svid, cn0=$cn0, elev=$elevation, az=$currentAzimuth")
+        XposedBridge.log("[GPS_Spoofer] Generated Sat: type=$type, svid=$svid, cn0=$cn0, elev=$elevation, az=$currentAzimuth")
 
         val rngFix = java.util.Random(satIndex.toLong() + 2000L)
         val usedInFix = rngFix.nextDouble() < 0.75
@@ -2682,6 +2682,7 @@ class LocationHooker : XposedModule() {
                         if (config != null && config.optBoolean("active", false)) {
                             val count = config.optInt("satellite_count", 20)
                             param.result = count // 卫星可见总数保持稳定，不跳变
+                            XposedBridge.log("[GPS_Spoofer] getSatelliteCount -> $count")
                         }
                     }
                 }
@@ -2701,6 +2702,7 @@ class LocationHooker : XposedModule() {
                             val enableJitter = config.optBoolean("enable_jitter", true)
                             val data = generateSatelliteData(satIndex, deltaTimeMin, enableJitter, timeSec)
                             param.result = data.cn0
+                            // XposedBridge.log("[GPS_Spoofer] getCn0DbHz($satIndex) -> ${data.cn0}")
                         }
                     }
                 }
