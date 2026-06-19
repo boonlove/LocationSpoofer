@@ -252,7 +252,7 @@ fun FullScreenMapPage(
                                 ) {
                                 showApiKeyWarning = true
                             } else if (searchQuery.isNotBlank()) {
-                                performPoiSearch(context, uiState.mapEngine, searchQuery, isDomestic) { r ->
+                                performPoiSearch(context, activeEngine, searchQuery, isDomestic) { r ->
                                     searchResults = r
                                     showSearchResults = r.isNotEmpty()
                                 }

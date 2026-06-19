@@ -331,7 +331,7 @@ fun SpoofingScreen(
                     ) {
                     showApiKeyWarning = true
                 } else if (searchQuery.isNotBlank()) {
-                    performPoiSearch(context, uiState.mapEngine, searchQuery, isDomestic) { results ->
+                    performPoiSearch(context, activeEngine, searchQuery, isDomestic) { results ->
                         searchResults = results
                         showSearchResults = results.isNotEmpty()
                     }
@@ -1752,12 +1752,12 @@ private var cachedPlacesClient: com.google.android.libraries.places.api.net.Plac
 
 fun performPoiSearch(
     context: android.content.Context,
-    mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
+    activeEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
     keyword: String,
     isDomestic: Boolean,
     onResult: (List<AppPoiItem>) -> Unit
 ) {
-    if (mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
+    if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
         try {
             val mPoiSearch = com.baidu.mapapi.search.poi.PoiSearch.newInstance()
             mPoiSearch.setOnGetPoiSearchResultListener(object : com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener {
@@ -1787,7 +1787,7 @@ fun performPoiSearch(
             e.printStackTrace()
             onResult(emptyList())
         }
-    } else if (isDomestic) {
+    } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP) {
         try {
             val query = PoiSearch.Query(keyword, "", "")
             query.pageSize = 10

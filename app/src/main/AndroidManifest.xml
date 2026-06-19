@@ -56,9 +56,6 @@
             </intent-filter>
         </activity>
         <service android:name="com.amap.api.location.APSService" />
-        <service android:name="com.baidu.location.f"
-            android:enabled="true"
-            android:process=":remote"/>
         <service
             android:name=".service.SpoofingService"
             android:enabled="true"
