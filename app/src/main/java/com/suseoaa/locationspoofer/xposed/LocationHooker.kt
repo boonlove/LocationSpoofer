@@ -2613,10 +2613,60 @@ class LocationHooker : XposedModule() {
      */
     private fun hookGnssStatus(classLoader: ClassLoader) {
         try {
+            val locationManagerClazz = XposedHelpers.findClass("android.location.LocationManager", classLoader)
+            
+            // Hook addGpsStatusListener
+            try {
+                XposedBridge.hookAllMethods(locationManagerClazz, "addGpsStatusListener", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            val listener = param.args[0]
+                            if (listener != null) {
+                                startGpsStatusInjector(listener, classLoader)
+                            }
+                        }
+                    }
+                })
+            } catch (e: Throwable) { XposedBridge.log(e) }
+
+            // Hook registerGnssStatusCallback
+            try {
+                XposedBridge.hookAllMethods(locationManagerClazz, "registerGnssStatusCallback", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            var callbackObj: Any? = null
+                            for (arg in param.args) {
+                                if (arg != null && arg.javaClass.name.contains("GnssStatus\$Callback")) {
+                                    callbackObj = arg
+                                    break
+                                }
+                            }
+                            if (callbackObj != null) {
+                                startGnssStatusInjector(callbackObj, classLoader)
+                            }
+                        }
+                    }
+                })
+            } catch (e: Throwable) { XposedBridge.log(e) }
+
+            // Hook GpsStatus.getSatellites() for legacy Apps like DevCheck
+            try {
+                XposedHelpers.findAndHookMethod("android.location.GpsStatus", classLoader, "getSatellites", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val config = readConfig()
+                        if (config != null && config.optBoolean("active", false)) {
+                            param.result = createSpoofedGpsSatellites(classLoader)
+                        }
+                    }
+                })
+            } catch (e: Throwable) { XposedBridge.log(e) }
+
             XposedHelpers.findAndHookMethod(
                 "android.location.GnssStatus", classLoader, "getSatelliteCount",
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val count = config.optInt("satellite_count", 20)
@@ -2630,7 +2680,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "getCn0DbHz",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2650,7 +2700,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "usedInFix",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2666,7 +2716,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "getConstellationType",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2681,7 +2731,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "getAzimuthDegrees",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2698,7 +2748,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "getElevationDegrees",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2716,7 +2766,7 @@ class LocationHooker : XposedModule() {
                 "android.location.GnssStatus", classLoader, "getSvid",
                 Int::class.javaPrimitiveType!!,
                 object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val satIndex = param.args[0] as Int
@@ -2848,6 +2898,99 @@ class LocationHooker : XposedModule() {
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun startGnssStatusInjector(callbackObj: Any, classLoader: ClassLoader) {
+        val weakCallback = java.lang.ref.WeakReference(callbackObj)
+        val timer = java.util.Timer()
+        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
+            override fun run() {
+                val callback = weakCallback.get()
+                if (callback == null) {
+                    timer.cancel()
+                    return
+                }
+                val config = readConfig()
+                if (config == null || !config.optBoolean("active", false)) return
+                
+                try {
+                    val gnssStatusClass = classLoader.loadClass("android.location.GnssStatus")
+                    val unsafeClass = classLoader.loadClass("sun.misc.Unsafe")
+                    val theUnsafeField = unsafeClass.getDeclaredField("theUnsafe")
+                    theUnsafeField.isAccessible = true
+                    val unsafe = theUnsafeField.get(null)
+                    val allocateMethod = unsafeClass.getMethod("allocateInstance", Class::class.java)
+                    val dummyGnssStatus = allocateMethod.invoke(unsafe, gnssStatusClass)
+                    
+                    XposedHelpers.callMethod(callback, "onSatelliteStatusChanged", dummyGnssStatus)
+                } catch (e: Throwable) {}
+            }
+        }, 1000L, 1000L)
+    }
+
+    private fun startGpsStatusInjector(listener: Any, classLoader: ClassLoader) {
+        val weakListener = java.lang.ref.WeakReference(listener)
+        val timer = java.util.Timer()
+        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
+            override fun run() {
+                val callback = weakListener.get()
+                if (callback == null) {
+                    timer.cancel()
+                    return
+                }
+                val config = readConfig()
+                if (config == null || !config.optBoolean("active", false)) return
+                
+                try {
+                    // event 4 = GPS_EVENT_SATELLITE_STATUS
+                    XposedHelpers.callMethod(callback, "onGpsStatusChanged", 4)
+                } catch (e: Throwable) {}
+            }
+        }, 1000L, 1000L)
+    }
+
+    private fun createSpoofedGpsSatellites(classLoader: ClassLoader): Iterable<Any> {
+        val list = ArrayList<Any>()
+        try {
+            val config = readConfig() ?: return list
+            val count = config.optInt("satellite_count", 20)
+            val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
+            val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
+            val timeSec = System.currentTimeMillis() / 1000.0
+            val enableJitter = config.optBoolean("enable_jitter", true)
+
+            val satelliteClass = classLoader.loadClass("android.location.GpsSatellite")
+            val constructor = satelliteClass.getDeclaredConstructor(Int::class.javaPrimitiveType)
+            constructor.isAccessible = true
+
+            for (i in 0 until count) {
+                val data = generateSatelliteData(i, deltaTimeMin, enableJitter, timeSec)
+                val sat = constructor.newInstance(data.svid)
+                try { XposedHelpers.setBooleanField(sat, "mValid", true) } catch (e: Throwable) {}
+                try { XposedHelpers.setBooleanField(sat, "mHasEphemeris", true) } catch (e: Throwable) {}
+                try { XposedHelpers.setBooleanField(sat, "mHasAlmanac", true) } catch (e: Throwable) {}
+                try { XposedHelpers.setBooleanField(sat, "mUsedInFix", data.usedInFix) } catch (e: Throwable) {}
+                try { 
+                    val f = satelliteClass.getDeclaredField("mSnr")
+                    f.isAccessible = true
+                    f.setFloat(sat, data.cn0)
+                } catch (e: Throwable) {}
+                try { 
+                    val f = satelliteClass.getDeclaredField("mElevation")
+                    f.isAccessible = true
+                    f.setFloat(sat, data.elevation)
+                } catch (e: Throwable) {}
+                try { 
+                    val f = satelliteClass.getDeclaredField("mAzimuth")
+                    f.isAccessible = true
+                    f.setFloat(sat, data.azimuth)
+                } catch (e: Throwable) {}
+                list.add(sat)
+            }
+        } catch (e: Throwable) {
+            XposedBridge.log(e)
+        }
+        return list
     }
 
     private fun createOnNmeaMessageListenerProxy(original: Any, classLoader: ClassLoader): Any {
