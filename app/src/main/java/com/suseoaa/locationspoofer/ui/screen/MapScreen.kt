@@ -518,7 +518,7 @@ fun FullScreenMapPage(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(route.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = AppColors.textSecondary(isDark))
                                     }
                                     IconButton(onClick = { viewModel.removeSavedRoute(route) }) {
                                         Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error)
