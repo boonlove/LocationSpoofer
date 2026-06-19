@@ -10,13 +10,15 @@ import androidx.room.RoomDatabase
         LocationConnectedWifi::class,
         WifiDevice::class, LocationWifi::class,
         BluetoothDevice::class, LocationBluetooth::class,
-        CellDevice::class, LocationCell::class
+        CellDevice::class, LocationCell::class,
+        SavedRouteEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun environmentDao(): EnvironmentDao
+    abstract fun savedRouteDao(): SavedRouteDao
 
     companion object {
         @Volatile

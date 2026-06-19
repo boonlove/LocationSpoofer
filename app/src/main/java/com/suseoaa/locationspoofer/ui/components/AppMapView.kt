@@ -37,6 +37,7 @@ interface AppMapController {
     fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float)
     fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker
     fun animateCamera(lat: Double, lng: Double, zoom: Float? = null)
+    fun fitBounds(points: List<Pair<Double, Double>>, padding: Int)
     fun moveCamera(lat: Double, lng: Double, zoom: Float? = null)
     val cameraTargetLat: Double?
     val cameraTargetLng: Double?
@@ -95,6 +96,14 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
     override fun animateCamera(lat: Double, lng: Double, zoom: Float?) {
         if (zoom != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(AMapLatLng(lat, lng), zoom))
         else map.animateCamera(CameraUpdateFactory.newLatLng(AMapLatLng(lat, lng)))
+    }
+    override fun fitBounds(points: List<Pair<Double, Double>>, padding: Int) {
+        if (points.isEmpty()) return
+        val builder = com.amap.api.maps.model.LatLngBounds.Builder()
+        points.forEach { builder.include(AMapLatLng(it.first, it.second)) }
+        try {
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), padding))
+        } catch (e: Exception) { e.printStackTrace() }
     }
     override fun moveCamera(lat: Double, lng: Double, zoom: Float?) {
         if (zoom != null) map.moveCamera(CameraUpdateFactory.newLatLngZoom(AMapLatLng(lat, lng), zoom))
@@ -216,6 +225,14 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
     override fun animateCamera(lat: Double, lng: Double, zoom: Float?) {
         if (zoom != null) map.animateCamera(GCameraUpdateFactory.newLatLngZoom(GLatLng(lat, lng), zoom))
         else map.animateCamera(GCameraUpdateFactory.newLatLng(GLatLng(lat, lng)))
+    }
+    override fun fitBounds(points: List<Pair<Double, Double>>, padding: Int) {
+        if (points.isEmpty()) return
+        val builder = com.google.android.gms.maps.model.LatLngBounds.Builder()
+        points.forEach { builder.include(GLatLng(it.first, it.second)) }
+        try {
+            map.animateCamera(GCameraUpdateFactory.newLatLngBounds(builder.build(), padding))
+        } catch (e: Exception) { e.printStackTrace() }
     }
     override fun moveCamera(lat: Double, lng: Double, zoom: Float?) {
         if (zoom != null) map.moveCamera(GCameraUpdateFactory.newLatLngZoom(GLatLng(lat, lng), zoom))
@@ -362,6 +379,55 @@ class BaiduMapControllerImpl(
         else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(com.baidu.mapapi.model.LatLng(lat, lng))
         map.animateMapStatus(update)
     }
+    override fun fitBounds(points: List<Pair<Double, Double>>, padding: Int) {
+        if (points.isEmpty()) return
+        try {
+            var minLat = 90.0
+            var maxLat = -90.0
+            var minLng = 180.0
+            var maxLng = -180.0
+            points.forEach {
+                if (it.first < minLat) minLat = it.first
+                if (it.first > maxLat) maxLat = it.first
+                if (it.second < minLng) minLng = it.second
+                if (it.second > maxLng) maxLng = it.second
+            }
+            val centerLat = (minLat + maxLat) / 2
+            val centerLng = (minLng + maxLng) / 2
+
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(minLat, minLng, maxLat, maxLng, results)
+            val distance = results[0]
+
+            // 百度地图距离与缩放级别的经验映射
+            // 如果处于小窗模式 (padding 较小)，适当缩小缩放级别以显示更多内容
+            val paddingFactor = if (padding < 50) 1.5f else 1.0f
+            val adjustedDistance = distance * paddingFactor
+
+            val zoom = when {
+                adjustedDistance < 50 -> 20f
+                adjustedDistance < 200 -> 18f
+                adjustedDistance < 500 -> 17f
+                adjustedDistance < 1000 -> 16f
+                adjustedDistance < 2000 -> 15f
+                adjustedDistance < 5000 -> 14f
+                adjustedDistance < 10000 -> 13f
+                adjustedDistance < 20000 -> 12f
+                adjustedDistance < 50000 -> 11f
+                adjustedDistance < 100000 -> 10f
+                adjustedDistance < 200000 -> 9f
+                adjustedDistance < 500000 -> 8f
+                adjustedDistance < 1000000 -> 7f
+                adjustedDistance < 2000000 -> 6f
+                else -> 5f
+            }
+
+            val update = com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(
+                com.baidu.mapapi.model.LatLng(centerLat, centerLng), zoom
+            )
+            map.animateMapStatus(update)
+        } catch (e: Exception) { e.printStackTrace() }
+    }
     override fun moveCamera(lat: Double, lng: Double, zoom: Float?) {
         val update = if (zoom != null) com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(com.baidu.mapapi.model.LatLng(lat, lng), zoom)
         else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(com.baidu.mapapi.model.LatLng(lat, lng))
@@ -472,7 +538,7 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
             modifier = modifier
         )
     } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
-        val baiduMapView = remember {
+        val baiduMapView = remember { 
             val view = com.baidu.mapapi.map.TextureMapView(context)
             view
         }

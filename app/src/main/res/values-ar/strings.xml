@@ -21,6 +21,12 @@
     <string name="movement_speed">سرعة الحركة</string>
     <string name="speed_unit">السرعة (م/ث)</string>
     <string name="joystick_description">استخدم عصا التحكم على الشاشة للتحكم في الاتجاه وتحديث الموقع في الوقت الفعلي</string>
+    <string name="save_route">حفظ المسار</string>
+    <string name="route_name">اسم المسار</string>
+    <string name="save_success">تم الحفظ بنجاح!</string>
+    <string name="route_library">مكتبة المسارات</string>
+    <string name="no_saved_routes">لا توجد مسارات محفوظة</string>
+    <string name="route_nodes_count">%d نقاط</string>
     <string name="cancel">إلغاء</string>
     <string name="start_simulation">بدء المحاكاة</string>
     <string name="back">رجوع</string>

@@ -15,7 +15,8 @@ class LocationRepository(
     private val configManager: ConfigManager,
     private val rootManager: RootManager,
     private val lsposedManager: LSPosedManager,
-    private val settingsManager: com.suseoaa.locationspoofer.utils.SettingsManager
+    private val settingsManager: com.suseoaa.locationspoofer.utils.SettingsManager,
+    private val savedRouteDao: com.suseoaa.locationspoofer.data.db.SavedRouteDao
 ) {
     suspend fun checkRootAccess(): Boolean = rootManager.checkRootAccess()
 
@@ -141,5 +142,23 @@ class LocationRepository(
             })
         }
         return arr.toString()
+    }
+
+    fun getSavedRoutes(): kotlinx.coroutines.flow.Flow<List<com.suseoaa.locationspoofer.data.db.SavedRouteEntity>> {
+        return savedRouteDao.getAllSavedRoutes()
+    }
+
+    suspend fun insertSavedRoute(name: String, points: List<RoutePoint>) {
+        val pointsJson = routePointsToJson(points)
+        savedRouteDao.insertSavedRoute(
+            com.suseoaa.locationspoofer.data.db.SavedRouteEntity(
+                name = name,
+                pointsJson = pointsJson
+            )
+        )
+    }
+
+    suspend fun deleteSavedRoute(route: com.suseoaa.locationspoofer.data.db.SavedRouteEntity) {
+        savedRouteDao.deleteSavedRoute(route)
     }
 }

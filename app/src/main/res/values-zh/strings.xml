@@ -22,6 +22,12 @@
     <string name="speed_unit">速度 (m/s)</string>
     <string name="joystick_description">使用屏幕摇杆控制移动方向，实时更新定位</string>
     <string name="cancel">取消</string>
+    <string name="save_route">保存路线</string>
+    <string name="route_name">路线名称</string>
+    <string name="save_success">收藏成功</string>
+    <string name="route_library">路线库</string>
+    <string name="no_saved_routes">暂无收藏的路线</string>
+    <string name="route_nodes_count">%d 个节点</string>
     <string name="start_simulation">开始模拟</string>
     <string name="back">返回</string>
     <string name="undo">撤销</string>

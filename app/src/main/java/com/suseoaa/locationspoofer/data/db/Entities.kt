@@ -201,3 +201,13 @@ data class CompleteLocation(
     @Relation(entity = LocationCell::class, parentColumn = "id", entityColumn = "locationId")
     val cells: List<LocationWithCell>
 )
+
+@Serializable
+@Entity(tableName = "saved_routes")
+data class SavedRouteEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String,
+    val pointsJson: String, // Store List<RoutePoint> as JSON
+    val timestamp: Long = System.currentTimeMillis()
+)

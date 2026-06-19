@@ -129,14 +129,30 @@ fun FullScreenMapPage(
             }
             map.addMarker(p.lat, p.lng, "${idx + 1}", type)
         }
+
+        // 确保被 clear() 清除的实时位置图标能够重新绘制
+        if (uiState.isSpoofingActive) {
+            val currentLat = uiState.latitudeInput.toDoubleOrNull()
+            val currentLng = uiState.longitudeInput.toDoubleOrNull()
+            if (currentLat != null && currentLng != null) {
+                liveMarker = map.addMarker(
+                    currentLat, currentLng,
+                    context.getString(R.string.current_location),
+                    MarkerType.ORANGE
+                )
+            }
+        }
     }
 
     // 运行中时跟踪实时位置
     val lat = uiState.latitudeInput.toDoubleOrNull()
     val lng = uiState.longitudeInput.toDoubleOrNull()
-    LaunchedEffect(lat, lng, isRunning) {
-        if (isRunning && lat != null && lng != null) {
-            mapRef?.animateCamera(lat, lng)
+    LaunchedEffect(lat, lng, uiState.isSpoofingActive, uiState.routePlanStage) {
+        if (uiState.isSpoofingActive && lat != null && lng != null) {
+            // 只有在非路线规划运行时才跟随坐标点移动镜头，如果是路线规划则需要纵览全局
+            if (uiState.routePlanStage != RoutePlanStage.RUNNING) {
+                mapRef?.animateCamera(lat, lng)
+            }
             // 更新或创建实时位置标记
             if (liveMarker != null) {
                 liveMarker?.setPosition(lat, lng)
@@ -146,6 +162,22 @@ fun FullScreenMapPage(
                     context.getString(R.string.current_location),
                     MarkerType.ORANGE
                 )
+            }
+        }
+    }
+
+    // 根据路线和模式自动缩放
+    LaunchedEffect(isInPipMode, uiState.routePlanStage, routePoints) {
+        if (uiState.routePlanStage == RoutePlanStage.RUNNING && routePoints.size >= 2) {
+            // 路线规划运行时，显示完整的路线范围
+            val padding = if (isInPipMode) 30 else 150
+            mapRef?.fitBounds(routePoints.map { Pair(it.lat, it.lng) }, padding)
+        } else if (isInPipMode) {
+            // 单点定位进入小窗时，放大到 18f
+            val currentLat = uiState.latitudeInput.toDoubleOrNull()
+            val currentLng = uiState.longitudeInput.toDoubleOrNull()
+            if (currentLat != null && currentLng != null) {
+                mapRef?.animateCamera(currentLat, currentLng, 18f)
             }
         }
     }
@@ -163,7 +195,7 @@ fun FullScreenMapPage(
             map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
             val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
-            map.moveCamera(initLat, initLng, 15f)
+            map.moveCamera(initLat, initLng, 18f)
         }
 
         // 选点模式的十字准星
@@ -306,7 +338,7 @@ fun FullScreenMapPage(
                 AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.READY || stage == RoutePlanStage.IDLE) {
                     MapFab(
                         icon = Icons.Rounded.Bookmarks,
-                        contentDescription = "收藏路线",
+                        contentDescription = stringResource(R.string.route_library),
                         containerColor = MaterialTheme.colorScheme.surface,
                         contentColor = AccentBlue
                     ) {
@@ -425,14 +457,17 @@ fun FullScreenMapPage(
     if (showSaveRouteDialog) {
         var routeName by remember { mutableStateOf("") }
         Dialog(onDismissRequest = { showSaveRouteDialog = false }) {
-            Card(shape = RoundedCornerShape(16.dp)) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Text("收藏当前路线", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
                     androidx.compose.material3.OutlinedTextField(
                         value = routeName,
                         onValueChange = { routeName = it },
-                        label = { Text("路线名称") },
+                        label = { Text(stringResource(R.string.route_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -444,9 +479,9 @@ fun FullScreenMapPage(
                         Spacer(Modifier.width(8.dp))
                         Button(onClick = {
                             if (routeName.isNotBlank()) {
-                                viewModel.addSavedRoute(routeName)
+                                viewModel.saveRoute(routeName, routePoints)
+                                Toast.makeText(context, context.getString(R.string.save_success), Toast.LENGTH_SHORT).show()
                                 showSaveRouteDialog = false
-                                Toast.makeText(context, "收藏成功", Toast.LENGTH_SHORT).show()
                             }
                         }) {
                             Text(stringResource(R.string.save))
@@ -459,13 +494,17 @@ fun FullScreenMapPage(
 
     if (showSavedRoutesDialog) {
         Dialog(onDismissRequest = { showSavedRoutesDialog = false }) {
-            Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("路线库", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.route_library), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
                     if (uiState.savedRoutes.isEmpty()) {
                         Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                            Text("暂无收藏的路线", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                            Text(stringResource(R.string.no_saved_routes), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                         }
                     } else {
                         LazyColumn(modifier = Modifier.weight(1f)) {
@@ -479,7 +518,7 @@ fun FullScreenMapPage(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(route.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                        Text("${route.points.size} 个节点", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
                                     }
                                     IconButton(onClick = { viewModel.removeSavedRoute(route) }) {
                                         Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error)
@@ -604,27 +643,41 @@ private fun BottomActionBar(
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = onConfirmPoint,
                         modifier = Modifier.weight(1f).height(52.dp),
                         shape = RoundedCornerShape(14.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                     ) {
-                        Icon(Icons.Rounded.AddLocation, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold)
+                        Icon(Icons.Rounded.AddLocation, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                     Button(
                         onClick = onFinishSelecting,
                         enabled = routePoints.size >= 2,
                         modifier = Modifier.weight(1f).height(52.dp),
                         shape = RoundedCornerShape(14.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
                     ) {
-                        Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.finish_selecting), fontWeight = FontWeight.Bold)
+                        Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.finish_selecting), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onSaveRoute,
+                        enabled = routePoints.size >= 2,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                    ) {
+                        Icon(Icons.Rounded.Star, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(stringResource(R.string.save_route), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 }
             }

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,7 +56,7 @@ class MainViewModel(
                 com.suseoaa.locationspoofer.data.model.MapEngine.AUTO
             },
             savedLocations = settingsRepository.getSavedLocations(),
-            savedRoutes = settingsRepository.getSavedRoutes(),
+            savedRoutes = emptyList(), // Will be populated by Room Flow
             currentLanguage = settingsRepository.getLanguage(),
             isLanguageSet = settingsRepository.isLanguageSet(),
             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
@@ -131,6 +132,26 @@ class MainViewModel(
                         hookedApps = if (active) lsposedManager.getHookedApps(context) else emptyList()
                     )
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            locationRepository.getSavedRoutes().collect { entities ->
+                val routes = entities.map { entity ->
+                    val points = mutableListOf<RoutePoint>()
+                    try {
+                        val arr = org.json.JSONArray(entity.pointsJson)
+                        for (i in 0 until arr.length()) {
+                            val obj = arr.getJSONObject(i)
+                            points.add(RoutePoint(obj.getDouble("lat"), obj.getDouble("lng")))
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+                    com.suseoaa.locationspoofer.data.model.SavedRoute(entity.name, points).apply {
+                        // attach ID dynamically if needed or just use name for deletion
+                        // Currently MapScreen's showSavedRoutesDialog uses route.name
+                    }
+                }
+                _uiState.update { it.copy(savedRoutes = routes) }
             }
         }
     }
@@ -789,6 +810,24 @@ class MainViewModel(
     /** 设置路线运行模式 */
     fun setRouteRunMode(mode: RouteRunMode) {
         _uiState.update { it.copy(routeRunMode = mode) }
+    }
+
+    fun saveRoute(name: String, points: List<RoutePoint>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            locationRepository.insertSavedRoute(name, points)
+        }
+    }
+    
+    fun deleteSavedRoute(route: com.suseoaa.locationspoofer.data.model.SavedRoute) {
+        viewModelScope.launch(Dispatchers.IO) {
+            // we delete by finding the entity with matching name
+            // (a bit hacky but works for now, or we can add delete by name in DAO)
+            val routes = locationRepository.getSavedRoutes().first()
+            val entity = routes.find { it.name == route.name }
+            if (entity != null) {
+                locationRepository.deleteSavedRoute(entity)
+            }
+        }
     }
 
     /** 设置循环模式速度 */

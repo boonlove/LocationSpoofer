@@ -178,4 +178,11 @@
     <string name="merged_updates_badge">Includes %1$d versions of updates</string>
     <string name="brand_github">GitHub</string>
     <string name="brand_telegram">Telegram</string>
+    <string name="save_route">Save Route</string>
+    <string name="route_name">Route Name</string>
+    <string name="save_success">Saved successfully!</string>
+
+    <string name="route_library">Route Library</string>
+    <string name="no_saved_routes">No saved routes</string>
+    <string name="route_nodes_count">%d points</string>
 </resources>
