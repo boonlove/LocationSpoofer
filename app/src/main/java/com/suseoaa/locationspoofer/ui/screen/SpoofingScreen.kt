@@ -1160,13 +1160,24 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
         ) {
             Button(
                 onClick = onStartFixedSpoofing,
+                enabled = !uiState.isSavingConfig,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
-                Icon(Icons.Rounded.MyLocation, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(stringResource(R.string.fixed_simulation), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                if (uiState.isSavingConfig) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Starting...", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                } else {
+                    Icon(Icons.Rounded.MyLocation, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(stringResource(R.string.fixed_simulation), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
             Button(
                 onClick = { viewModel.enterRoutePlanning(); onOpenMap() },

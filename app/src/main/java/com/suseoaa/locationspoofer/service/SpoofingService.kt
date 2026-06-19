@@ -124,6 +124,7 @@ class SpoofingService : Service() {
     private fun stopSpoofing() {
         spoofingJob?.cancel()
         isRunning = false
+        
         removeTestProvider(LocationManager.GPS_PROVIDER)
         removeTestProvider(LocationManager.NETWORK_PROVIDER)
         stopForeground(STOP_FOREGROUND_REMOVE)

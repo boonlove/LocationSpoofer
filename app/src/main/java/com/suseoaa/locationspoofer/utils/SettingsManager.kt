@@ -80,7 +80,7 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putString("altitude", value).apply()
 
     var satelliteCount: String
-        get() = prefs.getString("satellite_count", "20") ?: "20"
+        get() = prefs.getString("satellite_count", "10") ?: "10"
         set(value) = prefs.edit().putString("satellite_count", value).apply()
 
     fun getSavedLocations(): List<SavedLocation> {

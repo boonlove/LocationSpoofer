@@ -56,6 +56,7 @@ data class AppState(
     val longitudeInput: String = "",
     val latitudeInput: String = "",
     val showCoordinateError: Boolean = false,
+    val isSavingConfig: Boolean = false,
     val isSpoofingActive: Boolean = false,
     val wifiLoadStatus: WifiLoadStatus = WifiLoadStatus.IDLE,
     val wifiApCount: Int = 0,

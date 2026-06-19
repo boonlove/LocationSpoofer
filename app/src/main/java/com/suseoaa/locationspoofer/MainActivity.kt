@@ -93,12 +93,19 @@ class MainActivity : ComponentActivity() {
                 ) {
                     MaterialTheme(colorScheme = colorScheme) {
                         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                            MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark)
+                            MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark, isInPipMode = pipModeState)
                         }
                     }
                 }
             }
         }
+    }
+
+    private var pipModeState by mutableStateOf(false)
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        pipModeState = isInPictureInPictureMode
     }
 
     private fun checkAndRequestPermissions() {
@@ -144,6 +151,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (viewModel.uiState.value.isSpoofingActive) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val params = android.app.PictureInPictureParams.Builder().build()
+                enterPictureInPictureMode(params)
+            }
+        }
+    }
 }
 
 private data class MainNavState(
@@ -157,7 +174,8 @@ private data class MainNavState(
 fun MainScreen(
     viewModel: MainViewModel,
     uiState: com.suseoaa.locationspoofer.data.model.AppState,
-    isDark: Boolean
+    isDark: Boolean,
+    isInPipMode: Boolean
 ) {
     var isFullScreenMap by remember { mutableStateOf(false) }
     var isScannerMap by remember { mutableStateOf(false) }
@@ -184,7 +202,7 @@ fun MainScreen(
     }
 
     AnimatedContent(
-        targetState = MainNavState(isFullScreenMap, isScannerMap, uiState.isManageDataScreen, isSettingsScreen),
+        targetState = MainNavState(isFullScreenMap || isInPipMode, isScannerMap && !isInPipMode, uiState.isManageDataScreen && !isInPipMode, isSettingsScreen && !isInPipMode),
         transitionSpec = {
             slideInVertically(tween(400)) { it } togetherWith slideOutVertically(tween(400)) { -it }
         },
@@ -195,6 +213,7 @@ fun MainScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 isDark = isDark,
+                isInPipMode = isInPipMode,
                 onClose = { closeMapAndResetRouteIfNeeded() }
             )
         } else if (navState.scanner) {

@@ -68,6 +68,7 @@ fun FullScreenMapPage(
     viewModel: MainViewModel,
     uiState: AppState,
     isDark: Boolean,
+    isInPipMode: Boolean = false,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -166,7 +167,7 @@ fun FullScreenMapPage(
         }
 
         // 选点模式的十字准星
-        if (stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.IDLE) {
+        if (!isInPipMode && (stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.IDLE)) {
             Icon(
                 Icons.Rounded.AddLocationAlt, null,
                 tint = AccentBlue.copy(alpha = 0.8f),
@@ -184,9 +185,10 @@ fun FullScreenMapPage(
         }
 
         // 顶部栏（含搜索）
-        Column(
-            modifier = Modifier.align(Alignment.TopCenter)
-        ) {
+        if (!isInPipMode) {
+            Column(
+                modifier = Modifier.align(Alignment.TopCenter)
+            ) {
             TopBar(
                 stage = stage,
                 routePointCount = routePoints.size,
@@ -284,99 +286,103 @@ fun FullScreenMapPage(
                 }
             }
         }
+        } // End of if(!isInPipMode) for TopBar
 
         // 右侧定位和图层按钮
-        Column(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            MapFab(
-                icon = Icons.Rounded.Layers,
-                contentDescription = stringResource(R.string.map_type_label),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = AccentBlue
+        if (!isInPipMode) {
+            Column(
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                showMapTypeDialog = true
-            }
-
-            AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.READY || stage == RoutePlanStage.IDLE) {
                 MapFab(
-                    icon = Icons.Rounded.Bookmarks,
-                    contentDescription = "收藏路线",
+                    icon = Icons.Rounded.Layers,
+                    contentDescription = stringResource(R.string.map_type_label),
                     containerColor = MaterialTheme.colorScheme.surface,
                     contentColor = AccentBlue
                 ) {
-                    showSavedRoutesDialog = true
+                    showMapTypeDialog = true
+                }
+
+                AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.READY || stage == RoutePlanStage.IDLE) {
+                    MapFab(
+                        icon = Icons.Rounded.Bookmarks,
+                        contentDescription = "收藏路线",
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = AccentBlue
+                    ) {
+                        showSavedRoutesDialog = true
+                    }
+                }
+
+                MapFab(
+                    icon = Icons.Rounded.MyLocation,
+                    contentDescription = stringResource(R.string.locate_to_current),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = AccentBlue
+                ) {
+                    viewModel.fetchCurrentLocation(context) { lLat, lLng ->
+                        mapRef?.animateCamera(lLat, lLng, 16f)
+                    }
                 }
             }
 
-            MapFab(
-                icon = Icons.Rounded.MyLocation,
-                contentDescription = stringResource(R.string.locate_to_current),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = AccentBlue
+            // 摇杆（仅手动模式运行中）
+            AnimatedVisibility(
+                visible = isRunning && isManual,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 180.dp),
+                enter = slideInVertically(tween(250)) { it / 2 } + fadeIn(tween(250)),
+                exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(tween(200))
             ) {
-                viewModel.fetchCurrentLocation(context) { lLat, lLng ->
-                    mapRef?.animateCamera(lLat, lLng, 16f)
-                }
+                JoystickPanel(viewModel = viewModel, maxSpeedMs = uiState.routeSimMode.speedMs.toFloat())
             }
-        }
-
-        // 摇杆（仅手动模式运行中）
-        AnimatedVisibility(
-            visible = isRunning && isManual,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 180.dp),
-            enter = slideInVertically(tween(250)) { it / 2 } + fadeIn(tween(250)),
-            exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(tween(200))
-        ) {
-            JoystickPanel(viewModel = viewModel, maxSpeedMs = uiState.routeSimMode.speedMs.toFloat())
         }
 
         // IDLE阶段（全屏选点模式）只显示单一确认选点按钮
-        if (stage == RoutePlanStage.IDLE) {
-            Button(
-                onClick = {
-                    val tLat = mapRef?.cameraTargetLat
-                    val tLng = mapRef?.cameraTargetLng
-                    if (tLat != null && tLng != null) {
-                        viewModel.confirmMapPoint(tLat, tLng)
-                        Toast.makeText(context, context.getString(R.string.coordinate_selected), Toast.LENGTH_SHORT).show()
-                        onClose()
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-            ) {
-                Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold)
+        if (!isInPipMode) {
+            if (stage == RoutePlanStage.IDLE) {
+                Button(
+                    onClick = {
+                        val tLat = mapRef?.cameraTargetLat
+                        val tLng = mapRef?.cameraTargetLng
+                        if (tLat != null && tLng != null) {
+                            viewModel.confirmMapPoint(tLat, tLng)
+                            Toast.makeText(context, context.getString(R.string.coordinate_selected), Toast.LENGTH_SHORT).show()
+                            onClose()
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) {
+                    Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold)
+                }
+            } else {
+                // 底部操作栏 (路线规划模式)
+                BottomActionBar(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    stage = stage,
+                    routePoints = routePoints,
+                    onConfirmPoint = {
+                        val tLat = mapRef?.cameraTargetLat
+                        val tLng = mapRef?.cameraTargetLng
+                        if (tLat != null && tLng != null) {
+                            viewModel.addRoutePoint(tLat, tLng)
+                        }
+                    },
+                    onFinishSelecting = { viewModel.finishSelectingPoints() },
+                    onRestartSelecting = { viewModel.restartSelectingPoints() },
+                    onSaveRoute = { showSaveRouteDialog = true },
+                    onStartPlanning = { showConfigDialog = true },
+                    onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
+                )
             }
-        }
- else {
-            // 底部操作栏 (路线规划模式)
-            BottomActionBar(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                stage = stage,
-                routePoints = routePoints,
-                onConfirmPoint = {
-                    val tLat = mapRef?.cameraTargetLat
-                    val tLng = mapRef?.cameraTargetLng
-                    if (tLat != null && tLng != null) {
-                        viewModel.addRoutePoint(tLat, tLng)
-                    }
-                },
-                onFinishSelecting = { viewModel.finishSelectingPoints() },
-                onRestartSelecting = { viewModel.restartSelectingPoints() },
-                onSaveRoute = { showSaveRouteDialog = true },
-                onStartPlanning = { showConfigDialog = true },
-                onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
-            )
         }
     }
 

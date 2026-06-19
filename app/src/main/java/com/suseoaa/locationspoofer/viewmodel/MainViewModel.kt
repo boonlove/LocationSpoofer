@@ -670,6 +670,7 @@ class MainViewModel(
         settingsRepository.lastSpoofedLng = lng.toString()
         
         viewModelScope.launch {
+            _uiState.update { it.copy(isSavingConfig = true) }
             val now = System.currentTimeMillis()
             locationRepository.startSpoofing(
                 context, lat, lng,
@@ -684,8 +685,12 @@ class MainViewModel(
                 state.mockBluetooth && state.canMockBluetooth,
                 state.enableJitter
             )
+            
+            // Wait briefly to ensure root shell syncs to disk fully
+            kotlinx.coroutines.delay(200)
+
             _uiState.update {
-                it.copy(isSpoofingActive = true)
+                it.copy(isSpoofingActive = true, isSavingConfig = false)
             }
         }
     }

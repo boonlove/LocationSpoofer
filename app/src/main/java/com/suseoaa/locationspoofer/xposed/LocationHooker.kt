@@ -1,12 +1,12 @@
 package com.suseoaa.locationspoofer.xposed
 
-import com.suseoaa.locationspoofer.BuildConfig
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface
 import org.json.JSONObject
 import java.io.File
 import java.util.Random
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -220,6 +220,9 @@ class LocationHooker : XposedModule() {
         XposedHelpers.module = this
     }
 
+    private val nmeaTimers = ConcurrentHashMap<Any, java.util.Timer>()
+    private val hookedCallbackClasses = ConcurrentHashMap<Class<*>, Boolean>()
+
     override fun onPackageLoaded(param: XposedModuleInterface.PackageLoadedParam) {
         // Nothing here for now
     }
@@ -243,7 +246,7 @@ class LocationHooker : XposedModule() {
         
 
         // 宿主App自报平安
-        if (pkg == BuildConfig.APPLICATION_ID) {
+        if (pkg == "com.suseoaa.locationspoofer") {
             return // 宿主App不需要注入定位Hook
         }
 
@@ -716,7 +719,7 @@ class LocationHooker : XposedModule() {
                             extras?.remove("mockLocation")
                             extras?.remove("isMock")
                             // ★ Add fake satellites count to bundle
-                            val satCount = config.optInt("satellite_count", 20)
+                            val satCount = config.optInt("satellite_count", 10)
                             if (extras == null) {
                                 val newBundle = android.os.Bundle()
                                 newBundle.putInt("satellites", satCount)
@@ -820,8 +823,8 @@ class LocationHooker : XposedModule() {
             try {
                 val addNmeaListenerHook = object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config == null || !config.optBoolean("active", false)) return
+                        // 强制启动代理注入，无论当前active是true还是false。
+                        // 真正的状态校验在代理注入器的Timer中进行。
                         
                         val args = param.args
                         for (i in args.indices) {
@@ -855,6 +858,18 @@ class LocationHooker : XposedModule() {
                 }
                 val locationManagerClazz = XposedHelpers.findClass("android.location.LocationManager", classLoader)
                 XposedBridge.hookAllMethods(locationManagerClazz, "addNmeaListener", addNmeaListenerHook)
+                
+                // Hook removeNmeaListener
+                XposedBridge.hookAllMethods(locationManagerClazz, "removeNmeaListener", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        for (arg in param.args) {
+                            if (arg != null) {
+                                nmeaTimers.remove(arg)?.cancel()
+                                XposedBridge.log("[GPS_Spoofer] removeNmeaListener called, canceled timer.")
+                            }
+                        }
+                    }
+                })
             } catch (e: Throwable) {
                 XposedBridge.log(e)
             }
@@ -2565,20 +2580,61 @@ class LocationHooker : XposedModule() {
         val usedInFix: Boolean
     )
 
+    private var cachedSatellites: Array<SatelliteData>? = null
+    private var lastSatelliteUpdate: Long = 0L
+    private var isSpoofingActiveCache: Boolean = false
+    private var spoofingCountCache: Int = 0
+
+    private fun updateSatelliteCacheIfNeeded() {
+        val now = System.currentTimeMillis()
+        if (cachedSatellites == null || now - lastSatelliteUpdate > 1000) {
+            val config = readConfig()
+            isSpoofingActiveCache = config?.optBoolean("active", false) ?: false
+            if (isSpoofingActiveCache) {
+                val count = config?.optInt("satellite_count", 10) ?: 10
+                spoofingCountCache = count
+                val startTime = config?.optLong("start_timestamp", now) ?: now
+                val deltaTimeMin = (now - startTime) / 60000.0
+                val timeSec = now / 1000.0
+                val enableJitter = config?.optBoolean("enable_jitter", true) ?: true
+                
+                val newCache = Array(count) { i ->
+                    generateSatelliteData(i, deltaTimeMin, enableJitter, timeSec)
+                }
+                cachedSatellites = newCache
+            }
+            lastSatelliteUpdate = now
+        }
+    }
+
+    private fun getCachedSatellite(satIndex: Int): SatelliteData? {
+        if (!isSpoofingActiveCache || cachedSatellites == null || cachedSatellites!!.isEmpty()) return null
+        val safeIndex = satIndex % cachedSatellites!!.size
+        return cachedSatellites!![safeIndex]
+    }
+
     private fun generateSatelliteData(satIndex: Int, deltaTimeMin: Double, enableJitter: Boolean, timeSec: Double): SatelliteData {
+        // 增量刷新优化 (Incremental Update Optimization):
+        // 强制每个卫星的数据每 4 秒才变化一次，并使用 satIndex 进行错开 (Staggering)。
+        // 这意味着在任何一秒钟，只有 25% 的卫星数据发生变化。
+        // 目标 App 的 DiffUtil 会发现 75% 的卫星数据完全没变，从而跳过大部分 UI 重绘，彻底解决滑动卡顿！
+        val updateIntervalSec = 4.0
+        val steppedTimeSec = Math.floor((timeSec + satIndex) / updateIntervalSec) * updateIntervalSec - satIndex
+        val steppedDeltaTimeMin = steppedTimeSec / 60.0
+
         val rng = java.util.Random(satIndex.toLong() + 1000L)
         val initialPhase = rng.nextDouble() * Math.PI * 2
         val amplitude = 20.0 + rng.nextDouble() * 20.0
         val baseElevation = 30.0 + rng.nextDouble() * 20.0
-        val elevation = (baseElevation + amplitude * Math.sin(deltaTimeMin * 0.05 + initialPhase)).toFloat().coerceIn(0f, 90f)
+        val elevation = (baseElevation + amplitude * Math.sin(steppedDeltaTimeMin * 0.05 + initialPhase)).toFloat().coerceIn(0f, 90f)
 
         val rngAz = java.util.Random(satIndex.toLong() + 4000L)
         val initialAzimuth = rngAz.nextDouble() * 360.0
-        val currentAzimuth = ((initialAzimuth + deltaTimeMin * 0.5) % 360.0).toFloat()
+        val currentAzimuth = ((initialAzimuth + steppedDeltaTimeMin * 0.5) % 360.0).toFloat()
 
         val baseCn0 = 20.0 + (elevation / 90.0) * 20.0
         val noise = if (enableJitter) {
-            val dynamicRng = java.util.Random((timeSec / 3.0).toLong() + satIndex)
+            val dynamicRng = java.util.Random((steppedTimeSec / 3.0).toLong() + satIndex)
             (dynamicRng.nextDouble() - 0.5) * 4.0 // +/- 2 dB
         } else 0.0
         val cn0 = (baseCn0 + noise).coerceIn(10.0, 45.0).toFloat()
@@ -2597,7 +2653,7 @@ class LocationHooker : XposedModule() {
         }
         
         // Log satellite generated occasionally or if debugging
-        XposedBridge.log("[GPS_Spoofer] Generated Sat: type=$type, svid=$svid, cn0=$cn0, elev=$elevation, az=$currentAzimuth")
+        // XposedBridge.log("[GPS_Spoofer] Generated Sat: type=$type, svid=$svid, cn0=$cn0, elev=$elevation, az=$currentAzimuth")
 
         val rngFix = java.util.Random(satIndex.toLong() + 2000L)
         val usedInFix = rngFix.nextDouble() < 0.75
@@ -2624,43 +2680,167 @@ class LocationHooker : XposedModule() {
             try {
                 XposedBridge.hookAllMethods(locationManagerClazz, "addGpsStatusListener", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val listener = param.args[0]
-                            if (listener != null) {
-                                XposedBridge.log("[GPS_Spoofer] Detected addGpsStatusListener! Starting active injector.")
-                                startGpsStatusInjector(listener, classLoader)
+                        val listener = param.args[0]
+                        if (listener != null) {
+                            val clazz = listener.javaClass
+                            if (hookedCallbackClasses.putIfAbsent(clazz, true) == null) {
+                                try {
+                                    XposedBridge.hookAllMethods(clazz, "onGpsStatusChanged", object : XC_MethodHook() {
+                                        private var lastCallTime = 0L
+                                        override fun beforeHookedMethod(innerParam: MethodHookParam) {
+                                            val event = innerParam.args[0] as? Int
+                                            if (event == 4) { // GPS_EVENT_SATELLITE_STATUS
+                                                val now = System.currentTimeMillis()
+                                                if (now - lastCallTime < 1000) {
+                                                    innerParam.result = null // Throttle
+                                                } else {
+                                                    lastCallTime = now
+                                                }
+                                            }
+                                        }
+                                    })
+                                } catch (e: Throwable) {}
                             }
                         }
                     }
                 })
             } catch (e: Throwable) { XposedBridge.log(e) }
+
+            // Hook removeGpsStatusListener
+            try {
+                XposedBridge.hookAllMethods(locationManagerClazz, "removeGpsStatusListener", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        // No longer needed
+                    }
+                })
+            } catch (e: Throwable) {}
 
             // Hook registerGnssStatusCallback
             try {
                 XposedBridge.hookAllMethods(locationManagerClazz, "registerGnssStatusCallback", object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            var callbackObj: Any? = null
-                            val cbClass = try {
-                                classLoader.loadClass("android.location.GnssStatus\$Callback")
-                            } catch (e: Exception) { null }
+                        var callbackObj: Any? = null
+                        val cbClass = try {
+                            classLoader.loadClass("android.location.GnssStatus\$Callback")
+                        } catch (e: Exception) { null }
 
-                            for (arg in param.args) {
-                                if (arg != null && cbClass != null && cbClass.isInstance(arg)) {
-                                    callbackObj = arg
-                                    break
-                                }
+                        for (arg in param.args) {
+                            if (arg != null && cbClass != null && cbClass.isInstance(arg)) {
+                                callbackObj = arg
+                                break
                             }
-                            if (callbackObj != null) {
-                                XposedBridge.log("[GPS_Spoofer] Detected registerGnssStatusCallback! Starting active injector.")
-                                startGnssStatusInjector(callbackObj, classLoader)
+                        }
+                        if (callbackObj != null) {
+                            val clazz = callbackObj.javaClass
+                            if (hookedCallbackClasses.putIfAbsent(clazz, true) == null) {
+                                try {
+                                    XposedBridge.hookAllMethods(clazz, "onSatelliteStatusChanged", object : XC_MethodHook() {
+                                        private var lastCallTime = 0L
+                                        private var cachedGnssStatus: Any? = null
+                                        private var lastGnssStatusUpdate = 0L
+
+                                        override fun beforeHookedMethod(innerParam: MethodHookParam) {
+                                            val now = System.currentTimeMillis()
+                                            if (now - lastCallTime < 1000) {
+                                                innerParam.result = null // Throttle
+                                                return
+                                            }
+                                            lastCallTime = now
+
+                                            val statusObj = innerParam.args[0] ?: return
+                                            updateSatelliteCacheIfNeeded()
+
+                                            if (isSpoofingActiveCache && cachedSatellites != null) {
+                                                val count = spoofingCountCache
+                                                val sats = cachedSatellites!!
+
+                                                // 1. Android 11+ (API 30+) 优先使用原生 Builder
+                                                // 解决了 Android 11+ mSvidWithFlags 的位移变化 (8 -> 12) 导致的 SVID 全部变 0 的致命 Bug。
+                                                try {
+                                                    val builderClass = XposedHelpers.findClassIfExists("android.location.GnssStatus\$Builder", clazz.classLoader)
+                                                    if (builderClass != null) {
+                                                        if (cachedGnssStatus == null || now - lastGnssStatusUpdate > 1000) {
+                                                            val builder = builderClass.getDeclaredConstructor().newInstance()
+                                                            val addMethod = builderClass.getDeclaredMethod(
+                                                                "addSatellite",
+                                                                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Float::class.javaPrimitiveType,
+                                                                Float::class.javaPrimitiveType, Float::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+                                                                Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
+                                                                Float::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Float::class.javaPrimitiveType
+                                                            )
+                                                            addMethod.isAccessible = true
+                                                            for (i in 0 until count) {
+                                                                val sat = sats[i]
+                                                                addMethod.invoke(
+                                                                    builder, sat.type, sat.svid, sat.cn0, sat.elevation, sat.azimuth,
+                                                                    true, true, sat.usedInFix, false, 0f, false, 0f
+                                                                )
+                                                            }
+                                                            val buildMethod = builderClass.getDeclaredMethod("build")
+                                                            buildMethod.isAccessible = true
+                                                            cachedGnssStatus = buildMethod.invoke(builder)
+                                                            lastGnssStatusUpdate = now
+                                                        }
+                                                        innerParam.args[0] = cachedGnssStatus
+                                                        return // 成功构建并替换，直接返回
+                                                    }
+                                                } catch (e: Throwable) {}
+
+                                                // 2. Android 10 及以下 (API 24-29) 回退到反射直接篡改底层数组
+                                                // 旧版系统的 SVID_SHIFT_WIDTH = 8，以下位运算完全兼容。
+                                                try {
+                                                    val countField = statusObj.javaClass.getDeclaredField("mSvCount")
+                                                    countField.isAccessible = true
+                                                    countField.setInt(statusObj, count)
+
+                                                    val cn0DbHzs = FloatArray(count)
+                                                    val elevations = FloatArray(count)
+                                                    val azimuths = FloatArray(count)
+                                                    val svidWithFlags = IntArray(count)
+
+                                                    for (i in 0 until count) {
+                                                        val sat = sats[i]
+                                                        cn0DbHzs[i] = sat.cn0
+                                                        elevations[i] = sat.elevation
+                                                        azimuths[i] = sat.azimuth
+                                                        var flags = 1 or 2
+                                                        if (sat.usedInFix) flags = flags or 4
+                                                        svidWithFlags[i] = (sat.svid shl 8) or (sat.type and 0xF) or (flags shl 4)
+                                                    }
+
+                                                    val setField = { name: String, value: Any ->
+                                                        try {
+                                                            val f = statusObj.javaClass.getDeclaredField(name)
+                                                            f.isAccessible = true
+                                                            f.set(statusObj, value)
+                                                        } catch (e: Exception) {}
+                                                    }
+
+                                                    setField("mSvidWithFlags", svidWithFlags)
+                                                    setField("mCn0DbHz", cn0DbHzs)
+                                                    setField("mElevations", elevations)
+                                                    setField("mAzimuths", azimuths)
+                                                    setField("mCarrierFrequencies", FloatArray(count))
+                                                    setField("mBasebandCn0DbHzs", FloatArray(count))
+                                                } catch (e: Exception) {}
+                                            }
+                                        }
+                                    })
+                                } catch (e: Throwable) {}
                             }
                         }
                     }
                 })
             } catch (e: Throwable) { XposedBridge.log(e) }
+
+            // Hook unregisterGnssStatusCallback
+            try {
+                XposedBridge.hookAllMethods(locationManagerClazz, "unregisterGnssStatusCallback", object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        // No longer needed
+                    }
+                })
+            } catch (e: Throwable) {}
 
             // Hook GpsStatus.getSatellites() for legacy Apps like DevCheck
             try {
@@ -2674,167 +2854,6 @@ class LocationHooker : XposedModule() {
                 })
             } catch (e: Throwable) { XposedBridge.log(e) }
 
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getSatelliteCount",
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val count = config.optInt("satellite_count", 20)
-                            param.result = count // 卫星可见总数保持稳定，不跳变
-                            XposedBridge.log("[GPS_Spoofer] getSatelliteCount -> $count")
-                        }
-                    }
-                }
-            )
-
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getCn0DbHz",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
-                            val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
-                            val timeSec = System.currentTimeMillis() / 1000.0
-                            val enableJitter = config.optBoolean("enable_jitter", true)
-                            val data = generateSatelliteData(satIndex, deltaTimeMin, enableJitter, timeSec)
-                            param.result = data.cn0
-                            // XposedBridge.log("[GPS_Spoofer] getCn0DbHz($satIndex) -> ${data.cn0}")
-                        }
-                    }
-                }
-            )
-
-            // Hook GnssStatus.usedInFix(int) -- 标记部分卫星参与定位
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "usedInFix",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val data = generateSatelliteData(satIndex, 0.0, false, 0.0)
-                            param.result = data.usedInFix
-                        }
-                    }
-                }
-            )
-
-            // Hook GnssStatus.getConstellationType(int) -- 返回混合星座类型
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getConstellationType",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val data = generateSatelliteData(satIndex, 0.0, false, 0.0)
-                            param.result = data.type
-                        }
-                    }
-                }
-            )
-
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getAzimuthDegrees",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
-                            val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
-                            val data = generateSatelliteData(satIndex, deltaTimeMin, false, 0.0)
-                            param.result = data.azimuth
-                        }
-                    }
-                }
-            )
-
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getElevationDegrees",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
-                            val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
-                            val data = generateSatelliteData(satIndex, deltaTimeMin, false, 0.0)
-                            param.result = data.elevation
-                        }
-                    }
-                }
-            )
-
-            // Hook GnssStatus.getSvid(int) -- 卫星编号
-            XposedHelpers.findAndHookMethod(
-                "android.location.GnssStatus", classLoader, "getSvid",
-                Int::class.javaPrimitiveType!!,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) {
-                            val satIndex = param.args[0] as Int
-                            val data = generateSatelliteData(satIndex, 0.0, false, 0.0)
-                            param.result = data.svid
-                        }
-                    }
-                }
-            )
-
-            // 防止真实卫星数为0时，目标App调用未Hook的特定方法导致 ArrayIndexOutOfBoundsException
-            try {
-                XposedHelpers.findAndHookMethod("android.location.GnssStatus", classLoader, "hasEphemerisData", Int::class.javaPrimitiveType!!, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result = true
-                    }
-                })
-            } catch (e: Throwable) {}
-
-            try {
-                XposedHelpers.findAndHookMethod("android.location.GnssStatus", classLoader, "hasAlmanacData", Int::class.javaPrimitiveType!!, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result = true
-                    }
-                })
-            } catch (e: Throwable) {}
-
-            try {
-                XposedHelpers.findAndHookMethod("android.location.GnssStatus", classLoader, "hasCarrierPhase", Int::class.javaPrimitiveType!!, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result = true
-                    }
-                })
-            } catch (e: Throwable) {}
-
-            try {
-                XposedHelpers.findAndHookMethod("android.location.GnssStatus", classLoader, "getCarrierFrequencyHz", Int::class.javaPrimitiveType!!, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result = 1575420000.0f
-                    }
-                })
-            } catch (e: Throwable) {}
-
-            try {
-                XposedHelpers.findAndHookMethod("android.location.GnssStatus", classLoader, "getBasebandCn0DbHz", Int::class.javaPrimitiveType!!, object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val config = readConfig()
-                        if (config != null && config.optBoolean("active", false)) param.result = 20.0f
-                    }
-                })
-            } catch (e: Throwable) {}
 
             XposedBridge.log("[LocationSpoofer] GnssStatus hooks installed")
         } catch (e: Throwable) {
@@ -2842,173 +2861,127 @@ class LocationHooker : XposedModule() {
         }
     }
 
+    @Volatile
     private var lastConfig: JSONObject? = null
-    private var lastReadTime: Long = 0
+    @Volatile
+    private var isConfigPollingStarted = false
+    private val pollingLock = Any()
 
     /**
      * 从本地文件读取模拟配置(纯文件方案,无ContentProvider跨进程调用)
      *
-     * 设计决策 -- 为何彻底废弃ContentProvider:
-     *
-     * 1. Android11+(API30)的包可见性(PackageVisibility)机制:
-     *    目标App进程通过contentResolver.query()访问com.suseoaa.locationspoofer.fork.provider时,
-     *    如果目标App的AndroidManifest.xml未声明<queries>对本App的可见性,
-     *    系统会返回null并在ActivityThread中打印"Failed to find provider info"错误,
-     *    此错误无法被try-catch捕获(发生在系统框架层),导致Logcat被疯狂刷屏。
-     *
-     * 2. 部分App(如学习通com.chaoxing.mobile)运行在受限沙盒中,
-     *    即使声明了权限也无法跨进程查询外部Provider。
-     *
-     * 3. 文件方案的可靠性:
-     *    ConfigManager通过root权限将JSON写入/data/local/tmp/locationspoofer_config.json,
-     *    并设置chmod 777 + chcon u:object_r:shell_data_file:s0,
-     *    所有进程(含system_server、目标App、Xposed模块进程)均可直接读取,
-     *    无需任何Android权限或可见性声明。
-     *
-     * 缓存策略:
-     *    800毫秒内的重复调用直接返回内存缓存的lastConfig,避免高频磁盘I/O。
-     *    800ms这个阈值的选择依据: Hook回调频率约为1-2次/秒(GPS更新周期),
-     *    800ms确保每个GPS更新周期内最多读取1次文件,同时保证配置变更在1秒内生效。
-     *
-     * 预计算优化:
-     *    在此处集中预计算WGS-84和BD-09坐标,避免每次Hook回调都重复执行三角函数运算。
-     *    gcj02ToWgs84()包含6次sin/cos调用+2次sqrt,预计算可节约约95%的CPU开销。
+     * 架构优化:
+     *    由于此方法会被各种 Hook 在主线程极其高频地调用（例如每秒数百次），
+     *    任何在主线程进行的文件 IO（哪怕是偶尔一次）都会导致严重的丢帧卡顿（Stutter）。
+     *    因此重构为：在首次调用时启动一个后台守护线程（Daemon Thread），
+     *    每隔 1000ms 在后台异步读取文件并更新 Volatile 的 lastConfig。
+     *    主线程的 readConfig() 永远只返回内存中的 lastConfig，实现真正的 0 IO 延迟。
      */
     private fun readConfig(): JSONObject? {
-        val currentTime = System.currentTimeMillis()
-        // 800毫秒内存缓存: 避免高频Hook回调导致的密集磁盘I/O
-        if (currentTime - lastReadTime < 800 && lastConfig != null) {
-            return lastConfig
-        }
+        if (!isConfigPollingStarted) {
+            synchronized(pollingLock) {
+                if (!isConfigPollingStarted) {
+                    isConfigPollingStarted = true
 
-        return try {
-            val file = File("/data/local/tmp/locationspoofer_config.json")
-            if (file.exists() && file.canRead()) {
-                val content = file.readText()
-                val config = JSONObject(content)
-
-                // 确保wifi_json字段存在(部分旧版本配置文件可能缺失)
-                if (!config.has("wifi_json")) config.put("wifi_json", org.json.JSONArray())
-
-                // ── 集中预计算坐标系转换,避免每次Hook回调都重复计算 ──
-                val lat = config.optDouble("lat", 0.0)  // GCJ-02纬度
-                val lng = config.optDouble("lng", 0.0)  // GCJ-02经度
-
-                // 预计算WGS-84: 供android.location.Location的getLatitude/getLongitude使用
-                val wgs84 = gcj02ToWgs84(lat, lng)
-                config.put("wgs84_lat", wgs84.first)
-                config.put("wgs84_lng", wgs84.second)
-
-                // 预计算BD-09: 供百度BDLocation的getLatitude/getLongitude使用
-                val bd09 = gcj02ToBd09(lat, lng)
-                config.put("bd09_lat", bd09.first)
-                config.put("bd09_lng", bd09.second)
-
-                lastConfig = config
-                lastReadTime = currentTime
-                config
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun startGnssStatusInjector(callbackObj: Any, classLoader: ClassLoader) {
-        val weakCallback = java.lang.ref.WeakReference(callbackObj)
-        val timer = java.util.Timer()
-        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
-            override fun run() {
-                val callback = weakCallback.get()
-                if (callback == null) {
-                    timer.cancel()
-                    return
-                }
-                val config = readConfig()
-                if (config == null || !config.optBoolean("active", false)) return
-                
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    // 首次调用时同步读取一次，确保立即有数据可用
                     try {
-                        val gnssStatusClass = classLoader.loadClass("android.location.GnssStatus")
-                        val unsafeClass = classLoader.loadClass("sun.misc.Unsafe")
-                        val theUnsafeField = unsafeClass.getDeclaredField("theUnsafe")
-                        theUnsafeField.isAccessible = true
-                        val unsafe = theUnsafeField.get(null)
-                        val allocateMethod = unsafeClass.getMethod("allocateInstance", Class::class.java)
-                        val dummyGnssStatus = allocateMethod.invoke(unsafe, gnssStatusClass)
-                        
-                        XposedHelpers.callMethod(callback, "onSatelliteStatusChanged", dummyGnssStatus)
-                    } catch (e: Throwable) {}
+                        val file = File("/data/local/tmp/locationspoofer_config.json")
+                        if (file.exists() && file.canRead()) {
+                            val content = file.readText()
+                            val config = JSONObject(content)
+                            if (!config.has("wifi_json")) config.put("wifi_json", org.json.JSONArray())
+                            val lat = config.optDouble("lat", 0.0)
+                            val lng = config.optDouble("lng", 0.0)
+                            val wgs84 = gcj02ToWgs84(lat, lng)
+                            config.put("wgs84_lat", wgs84.first)
+                            config.put("wgs84_lng", wgs84.second)
+                            val bd09 = gcj02ToBd09(lat, lng)
+                            config.put("bd09_lat", bd09.first)
+                            config.put("bd09_lng", bd09.second)
+                            lastConfig = config
+                        }
+                    } catch (e: Exception) {}
+
+                    // 启动后台轮询守护线程
+                    Thread {
+                        while (true) {
+                            try {
+                                Thread.sleep(1000)
+                                val file = File("/data/local/tmp/locationspoofer_config.json")
+                                if (file.exists() && file.canRead()) {
+                                    val content = file.readText()
+                                    val config = JSONObject(content)
+                                    if (!config.has("wifi_json")) config.put("wifi_json", org.json.JSONArray())
+                                    val lat = config.optDouble("lat", 0.0)
+                                    val lng = config.optDouble("lng", 0.0)
+                                    val wgs84 = gcj02ToWgs84(lat, lng)
+                                    config.put("wgs84_lat", wgs84.first)
+                                    config.put("wgs84_lng", wgs84.second)
+                                    val bd09 = gcj02ToBd09(lat, lng)
+                                    config.put("bd09_lat", bd09.first)
+                                    config.put("bd09_lng", bd09.second)
+                                    lastConfig = config
+                                }
+                            } catch (e: Exception) {}
+                        }
+                    }.apply {
+                        isDaemon = true
+                        name = "LocationSpoofer_ConfigPoller"
+                        start()
+                    }
                 }
             }
-        }, 1000L, 1000L)
+        }
+        return lastConfig
     }
 
-    private fun startGpsStatusInjector(listener: Any, classLoader: ClassLoader) {
-        val weakListener = java.lang.ref.WeakReference(listener)
-        val timer = java.util.Timer()
-        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
-            override fun run() {
-                val callback = weakListener.get()
-                if (callback == null) {
-                    timer.cancel()
-                    return
-                }
-                val config = readConfig()
-                if (config == null || !config.optBoolean("active", false)) return
-                
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    try {
-                        // event 4 = GPS_EVENT_SATELLITE_STATUS
-                        XposedHelpers.callMethod(callback, "onGpsStatusChanged", 4)
-                    } catch (e: Throwable) {}
-                }
-            }
-        }, 1000L, 1000L)
-    }
+    private var cachedGpsSatellitesList: Iterable<Any>? = null
+    private var lastGpsSatellitesUpdate = 0L
 
     private fun createSpoofedGpsSatellites(classLoader: ClassLoader): Iterable<Any> {
-        val list = ArrayList<Any>()
-        try {
-            val config = readConfig() ?: return list
-            val count = config.optInt("satellite_count", 20)
-            val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
-            val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
-            val timeSec = System.currentTimeMillis() / 1000.0
-            val enableJitter = config.optBoolean("enable_jitter", true)
+        val now = System.currentTimeMillis()
+        if (cachedGpsSatellitesList == null || now - lastGpsSatellitesUpdate > 1000) {
+            val list = ArrayList<Any>()
+            try {
+                updateSatelliteCacheIfNeeded()
+                if (!isSpoofingActiveCache || cachedSatellites == null) return list
 
-            val satelliteClass = classLoader.loadClass("android.location.GpsSatellite")
-            val constructor = satelliteClass.getDeclaredConstructor(Int::class.javaPrimitiveType)
-            constructor.isAccessible = true
+                val satelliteClass = classLoader.loadClass("android.location.GpsSatellite")
+                val constructor = satelliteClass.getDeclaredConstructor(Int::class.javaPrimitiveType)
+                constructor.isAccessible = true
 
-            for (i in 0 until count) {
-                val data = generateSatelliteData(i, deltaTimeMin, enableJitter, timeSec)
-                val prn = if (data.type == 3) data.svid + 64 else data.svid
-                val sat = constructor.newInstance(prn)
-                try { XposedHelpers.setBooleanField(sat, "mValid", true) } catch (e: Throwable) {}
-                try { XposedHelpers.setBooleanField(sat, "mHasEphemeris", true) } catch (e: Throwable) {}
-                try { XposedHelpers.setBooleanField(sat, "mHasAlmanac", true) } catch (e: Throwable) {}
-                try { XposedHelpers.setBooleanField(sat, "mUsedInFix", data.usedInFix) } catch (e: Throwable) {}
-                try { 
-                    val f = satelliteClass.getDeclaredField("mSnr")
-                    f.isAccessible = true
-                    f.setFloat(sat, data.cn0)
-                } catch (e: Throwable) {}
-                try { 
-                    val f = satelliteClass.getDeclaredField("mElevation")
-                    f.isAccessible = true
-                    f.setFloat(sat, data.elevation)
-                } catch (e: Throwable) {}
-                try { 
-                    val f = satelliteClass.getDeclaredField("mAzimuth")
-                    f.isAccessible = true
-                    f.setFloat(sat, data.azimuth)
-                } catch (e: Throwable) {}
-                list.add(sat)
+                for (i in 0 until spoofingCountCache) {
+                    val data = getCachedSatellite(i) ?: continue
+                    val prn = if (data.type == 3) data.svid + 64 else data.svid
+                    val sat = constructor.newInstance(prn)
+                    try { XposedHelpers.setBooleanField(sat, "mValid", true) } catch (e: Throwable) {}
+                    try { XposedHelpers.setBooleanField(sat, "mHasEphemeris", true) } catch (e: Throwable) {}
+                    try { XposedHelpers.setBooleanField(sat, "mHasAlmanac", true) } catch (e: Throwable) {}
+                    try { XposedHelpers.setBooleanField(sat, "mUsedInFix", data.usedInFix) } catch (e: Throwable) {}
+                    try { 
+                        val f = satelliteClass.getDeclaredField("mSnr")
+                        f.isAccessible = true
+                        f.setFloat(sat, data.cn0)
+                    } catch (e: Throwable) {}
+                    try { 
+                        val f = satelliteClass.getDeclaredField("mElevation")
+                        f.isAccessible = true
+                        f.setFloat(sat, data.elevation)
+                    } catch (e: Throwable) {}
+                    try { 
+                        val f = satelliteClass.getDeclaredField("mAzimuth")
+                        f.isAccessible = true
+                        f.setFloat(sat, data.azimuth)
+                    } catch (e: Throwable) {}
+                    list.add(sat)
+                }
+                cachedGpsSatellitesList = list
+                lastGpsSatellitesUpdate = now
+            } catch (e: Throwable) {
+                XposedBridge.log(e)
             }
-        } catch (e: Throwable) {
-            XposedBridge.log(e)
         }
-        return list
+        return cachedGpsSatellitesList ?: ArrayList()
     }
 
     private fun createOnNmeaMessageListenerProxy(original: Any, classLoader: ClassLoader): Any {
@@ -3022,6 +2995,7 @@ class LocationHooker : XposedModule() {
                         val originalMsg = args[0] as? String
                         if (originalMsg != null) {
                             val spoofedMsg = spoofNmeaMessage(originalMsg)
+                            if (spoofedMsg == null) return null // Allow dropping messages
                             val newArgs = arrayOfNulls<Any>(args.size)
                             for (i in args.indices) {
                                 newArgs[i] = if (i == 0) spoofedMsg else args[i]
@@ -3034,7 +3008,7 @@ class LocationHooker : XposedModule() {
                 }
             }
         )
-        startNmeaGsvInjector(original, "onNmeaMessage", classLoader)
+        // startNmeaGsvInjector(original, "onNmeaMessage", classLoader)
         return proxy
     }
 
@@ -3049,6 +3023,7 @@ class LocationHooker : XposedModule() {
                         val originalMsg = args[1] as? String
                         if (originalMsg != null) {
                             val spoofedMsg = spoofNmeaMessage(originalMsg)
+                            if (spoofedMsg == null) return null // Allow dropping messages
                             val newArgs = arrayOfNulls<Any>(args.size)
                             for (i in args.indices) {
                                 newArgs[i] = if (i == 1) spoofedMsg else args[i]
@@ -3061,112 +3036,11 @@ class LocationHooker : XposedModule() {
                 }
             }
         )
-        startNmeaGsvInjector(original, "onNmeaReceived", classLoader)
+        // startNmeaGsvInjector(original, "onNmeaReceived", classLoader)
         return proxy
     }
 
-    /**
-     * 启动后台定时器主动向应用发送 NMEA GSV 报文
-     */
-    private fun startNmeaGsvInjector(originalListener: Any, methodName: String, classLoader: ClassLoader) {
-        val weakListener = java.lang.ref.WeakReference(originalListener)
-        val timer = java.util.Timer()
-        timer.scheduleAtFixedRate(object : java.util.TimerTask() {
-            override fun run() {
-                val listener = weakListener.get()
-                if (listener == null) {
-                    timer.cancel()
-                    return
-                }
-                
-                val config = readConfig()
-                if (config == null || !config.optBoolean("active", false)) return
-                
-                val count = config.optInt("satellite_count", 20)
-                val startTime = config.optLong("start_timestamp", System.currentTimeMillis())
-                val deltaTimeMin = (System.currentTimeMillis() - startTime) / 60000.0
-                val timeSec = System.currentTimeMillis() / 1000.0
-                val enableJitter = config.optBoolean("enable_jitter", true)
-                
-                // Generate data for all satellites
-                val satellites = mutableListOf<SatelliteData>()
-                for (i in 0 until count) {
-                    satellites.add(generateSatelliteData(i, deltaTimeMin, enableJitter, timeSec))
-                }
-                
-                // Group by constellation type
-                val gpsSats = satellites.filter { it.type == 1 }
-                val glonassSats = satellites.filter { it.type == 3 }
-                val bdsSats = satellites.filter { it.type == 5 }
-                
-                val sentences = mutableListOf<String>()
-                sentences.addAll(generateGsvSentences("GP", gpsSats))
-                sentences.addAll(generateGsvSentences("GL", glonassSats))
-                sentences.addAll(generateGsvSentences("BD", bdsSats))
-                
-                // Dispatch all sentences to the listener
-                val timestamp = System.currentTimeMillis()
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    for (sentence in sentences) {
-                        try {
-                            if (methodName == "onNmeaMessage") {
-                                XposedHelpers.callMethod(listener, methodName, sentence, timestamp)
-                            } else {
-                                XposedHelpers.callMethod(listener, methodName, timestamp, sentence)
-                            }
-                        } catch (e: Throwable) {
-                            // Ignore exceptions from closed/destroyed listeners
-                        }
-                    }
-                }
-            }
-        }, 1000L, 1000L) // Inject every 1 second
-    }
-
-    private fun generateGsvSentences(talkerId: String, sats: List<SatelliteData>): List<String> {
-        val sentences = mutableListOf<String>()
-        if (sats.isEmpty()) return sentences
-        
-        val totalSats = sats.size
-        val totalMsgs = Math.ceil(totalSats / 4.0).toInt()
-        
-        for (msgNum in 1..totalMsgs) {
-            val sb = StringBuilder()
-            sb.append("\$${talkerId}GSV,")
-            sb.append("$totalMsgs,")
-            sb.append("$msgNum,")
-            sb.append(String.format("%02d", totalSats))
-            
-            val startIndex = (msgNum - 1) * 4
-            val endIndex = Math.min(startIndex + 4, totalSats)
-            
-            for (i in startIndex until endIndex) {
-                val sat = sats[i]
-                sb.append(",")
-                val prn = if (talkerId == "GL") sat.svid + 64 else sat.svid
-                sb.append(String.format("%02d", prn))
-                sb.append(",")
-                sb.append(String.format("%02d", sat.elevation.toInt()))
-                sb.append(",")
-                sb.append(String.format("%03d", sat.azimuth.toInt()))
-                sb.append(",")
-                sb.append(String.format("%02d", sat.cn0.toInt()))
-            }
-            
-            // Add empty fields if less than 4 satellites in this sentence (some strict parsers expect exactly 4 blocks)
-            for (i in endIndex until startIndex + 4) {
-                sb.append(",,,,")
-            }
-            
-            val content = sb.toString().substring(1) // Remove '$' for checksum
-            val checksum = calculateNmeaChecksum(content)
-            sentences.add("\$$content*$checksum\r\n")
-        }
-        
-        return sentences
-    }
-
-    private fun spoofNmeaMessage(sentence: String): String {
+    private fun spoofNmeaMessage(sentence: String): String? {
         try {
             val config = readConfig() ?: return sentence
             if (!config.optBoolean("active", false)) return sentence
@@ -3182,6 +3056,13 @@ class LocationHooker : XposedModule() {
             
             val type = fields[0]
             var modified = false
+            
+            // Drop GSV sentences to hide real hardware satellites.
+            // (We removed the fake GSV injector, so the app will simply not see GSV sentences,
+            // which is safer than showing real hardware GSV sentences that conflict with our fake GnssStatus).
+            if (type.endsWith("GSV")) {
+                return null
+            }
             
             if (type.endsWith("RMC") && fields.size >= 7) {
                 val (latStr, latDir) = convertToNmeaLatitude(targetLat)
