@@ -773,7 +773,9 @@ fun SpoofingScreen(
             onToggleWifi = { viewModel.toggleMockWifi() },
             onToggleCell = { viewModel.toggleMockCell() },
             onToggleBluetooth = { viewModel.toggleMockBluetooth() },
-            onToggleJitter = { viewModel.toggleEnableJitter() }
+            onToggleJitter = { viewModel.toggleEnableJitter() },
+            onAltitudeChange = { viewModel.setAltitude(it) },
+            onSatelliteCountChange = { viewModel.setSatelliteCount(it) }
         )
     }
 
@@ -1968,7 +1970,9 @@ fun StartSpoofingDialog(
     onToggleWifi: () -> Unit,
     onToggleCell: () -> Unit,
     onToggleBluetooth: () -> Unit,
-    onToggleJitter: () -> Unit
+    onToggleJitter: () -> Unit,
+    onAltitudeChange: (String) -> Unit,
+    onSatelliteCountChange: (String) -> Unit
 ) {
     LocalizedDialog(onDismissRequest = onDismiss) {
         Surface(
@@ -2023,6 +2027,34 @@ fun StartSpoofingDialog(
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(R.string.enable_slight_jitter), modifier = Modifier.weight(1f), fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
                     Switch(checked = uiState.enableJitter, onCheckedChange = { onToggleJitter() })
+                }
+                
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = uiState.altitudeInput,
+                        onValueChange = onAltitudeChange,
+                        label = { Text("海拔 (米)", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentBlue,
+                            focusedLabelColor = AccentBlue
+                        )
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = uiState.satelliteCountInput,
+                        onValueChange = onSatelliteCountChange,
+                        label = { Text("卫星数", fontSize = 12.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AccentBlue,
+                            focusedLabelColor = AccentBlue
+                        )
+                    )
                 }
 
                 Spacer(Modifier.height(24.dp))

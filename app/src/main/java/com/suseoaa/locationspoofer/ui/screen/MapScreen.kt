@@ -72,8 +72,10 @@ fun FullScreenMapPage(
 ) {
     val context = LocalContext.current
     var mapRef by remember { mutableStateOf<AppMapController?>(null) }
-    var showConfigDialog by remember { mutableStateOf(false) }
     var showMapTypeDialog by remember { mutableStateOf(false) }
+    var showConfigDialog by remember { mutableStateOf(false) }
+    var showSaveRouteDialog by remember { mutableStateOf(false) }
+    var showSavedRoutesDialog by remember { mutableStateOf(false) }
     val isDomestic = viewModel.isDomesticEnvironment()
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppPoiItem>>(emptyList()) }
@@ -297,6 +299,17 @@ fun FullScreenMapPage(
                 showMapTypeDialog = true
             }
 
+            AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.READY || stage == RoutePlanStage.IDLE) {
+                MapFab(
+                    icon = Icons.Rounded.Bookmarks,
+                    contentDescription = "收藏路线",
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = AccentBlue
+                ) {
+                    showSavedRoutesDialog = true
+                }
+            }
+
             MapFab(
                 icon = Icons.Rounded.MyLocation,
                 contentDescription = stringResource(R.string.locate_to_current),
@@ -360,6 +373,7 @@ fun FullScreenMapPage(
                 },
                 onFinishSelecting = { viewModel.finishSelectingPoints() },
                 onRestartSelecting = { viewModel.restartSelectingPoints() },
+                onSaveRoute = { showSaveRouteDialog = true },
                 onStartPlanning = { showConfigDialog = true },
                 onStopRoute = { viewModel.stopRoutePlanning(); onClose() }
             )
@@ -400,6 +414,84 @@ fun FullScreenMapPage(
             onMapEngineSelected = { viewModel.setMapEngine(it) },
             onDismiss = { showMapTypeDialog = false }
         )
+    }
+
+    if (showSaveRouteDialog) {
+        var routeName by remember { mutableStateOf("") }
+        Dialog(onDismissRequest = { showSaveRouteDialog = false }) {
+            Card(shape = RoundedCornerShape(16.dp)) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text("收藏当前路线", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(16.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = routeName,
+                        onValueChange = { routeName = it },
+                        label = { Text("路线名称") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        androidx.compose.material3.TextButton(onClick = { showSaveRouteDialog = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            if (routeName.isNotBlank()) {
+                                viewModel.addSavedRoute(routeName)
+                                showSaveRouteDialog = false
+                                Toast.makeText(context, "收藏成功", Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Text(stringResource(R.string.save))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showSavedRoutesDialog) {
+        Dialog(onDismissRequest = { showSavedRoutesDialog = false }) {
+            Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("路线库", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(16.dp))
+                    if (uiState.savedRoutes.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            Text("暂无收藏的路线", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(uiState.savedRoutes) { route ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        viewModel.loadSavedRoute(route)
+                                        showSavedRoutesDialog = false
+                                    }.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(route.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                        Text("${route.points.size} 个节点", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                                    }
+                                    IconButton(onClick = { viewModel.removeSavedRoute(route) }) {
+                                        Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        androidx.compose.material3.TextButton(onClick = { showSavedRoutesDialog = false }) {
+                            Text(stringResource(R.string.close))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -480,6 +572,7 @@ private fun BottomActionBar(
     onConfirmPoint: () -> Unit,
     onFinishSelecting: () -> Unit,
     onRestartSelecting: () -> Unit,
+    onSaveRoute: () -> Unit,
     onStartPlanning: () -> Unit,
     onStopRoute: () -> Unit
 ) {
@@ -540,6 +633,15 @@ private fun BottomActionBar(
                         Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.re_select), fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = { onSaveRoute() },
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Rounded.Star, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("收藏", fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = onStartPlanning,

@@ -97,4 +97,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
     var enableJitter: Boolean
         get() = settingsManager.enableJitter
         set(value) { settingsManager.enableJitter = value }
+
+    var altitude: String
+        get() = settingsManager.altitude
+        set(value) { settingsManager.altitude = value }
+
+    var satelliteCount: String
+        get() = settingsManager.satelliteCount
+        set(value) { settingsManager.satelliteCount = value }
 }

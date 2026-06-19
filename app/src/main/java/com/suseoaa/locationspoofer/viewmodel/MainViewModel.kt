@@ -55,13 +55,16 @@ class MainViewModel(
                 com.suseoaa.locationspoofer.data.model.MapEngine.AUTO
             },
             savedLocations = settingsRepository.getSavedLocations(),
+            savedRoutes = settingsRepository.getSavedRoutes(),
             currentLanguage = settingsRepository.getLanguage(),
             isLanguageSet = settingsRepository.isLanguageSet(),
             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
             mockWifi = settingsRepository.mockWifi,
             mockCell = settingsRepository.mockCell,
             mockBluetooth = settingsRepository.mockBluetooth,
-            enableJitter = settingsRepository.enableJitter
+            enableJitter = settingsRepository.enableJitter,
+            altitudeInput = settingsRepository.altitude,
+            satelliteCountInput = settingsRepository.satelliteCount
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -225,6 +228,16 @@ class MainViewModel(
     }
 
     fun getSavedLanguage(): String = settingsRepository.getLanguage()
+
+    fun setAltitude(altitude: String) {
+        settingsRepository.altitude = altitude
+        _uiState.update { it.copy(altitudeInput = altitude) }
+    }
+
+    fun setSatelliteCount(count: String) {
+        settingsRepository.satelliteCount = count
+        _uiState.update { it.copy(satelliteCountInput = count) }
+    }
 
     // 当前位置获取
 
@@ -908,9 +921,29 @@ class MainViewModel(
         }
     }
 
-    fun removeSavedLocation(loc: SavedLocation) {
-        settingsRepository.removeSavedLocation(loc)
+    fun removeSavedLocation(location: SavedLocation) {
+        settingsRepository.removeSavedLocation(location)
         _uiState.update { it.copy(savedLocations = settingsRepository.getSavedLocations()) }
+    }
+
+    fun addSavedRoute(name: String) {
+        val points = _uiState.value.routePoints
+        if (points.size >= 2) {
+            settingsRepository.addSavedRoute(com.suseoaa.locationspoofer.data.model.SavedRoute(name, points))
+            _uiState.update { it.copy(savedRoutes = settingsRepository.getSavedRoutes()) }
+        }
+    }
+
+    fun removeSavedRoute(route: com.suseoaa.locationspoofer.data.model.SavedRoute) {
+        settingsRepository.removeSavedRoute(route)
+        _uiState.update { it.copy(savedRoutes = settingsRepository.getSavedRoutes()) }
+    }
+
+    fun loadSavedRoute(route: com.suseoaa.locationspoofer.data.model.SavedRoute) {
+        _uiState.update { it.copy(
+            routePoints = route.points,
+            routePlanStage = com.suseoaa.locationspoofer.data.model.RoutePlanStage.READY
+        )}
     }
 
     // 搜索

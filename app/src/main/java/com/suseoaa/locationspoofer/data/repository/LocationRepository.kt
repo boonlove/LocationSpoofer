@@ -14,7 +14,8 @@ import org.json.JSONObject
 class LocationRepository(
     private val configManager: ConfigManager,
     private val rootManager: RootManager,
-    private val lsposedManager: LSPosedManager
+    private val lsposedManager: LSPosedManager,
+    private val settingsManager: com.suseoaa.locationspoofer.utils.SettingsManager
 ) {
     suspend fun checkRootAccess(): Boolean = rootManager.checkRootAccess()
 
@@ -51,7 +52,9 @@ class LocationRepository(
         SpooferProvider.isRouteMode = isRouteMode
         SpooferProvider.enableJitter = enableJitter
 
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter)
+        val alt = settingsManager.altitude.toDoubleOrNull() ?: 0.0
+        val satCount = settingsManager.satelliteCount.toIntOrNull() ?: 20
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter, alt, satCount)
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -105,7 +108,9 @@ class LocationRepository(
         SpooferProvider.cellJson = cellJson
         SpooferProvider.bluetoothJson = bluetoothJson
         SpooferProvider.enableJitter = enableJitter
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter)
+        val alt = settingsManager.altitude.toDoubleOrNull() ?: 0.0
+        val satCount = settingsManager.satelliteCount.toIntOrNull() ?: 20
+        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter, alt, satCount)
     }
 
     suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {
@@ -121,7 +126,9 @@ class LocationRepository(
             wifiJson = wifiJson,
             appCoordinateSystems = appCoordinateSystems,
             cellJson = SpooferProvider.cellJson,
-            bluetoothJson = SpooferProvider.bluetoothJson
+            bluetoothJson = SpooferProvider.bluetoothJson,
+            altitude = settingsManager.altitude.toDoubleOrNull() ?: 0.0,
+            satelliteCount = settingsManager.satelliteCount.toIntOrNull() ?: 20
         )
     }
 

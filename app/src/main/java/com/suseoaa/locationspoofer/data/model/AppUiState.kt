@@ -93,6 +93,8 @@ data class AppState(
     val mockCell: Boolean = true,
     val mockBluetooth: Boolean = true,
     val enableJitter: Boolean = true,
+    val altitudeInput: String = "0.0",
+    val satelliteCountInput: String = "20",
     val canMockWifi: Boolean = false,
     val canMockCell: Boolean = false,
     val canMockBluetooth: Boolean = false,

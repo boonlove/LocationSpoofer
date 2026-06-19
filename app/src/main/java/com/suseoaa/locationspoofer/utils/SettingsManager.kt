@@ -75,6 +75,14 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean("enable_jitter", true)
         set(value) = prefs.edit().putBoolean("enable_jitter", value).apply()
 
+    var altitude: String
+        get() = prefs.getString("altitude", "0.0") ?: "0.0"
+        set(value) = prefs.edit().putString("altitude", value).apply()
+
+    var satelliteCount: String
+        get() = prefs.getString("satellite_count", "20") ?: "20"
+        set(value) = prefs.edit().putString("satellite_count", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()

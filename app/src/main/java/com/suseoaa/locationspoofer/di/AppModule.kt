@@ -18,7 +18,7 @@ val appModule = module {
     single { SettingsManager(androidContext()) }
     single { com.suseoaa.locationspoofer.utils.EnvironmentScanner(androidContext()) }
 
-    single { LocationRepository(get(), get(), get()) }
+    single { LocationRepository(get(), get(), get(), get()) }
     single { SettingsRepository(get()) }
 
     single { com.suseoaa.locationspoofer.data.db.AppDatabase.getDatabase(androidContext()) }
