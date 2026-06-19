@@ -7,7 +7,7 @@
 -keep interface de.robv.android.xposed.** { *; }
 -keep class io.github.libxposed.** { *; }
 -keep interface io.github.libxposed.** { *; }
--keep class com.suseoaa.locationspoofer.xposed.LocationHooker { *; }
+-keep class com.suseoaa.locationspoofer.xposed.** { *; }
 
 # AMap 3DMap & Location SDK
 -keep class com.amap.api.** { *; }
