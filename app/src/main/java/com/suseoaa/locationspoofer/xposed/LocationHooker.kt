@@ -844,8 +844,10 @@ class LocationHooker : XposedModule() {
                             }
                             
                             if (isOnNmea) {
+                                XposedBridge.log("[GPS_Spoofer] Detected addNmeaListener(OnNmeaMessageListener)! Starting active injector.")
                                 args[i] = createOnNmeaMessageListenerProxy(arg, classLoader)
                             } else if (isGpsNmea) {
+                                XposedBridge.log("[GPS_Spoofer] Detected addNmeaListener(GpsStatus.NmeaListener)! Starting active injector.")
                                 args[i] = createGpsStatusNmeaListenerProxy(arg, classLoader)
                             }
                         }
@@ -2593,6 +2595,9 @@ class LocationHooker : XposedModule() {
             3 -> 1 + (satIndex * 3) % 24 // GLONASS (GnssStatus standard is 1-24)
             else -> 1 + (satIndex * 5) % 63 // BDS
         }
+        
+        // Log satellite generated occasionally or if debugging
+        // XposedBridge.log("[GPS_Spoofer] Generated Sat: type=$type, svid=$svid, cn0=$cn0, elev=$elevation, az=$currentAzimuth")
 
         val rngFix = java.util.Random(satIndex.toLong() + 2000L)
         val usedInFix = rngFix.nextDouble() < 0.75
@@ -2623,6 +2628,7 @@ class LocationHooker : XposedModule() {
                         if (config != null && config.optBoolean("active", false)) {
                             val listener = param.args[0]
                             if (listener != null) {
+                                XposedBridge.log("[GPS_Spoofer] Detected addGpsStatusListener! Starting active injector.")
                                 startGpsStatusInjector(listener, classLoader)
                             }
                         }
@@ -2637,13 +2643,18 @@ class LocationHooker : XposedModule() {
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             var callbackObj: Any? = null
+                            val cbClass = try {
+                                classLoader.loadClass("android.location.GnssStatus\$Callback")
+                            } catch (e: Exception) { null }
+
                             for (arg in param.args) {
-                                if (arg != null && arg.javaClass.name.contains("GnssStatus\$Callback")) {
+                                if (arg != null && cbClass != null && cbClass.isInstance(arg)) {
                                     callbackObj = arg
                                     break
                                 }
                             }
                             if (callbackObj != null) {
+                                XposedBridge.log("[GPS_Spoofer] Detected registerGnssStatusCallback! Starting active injector.")
                                 startGnssStatusInjector(callbackObj, classLoader)
                             }
                         }
