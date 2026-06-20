@@ -475,10 +475,9 @@ class BaiduMapControllerImpl(
 }
 
 @Composable
-fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDomestic: Boolean, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
+fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDomestic: Boolean, isDark: Boolean, modifier: Modifier = Modifier, onMapReady: (AppMapController) -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
     var mapController by remember { mutableStateOf<AppMapController?>(null) }
 
     LaunchedEffect(isDark, mapController) {

@@ -1,6 +1,8 @@
 package com.suseoaa.locationspoofer.data.model
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import com.suseoaa.locationspoofer.R
 
 enum class WifiLoadStatus { IDLE, LOADING, DONE }
@@ -45,9 +47,23 @@ enum class AppMapType {
     MAP_3D
 }
 
+enum class DarkMode {
+    SYSTEM,
+    LIGHT,
+    DARK;
+
+    @Composable
+    fun isDark(): Boolean = when (this) {
+        DARK -> true
+        LIGHT -> false
+        else -> isSystemInDarkTheme()
+    }
+}
+
 data class AppState(
     val mapType: AppMapType = AppMapType.NORMAL,
     val mapEngine: MapEngine = MapEngine.AUTO,
+    val darkMode: DarkMode = DarkMode.SYSTEM,
     val isInitializing: Boolean = true,
     val isLanguageSet: Boolean = true, // Default to true to avoid flicker if not needed
     val currentLanguage: String = "",

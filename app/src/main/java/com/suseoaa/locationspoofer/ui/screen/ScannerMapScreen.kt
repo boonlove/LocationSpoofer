@@ -58,6 +58,7 @@ fun ScannerMapScreen(
         AppMapView(
             mapEngine = uiState.mapEngine,
             isDomestic = uiState.currentLanguage == "zh",
+            isDark = uiState.darkMode.isDark(),
             modifier = Modifier.fillMaxSize(),
             onMapReady = { controller ->
                 mapController = controller

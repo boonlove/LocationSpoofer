@@ -8,12 +8,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
+import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
@@ -40,6 +43,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val settingsViewModel: SettingsViewModel = koinViewModel()
+    var darkModeExpanded by remember { mutableStateOf(false) }
     var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
     var localBaiduApiKey by remember(uiState.baiduApiKey) { mutableStateOf(uiState.baiduApiKey) }
     var localGoogleApiKey by remember(uiState.googleApiKey) { mutableStateOf(uiState.googleApiKey) }
@@ -108,6 +112,65 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+
+            // 软件设置
+            Text(
+                "软件设置",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(8.dp))
+
+            // 深色模式
+            val darkModeOptions = listOf(DarkMode.SYSTEM to "跟随系统", DarkMode.LIGHT to "浅色", DarkMode.DARK to "深色")
+            val darkModeLabel = darkModeOptions.firstOrNull { it.first == uiState.darkMode }?.second ?: "跟随系统"
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .clickable { darkModeExpanded = true }
+                        .padding(horizontal = 16.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("深色模式", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(Modifier.weight(1f))
+                    Text(darkModeLabel, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                }
+
+                DropdownMenu(
+                    expanded = darkModeExpanded,
+                    onDismissRequest = { darkModeExpanded = false }
+                ) {
+                    darkModeOptions.forEach { (darkMode, label) ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 14.sp,
+                                        color = if (darkMode == uiState.darkMode) AccentBlue else MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Spacer(Modifier.weight(1f))
+                                    if (uiState.darkMode == darkMode) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            },
+                            onClick = {
+                                darkModeExpanded = false
+                                viewModel.setDarkMode(darkMode)
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(24.dp))
 
             Text(
                 stringResource(R.string.map_config),

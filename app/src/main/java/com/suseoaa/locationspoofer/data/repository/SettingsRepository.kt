@@ -30,6 +30,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.language = value
     }
 
+    fun getDarkMode(): String = settingsManager.darkMode
+
+    fun setDarkMode(value: String) {
+        settingsManager.darkMode = value
+    }
+
     fun getAmapApiKey(): String = settingsManager.amapApiKey
 
     fun setAmapApiKey(value: String) {

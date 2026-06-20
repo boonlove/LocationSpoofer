@@ -55,6 +55,11 @@ class MainViewModel(
             } catch (e: Exception) {
                 com.suseoaa.locationspoofer.data.model.MapEngine.AUTO
             },
+            darkMode = try {
+                com.suseoaa.locationspoofer.data.model.DarkMode.valueOf(settingsRepository.getDarkMode())
+            } catch (e: Exception) {
+                com.suseoaa.locationspoofer.data.model.DarkMode.SYSTEM
+            },
             savedLocations = settingsRepository.getSavedLocations(),
             savedRoutes = emptyList(), // Will be populated by Room Flow
             currentLanguage = settingsRepository.getLanguage(),
@@ -159,6 +164,11 @@ class MainViewModel(
     fun updateLanguage(langCode: String) {
         settingsRepository.setLanguage(langCode)
         _uiState.update { it.copy(currentLanguage = langCode) }
+    }
+
+    fun setDarkMode(mode: com.suseoaa.locationspoofer.data.model.DarkMode) {
+        settingsRepository.setDarkMode(mode.name)
+        _uiState.update { it.copy(darkMode = mode) }
     }
 
     fun setMapType(type: AppMapType) {

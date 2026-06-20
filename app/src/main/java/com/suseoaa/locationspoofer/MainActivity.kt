@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
                 LocalActivityResultRegistryOwner provides this@MainActivity
             ) {
                 val uiState by viewModel.uiState.collectAsState()
-                val isDark = isSystemInDarkTheme()
+                val isDark = uiState.darkMode.isDark()
                 val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
 
                 // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新

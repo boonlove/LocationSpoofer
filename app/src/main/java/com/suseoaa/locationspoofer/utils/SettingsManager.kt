@@ -11,9 +11,9 @@ import org.json.JSONObject
 class SettingsManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
 
-    var isDarkMode: Boolean
-        get() = prefs.getBoolean("is_dark_mode", true)
-        set(value) = prefs.edit().putBoolean("is_dark_mode", value).apply()
+    var darkMode: String
+        get() = prefs.getString("dark_mode", "SYSTEM") ?: "SYSTEM"
+        set(value) = prefs.edit().putString("dark_mode", value).apply()
 
     var language: String
         get() = prefs.getString("language", "") ?: ""
