@@ -300,17 +300,17 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
 class BaiduMapControllerImpl(
     private val map: com.baidu.mapapi.map.BaiduMap,
     private val mapView: com.baidu.mapapi.map.TextureMapView,
-    private val context: android.content.Context
+    private val context: android.content.Context,
+    private val styleId: String = ""
 ) : AppMapController {
     private var isDarkMode: Boolean = false
     private var currentMapType: AppMapType = AppMapType.NORMAL
 
     override fun setDarkMode(isDark: Boolean, context: android.content.Context) {
         isDarkMode = isDark
-        val customStyleId = ""
         val customStyleOptions = com.baidu.mapapi.map.MapCustomStyleOptions()
-        if (isDark && customStyleId.isNotBlank()) {
-            customStyleOptions.customStyleId(customStyleId)
+        if (isDark && styleId.isNotBlank()) {
+            customStyleOptions.customStyleId(styleId)
             mapView.setMapCustomStyle(customStyleOptions, object : com.baidu.mapapi.map.CustomMapStyleCallBack {
                 override fun onPreLoadLastCustomMapStyle(p0: String?): Boolean = false
                 override fun onCustomMapStyleLoadSuccess(p0: Boolean, p1: String?): Boolean = true
@@ -573,7 +573,9 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
                 baiduMapView.apply {
                     setOnTouchListener { v, _ -> v.parent?.requestDisallowInterceptTouchEvent(true); false }
                     map.setOnMapLoadedCallback {
-                        val controller = BaiduMapControllerImpl(map, this, context)
+                        val prefs = context.getSharedPreferences("app_settings", android.content.Context.MODE_PRIVATE)
+                        val styleId = prefs.getString("baidu_style_id", "") ?: ""
+                        val controller = BaiduMapControllerImpl(map, this, context, styleId)
                         mapController = controller
                         controller.setDarkMode(isDark, context)
                         onMapReady(controller) 

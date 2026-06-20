@@ -85,6 +85,8 @@
     <string name="custom_amap_key_hint">Enter your AMap key...</string>
     <string name="custom_baidu_key">Custom Baidu API Key</string>
     <string name="custom_baidu_key_hint">Enter your Baidu Map key...</string>
+    <string name="custom_baidu_style_id">Custom Map Style</string>
+    <string name="custom_baidu_style_id_hint">Enter your published Baidu Map style ID</string>
     <string name="custom_google_key">Custom Google API Key</string>
     <string name="custom_google_key_hint">Enter your Google Map key...</string>
     <string name="copy">Copy</string>

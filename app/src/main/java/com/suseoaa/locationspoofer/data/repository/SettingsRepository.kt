@@ -48,6 +48,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.googleApiKey = value
     }
 
+    fun getBaiduStyleId(): String = settingsManager.baiduStyleId
+
+    fun setBaiduStyleId(value: String) {
+        settingsManager.baiduStyleId = value
+    }
+
     fun getMapType(): String = settingsManager.mapType
 
     fun setMapType(value: String) {

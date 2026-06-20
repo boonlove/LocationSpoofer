@@ -29,6 +29,8 @@ import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
+import com.suseoaa.locationspoofer.viewmodel.SettingsViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SettingsScreen(
@@ -37,9 +39,11 @@ fun SettingsScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
+    val settingsViewModel: SettingsViewModel = koinViewModel()
     var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
     var localBaiduApiKey by remember(uiState.baiduApiKey) { mutableStateOf(uiState.baiduApiKey) }
     var localGoogleApiKey by remember(uiState.googleApiKey) { mutableStateOf(uiState.googleApiKey) }
+    var localBaiduStyleId by remember { mutableStateOf(settingsViewModel.getBaiduStyleId()) }
     val clipboardManager = LocalClipboardManager.current
 
     Column(
@@ -212,15 +216,26 @@ fun SettingsScreen(
             }
 
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.BAIDU) {
-                OutlinedTextField(
-                    value = localBaiduApiKey,
-                    onValueChange = { localBaiduApiKey = it },
-                    label = { Text(stringResource(R.string.custom_baidu_key)) },
-                    placeholder = { Text(stringResource(R.string.custom_baidu_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
-                )
+                Column {
+                    OutlinedTextField(
+                        value = localBaiduApiKey,
+                        onValueChange = { localBaiduApiKey = it },
+                        label = { Text(stringResource(R.string.custom_baidu_key)) },
+                        placeholder = { Text(stringResource(R.string.custom_baidu_key_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
+                    )
+                    OutlinedTextField(
+                        value = localBaiduStyleId,
+                        onValueChange = { localBaiduStyleId = it },
+                        label = { Text(stringResource(R.string.custom_baidu_style_id)) },
+                        placeholder = { Text(stringResource(R.string.custom_baidu_style_id_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
+                    )
+                }
             }
 
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.GOOGLE) {
@@ -241,6 +256,7 @@ fun SettingsScreen(
                     viewModel.setAmapApiKey(localAmapApiKey)
                     viewModel.setBaiduApiKey(localBaiduApiKey)
                     viewModel.setGoogleApiKey(localGoogleApiKey)
+                    settingsViewModel.setBaiduStyleId(localBaiduStyleId)
                     Toast.makeText(context, context.getString(R.string.restart_required_hint), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
