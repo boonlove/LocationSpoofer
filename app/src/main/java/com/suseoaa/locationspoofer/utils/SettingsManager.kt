@@ -35,6 +35,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("google_api_key", "") ?: ""
         set(value) = prefs.edit().putString("google_api_key", value).apply()
 
+    var wigleApiToken: String
+        get() = prefs.getString("wigle_api_token", "") ?: ""
+        set(value) = prefs.edit().putString("wigle_api_token", value).apply()
+
     var baiduStyleId: String
         get() = prefs.getString("baidu_style_id", "") ?: ""
         set(value) = prefs.edit().putString("baidu_style_id", value).apply()

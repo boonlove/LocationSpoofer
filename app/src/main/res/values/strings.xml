@@ -187,4 +187,8 @@
     <string name="route_library">Route Library</string>
     <string name="no_saved_routes">No saved routes</string>
     <string name="route_nodes_count">%d points</string>
+
+    <string name="wigle_config">WiGLE API Configuration</string>
+    <string name="custom_wigle_token">WiGLE API Token (Basic Auth Base64)</string>
+    <string name="custom_wigle_token_hint">Enter your WiGLE token...</string>
 </resources>

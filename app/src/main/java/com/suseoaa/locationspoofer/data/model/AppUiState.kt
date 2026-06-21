@@ -91,6 +91,7 @@ data class AppState(
     val amapApiKey: String = "",
     val baiduApiKey: String = "",
     val googleApiKey: String = "",
+    val wigleToken: String = "",
     val appSha1: String = "",
     val appCoordinateSystems: Map<String, String> = emptyMap(),
     val isContinuousScanning: Boolean = false,

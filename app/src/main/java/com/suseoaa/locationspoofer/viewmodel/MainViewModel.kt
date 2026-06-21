@@ -41,6 +41,7 @@ class MainViewModel(
     private val lsposedManager: com.suseoaa.locationspoofer.utils.LSPosedManager,
     private val environmentScanner: com.suseoaa.locationspoofer.utils.EnvironmentScanner,
     private val environmentDao: com.suseoaa.locationspoofer.data.db.EnvironmentDao,
+    private val wifiRepository: com.suseoaa.locationspoofer.data.repository.WifiRepository,
     private val context: Context
 ) : ViewModel() {
 
@@ -71,7 +72,8 @@ class MainViewModel(
             mockBluetooth = settingsRepository.mockBluetooth,
             enableJitter = settingsRepository.enableJitter,
             altitudeInput = settingsRepository.altitude,
-            satelliteCountInput = settingsRepository.satelliteCount
+            satelliteCountInput = settingsRepository.satelliteCount,
+            wigleToken = settingsRepository.getWigleApiToken()
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -632,7 +634,8 @@ class MainViewModel(
         if (lat == null || lng == null) {
             _uiState.update { 
                 it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false, 
-                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
+                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]",
+                        wifiApCount = 0, wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE) 
             }
             return
         }
@@ -659,8 +662,12 @@ class MainViewModel(
             withContext(Dispatchers.Main) {
                 if (validRecords.isEmpty()) {
                     _uiState.update { 
-                        it.copy(canMockWifi = false, canMockCell = false, canMockBluetooth = false,
-                                collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]") 
+                        it.copy(
+                            canMockWifi = false, canMockCell = false, canMockBluetooth = false,
+                            collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]",
+                            wifiApCount = 0,
+                            wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
+                        ) 
                     }
                 } else {
                     val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
@@ -668,12 +675,152 @@ class MainViewModel(
                     val hasC = cellJson != "[]"
                     val hasB = btJson != "[]"
                     
+                    val wifiCount = try {
+                        val obj = org.json.JSONObject(wifiJson)
+                        val nearby = obj.optJSONArray("nearbyWifi")
+                        nearby?.length() ?: 0
+                    } catch (e: Exception) { 0 }
+                    
                     _uiState.update { 
                         it.copy(
                             canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
-                            collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson
+                            collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson,
+                            wifiApCount = wifiCount,
+                            wifiLoadStatus = if (hasW) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
                         ) 
                     }
+                }
+            }
+        }
+    }
+
+    private suspend fun hasLocalScansWithin50m(lat: Double, lng: Double): Boolean {
+        val allRecords = withContext(Dispatchers.IO) { environmentDao.getAllCompleteLocations() }
+        for (record in allRecords) {
+            val loc = record.location
+            val dLat = Math.toRadians(lat - loc.lat)
+            val dLng = Math.toRadians(lng - loc.lng)
+            val a = kotlin.math.sin(dLat / 2).let { it * it } + 
+                    kotlin.math.cos(Math.toRadians(loc.lat)) * 
+                    kotlin.math.cos(Math.toRadians(lat)) * 
+                    kotlin.math.sin(dLng / 2).let { it * it }
+            val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+            if (distance <= 50.0) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private suspend fun fetchWifiFromWigleSync(lat: Double, lng: Double) {
+        val settingsToken = settingsRepository.getWigleApiToken()
+        if (settingsToken.isBlank()) {
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE,
+                        wifiApCount = 0,
+                        canMockWifi = false
+                    )
+                }
+            }
+            return
+        }
+
+        withContext(Dispatchers.Main) {
+            _uiState.update { it.copy(wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) }
+        }
+        // Align coordinate conversion to WGS-84 standard for WiGLE API
+        val wgs84 = com.suseoaa.locationspoofer.utils.CoordinateUtils.gcj02ToWgs84(lat, lng)
+        val wgsLat = wgs84.lat
+        val wgsLng = wgs84.lng
+
+        try {
+            val rawJsonArrayString = wifiRepository.fetchWifiData(wgsLat, wgsLng, settingsToken)
+            val nearbyArr = org.json.JSONArray(rawJsonArrayString)
+            if (nearbyArr.length() > 0) {
+                val wifiObj = org.json.JSONObject()
+                wifiObj.put("isConnected", true)
+                
+                val firstAp = nearbyArr.getJSONObject(0)
+                val firstBssid = firstAp.optString("bssid")
+                val firstSsid = firstAp.optString("ssid")
+                
+                val connObj = org.json.JSONObject().apply {
+                    put("bssid", firstBssid)
+                    put("ssid", firstSsid)
+                    put("vendor", com.suseoaa.locationspoofer.utils.MacVendorHelper.getVendor(firstBssid))
+                    put("level", -45)
+                    put("frequency", 2412)
+                    put("channel", 1)
+                    put("capabilities", "[WPA2-PSK-CCMP][ESS]")
+                    put("macAddress", "02:00:00:00:00:00")
+                    put("linkSpeed", 150)
+                    put("networkId", 1)
+                    put("wifiStandard", 4)
+                }
+                wifiObj.put("connectedWifi", connObj)
+                
+                val formattedNearby = org.json.JSONArray()
+                for (i in 0 until nearbyArr.length()) {
+                    val ap = nearbyArr.getJSONObject(i)
+                    val bssid = ap.optString("bssid")
+                    val ssid = ap.optString("ssid")
+                    val level = -50 - (i * 2)
+                    val freq = if (i % 2 == 0) 2412 else 5180
+                    
+                    val itemObj = org.json.JSONObject().apply {
+                        put("bssid", bssid)
+                        put("ssid", ssid)
+                        put("vendor", com.suseoaa.locationspoofer.utils.MacVendorHelper.getVendor(bssid))
+                        put("level", level)
+                        put("capabilities", "[WPA2-PSK-CCMP][ESS]")
+                        put("frequency", freq)
+                        put("channel", com.suseoaa.locationspoofer.utils.MacVendorHelper.frequencyToChannel(freq))
+                    }
+                    formattedNearby.put(itemObj)
+                }
+                wifiObj.put("nearbyWifi", formattedNearby)
+                
+                val formattedWifiJson = wifiObj.toString()
+                
+                withContext(Dispatchers.IO) {
+                    saveEnvironmentData(lat, lng, formattedWifiJson, "[]", "[]")
+                    // update metadata to indicate WiGLE source
+                    val newestLocation = environmentDao.getAllLocations().firstOrNull { it.lat == lat && it.lng == lng }
+                    if (newestLocation != null) {
+                        environmentDao.updateMetadata(newestLocation.id, "WiGLE 导入", "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})")
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    evaluateMockCapabilities()
+                    // Refresh count
+                    viewModelScope.launch(Dispatchers.IO) {
+                        val count = environmentDao.getRecordCount()
+                        _uiState.update { it.copy(environmentRecordCount = count) }
+                    }
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    _uiState.update {
+                        it.copy(
+                            wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE,
+                            wifiApCount = 0,
+                            canMockWifi = false
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE,
+                        wifiApCount = 0,
+                        canMockWifi = false
+                    )
                 }
             }
         }
@@ -703,19 +850,25 @@ class MainViewModel(
         
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingConfig = true) }
+            
+            if (state.mockWifi && !hasLocalScansWithin50m(lat, lng)) {
+                fetchWifiFromWigleSync(lat, lng)
+            }
+            
+            val updatedState = _uiState.value
             val now = System.currentTimeMillis()
             locationRepository.startSpoofing(
                 context, lat, lng,
                 "STILL", 0f, now,
                 emptyList(), false,
-                state.appCoordinateSystems,
-                state.collectedWifiJson,
-                state.collectedCellJson,
-                state.collectedBluetoothJson,
-                state.mockWifi && state.canMockWifi,
-                state.mockCell && state.canMockCell,
-                state.mockBluetooth && state.canMockBluetooth,
-                state.enableJitter
+                updatedState.appCoordinateSystems,
+                updatedState.collectedWifiJson,
+                updatedState.collectedCellJson,
+                updatedState.collectedBluetoothJson,
+                updatedState.mockWifi && updatedState.canMockWifi,
+                updatedState.mockCell && updatedState.canMockCell,
+                updatedState.mockBluetooth && updatedState.canMockBluetooth,
+                updatedState.enableJitter
             )
             
             // Wait briefly to ensure root shell syncs to disk fully
@@ -869,6 +1022,11 @@ class MainViewModel(
             )
         }
         evaluateMockCapabilities()
+        viewModelScope.launch {
+            if (_uiState.value.mockWifi && !hasLocalScansWithin50m(lat, lng)) {
+                fetchWifiFromWigleSync(lat, lng)
+            }
+        }
     }
 
     /** 清除地图选点状态 */
@@ -1446,6 +1604,11 @@ class MainViewModel(
     fun setGoogleApiKey(key: String) {
         settingsRepository.setGoogleApiKey(key)
         _uiState.update { it.copy(googleApiKey = key) }
+    }
+
+    fun setWigleApiToken(token: String) {
+        settingsRepository.setWigleApiToken(token)
+        _uiState.update { it.copy(wigleToken = token) }
     }
 
     @Suppress("DEPRECATION")

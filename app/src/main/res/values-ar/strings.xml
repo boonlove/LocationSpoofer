@@ -170,4 +170,8 @@
     <string name="merged_updates_badge">يتضمن %1$d إصدارات من التحديثات</string>
     <string name="brand_github">GitHub</string>
     <string name="brand_telegram">Telegram</string>
+
+    <string name="wigle_config">WiGLE API Configuration</string>
+    <string name="custom_wigle_token">WiGLE API Token (Basic Auth Base64)</string>
+    <string name="custom_wigle_token_hint">Enter your WiGLE token...</string>
 </resources>

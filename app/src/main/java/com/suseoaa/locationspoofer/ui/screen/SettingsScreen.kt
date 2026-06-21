@@ -55,6 +55,7 @@ fun SettingsScreen(
     var localAmapApiKey by remember(uiState.amapApiKey) { mutableStateOf(uiState.amapApiKey) }
     var localBaiduApiKey by remember(uiState.baiduApiKey) { mutableStateOf(uiState.baiduApiKey) }
     var localGoogleApiKey by remember(uiState.googleApiKey) { mutableStateOf(uiState.googleApiKey) }
+    var localWigleToken by remember(uiState.wigleToken) { mutableStateOf(uiState.wigleToken) }
     var localBaiduStyleId by remember { mutableStateOf(settingsViewModel.getBaiduStyleId()) }
     val clipboardManager = LocalClipboardManager.current
 
@@ -284,7 +285,7 @@ fun SettingsScreen(
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
                 )
             }
-
+            
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.BAIDU) {
                 Column {
                     PasswordField(
@@ -307,7 +308,7 @@ fun SettingsScreen(
                     )
                 }
             }
-
+            
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.GOOGLE) {
                 PasswordField(
                     value = localGoogleApiKey,
@@ -321,11 +322,32 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+
+            Text(
+                stringResource(R.string.wigle_config),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+            Spacer(Modifier.height(8.dp))
+
+            PasswordField(
+                value = localWigleToken,
+                onValueChange = { localWigleToken = it },
+                label = { Text(stringResource(R.string.custom_wigle_token)) },
+                placeholder = { Text(stringResource(R.string.custom_wigle_token_hint), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)) },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
+            )
+
+            Spacer(Modifier.height(16.dp))
             Button(
                 onClick = {
                     viewModel.setAmapApiKey(localAmapApiKey)
                     viewModel.setBaiduApiKey(localBaiduApiKey)
                     viewModel.setGoogleApiKey(localGoogleApiKey)
+                    viewModel.setWigleApiToken(localWigleToken)
                     settingsViewModel.setBaiduStyleId(localBaiduStyleId)
                     Toast.makeText(context, context.getString(R.string.restart_required_hint), Toast.LENGTH_SHORT).show()
                 },

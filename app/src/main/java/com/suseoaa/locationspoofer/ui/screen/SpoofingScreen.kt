@@ -2015,7 +2015,7 @@ fun StartSpoofingDialog(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                if (uiState.canMockWifi) {
+                if (uiState.canMockWifi || uiState.wigleToken.isNotBlank()) {
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Wifi, null, tint = AccentBlue, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))

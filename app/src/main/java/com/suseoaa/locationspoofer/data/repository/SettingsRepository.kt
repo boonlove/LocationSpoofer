@@ -54,6 +54,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.googleApiKey = value
     }
 
+    fun getWigleApiToken(): String = settingsManager.wigleApiToken
+
+    fun setWigleApiToken(value: String) {
+        settingsManager.wigleApiToken = value
+    }
+
     fun getBaiduStyleId(): String = settingsManager.baiduStyleId
 
     fun setBaiduStyleId(value: String) {
