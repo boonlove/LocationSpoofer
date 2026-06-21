@@ -1,4 +1,4 @@
-name: 创建 Release
+name: Release
 
 on:
   push:
@@ -10,12 +10,12 @@ permissions:
 
 jobs:
   build:
-    name: 编译 LocationSpoofer
-    uses: ./.github/workflows/build.yml
+    name: Android CI
+    uses: ./.github/workflows/android.yml
     secrets: inherit
 
   release:
-    name: 创建 GitHub Release
+    name: Release
     needs: build
     runs-on: ubuntu-latest
 

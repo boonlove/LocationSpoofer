@@ -1,4 +1,4 @@
-name: 编译 LocationSpoofer
+name: Android CI
 
 on:
   workflow_call:
@@ -13,14 +13,14 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
       - 'gradle/**'
-      - '.github/workflows/build.yml'
+      - '.github/workflows/android.yml'
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: 编译 LocationSpoofer
+    name: Android CI
     runs-on: ubuntu-latest
 
     steps:
@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 配置 Java 17
+      - name: 配置 JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -46,17 +46,13 @@ jobs:
       - name: 配置签名密钥
         run: |
           mkdir -p keystore
-          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > keystore/VirtualLocation.keystore
-          echo "storeFile=keystore/VirtualLocation.keystore" > keystore.properties
-          echo "keyAlias=${{ secrets.SIGNING_KEY_ALIAS }}" >> keystore.properties
-          echo "keyPassword=${{ secrets.SIGNING_KEY_PASSWORD }}" >> keystore.properties
-          echo "storePassword=${{ secrets.SIGNING_STORE_PASSWORD }}" >> keystore.properties
-
-      - name: 配置 API Key
-        run: |
-          echo "WIGLE_TOKEN: \"${{ secrets.WIGLE_TOKEN }}\"" > local.yml
-          echo "AMAP_API_KEY: \"${{ secrets.AMAP_API_KEY }}\"" >> local.yml
-          echo "GOOGLE_MAPS_API_KEY: \"${{ secrets.GOOGLE_MAPS_API_KEY }}\"" >> local.yml
+          echo "${{ secrets.SIGNING_KEY_STORE_BASE64 }}" | base64 --decode > keystore/LocationSpoofer.keystore
+          {
+            echo "storeFile=keystore/LocationSpoofer.keystore"
+            echo "keyAlias=${{ secrets.SIGNING_KEY_ALIAS }}"
+            echo "keyPassword=${{ secrets.SIGNING_KEY_PASSWORD }}"
+            echo "storePassword=${{ secrets.SIGNING_STORE_PASSWORD }}"
+          } > keystore.properties
 
       - name: 授予 gradlew 执行权限
         run: chmod +x ./gradlew
