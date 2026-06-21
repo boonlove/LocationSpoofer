@@ -124,7 +124,13 @@ fun FullScreenMapPage(
                 routePoints.lastIndex -> MarkerType.RED
                 else -> MarkerType.DEFAULT
             }
-            map.addMarker(p.lat, p.lng, "${idx + 1}", type)
+            
+            // 如果开启了真实路线且处于运行状态，则不绘制中间密集的轨迹点
+            if (uiState.useRealRoute && uiState.routePlanStage == RoutePlanStage.RUNNING && type == MarkerType.DEFAULT) {
+                return@forEachIndexed
+            }
+            
+            map.addMarker(p.lat, p.lng, if (type == MarkerType.RED && uiState.useRealRoute && uiState.routePlanStage == RoutePlanStage.RUNNING) "终点" else "${idx + 1}", type)
         }
 
         // 确保被 clear() 清除的实时位置图标能够重新绘制
@@ -437,8 +443,33 @@ fun FullScreenMapPage(
             },
             onRunModeChange = viewModel::setRouteRunMode,
             onSpeedChange = viewModel::setRouteSimMode,
-            onCustomSpeedChange = viewModel::setCustomSpeedMs
+            onCustomSpeedChange = viewModel::setCustomSpeedMs,
+            onUseRealRouteChange = viewModel::setUseRealRoute
         )
+    }
+
+    if (uiState.isFetchingRoute) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+                .pointerInput(Unit) { }, // Block interactions
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Text("正在规划真实路线...", fontSize = 16.sp)
+                }
+            }
+        }
     }
 
     if (showMapTypeDialog) {
@@ -737,7 +768,8 @@ private fun RoutePlanConfigDialog(
     onStartRoute: () -> Unit,
     onRunModeChange: (RouteRunMode) -> Unit,
     onSpeedChange: (SimMode) -> Unit,
-    onCustomSpeedChange: (Double) -> Unit = {}
+    onCustomSpeedChange: (Double) -> Unit = {},
+    onUseRealRouteChange: (Boolean) -> Unit = {}
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -855,6 +887,27 @@ private fun RoutePlanConfigDialog(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                     )
+                }
+
+                // 真实路线规划设置
+                AnimatedVisibility(uiState.routePoints.size >= 2) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onUseRealRouteChange(!uiState.useRealRoute) }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = uiState.useRealRoute,
+                            onCheckedChange = { onUseRealRouteChange(it) }
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("使用真实路线规划", fontSize = 14.sp)
+                            Text("通过API获取实际道路轨迹，遇到红绿灯自动停下15秒", fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                        }
+                    }
                 }
 
                 // 操作按钮

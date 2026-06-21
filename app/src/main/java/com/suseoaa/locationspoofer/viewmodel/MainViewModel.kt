@@ -873,6 +873,10 @@ class MainViewModel(
 
     /** 清除地图选点状态 */
 
+    fun setUseRealRoute(use: Boolean) {
+        _uiState.update { it.copy(useRealRoute = use) }
+    }
+
     /**
      * 开始路线模拟。
      * - 手动模式：启动 spoofing（STILL），由摇杆驱动 moveByJoystick 实时更新坐标。
@@ -885,13 +889,94 @@ class MainViewModel(
             return
         }
         if (state.routePoints.size < 2) return
-        val startPoint = state.routePoints.first()
+
+        if (state.useRealRoute) {
+            _uiState.update { it.copy(isFetchingRoute = true) }
+            fetchRealRouteAndStart(state.routePoints, state)
+        } else {
+            startSimulationWithPoints(state.routePoints, state)
+        }
+    }
+
+    private fun fetchRealRouteAndStart(points: List<RoutePoint>, state: AppState) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                com.amap.api.services.core.ServiceSettings.updatePrivacyShow(context, true, true)
+                com.amap.api.services.core.ServiceSettings.updatePrivacyAgree(context, true)
+                
+                val routeSearch = com.amap.api.services.route.RouteSearch(context)
+                val allRealPoints = mutableListOf<RoutePoint>()
+                var hasError = false
+                
+                for (i in 0 until points.size - 1) {
+                    // 从起点到终点，中间点作为途经点
+                    val start = com.amap.api.services.core.LatLonPoint(points[i].lat, points[i].lng)
+                    val end = com.amap.api.services.core.LatLonPoint(points[i + 1].lat, points[i + 1].lng)
+                    val fromAndTo = com.amap.api.services.route.RouteSearch.FromAndTo(start, end)
+
+                    // 创建驾车路线查询 (0: 速度优先，不考虑路况)
+                    val query = com.amap.api.services.route.RouteSearch.DriveRouteQuery(
+                        fromAndTo, com.amap.api.services.route.RouteSearch.DrivingDefault, null, null, ""
+                    )
+                    
+                    val result = routeSearch.calculateDriveRoute(query)
+                    if (result != null && result.paths.isNotEmpty()) {
+                        val path = result.paths[0]
+                        val segmentPoints = mutableListOf<RoutePoint>()
+                        val stepEndIndices = mutableListOf<Int>()
+                        for (step in path.steps) {
+                            for (polyline in step.polyline) {
+                                segmentPoints.add(RoutePoint(polyline.latitude, polyline.longitude, 0.0))
+                            }
+                            if (segmentPoints.isNotEmpty()) {
+                                stepEndIndices.add(segmentPoints.size - 1)
+                            }
+                        }
+                        val trafficLights = path.totalTrafficlights
+                        if (trafficLights > 0 && stepEndIndices.isNotEmpty()) {
+                            stepEndIndices.shuffled().take(trafficLights).forEach { idx ->
+                                segmentPoints[idx] = segmentPoints[idx].copy(waitSec = 15.0)
+                            }
+                        }
+                        allRealPoints.addAll(segmentPoints)
+                    } else {
+                        hasError = true
+                        break
+                    }
+                }
+                
+                if (!hasError && allRealPoints.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update { it.copy(isFetchingRoute = false) }
+                        startSimulationWithPoints(allRealPoints, state)
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        _uiState.update { it.copy(isFetchingRoute = false) }
+                        android.widget.Toast.makeText(context, "路线规划失败或部分失败，使用直线模拟", android.widget.Toast.LENGTH_SHORT).show()
+                        startSimulationWithPoints(points, state)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(isFetchingRoute = false) }
+                    android.widget.Toast.makeText(context, "路线请求异常: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    startSimulationWithPoints(points, state)
+                }
+            }
+        }
+    }
+
+    private fun startSimulationWithPoints(pointsToRun: List<RoutePoint>, state: AppState) {
+        val startPoint = pointsToRun.first()
 
         _uiState.update {
             it.copy(
                 latitudeInput = String.format("%.6f", startPoint.lat),
                 longitudeInput = String.format("%.6f", startPoint.lng),
-                routePlanStage = RoutePlanStage.RUNNING
+                routePlanStage = RoutePlanStage.RUNNING,
+                routePoints = pointsToRun
             )
         }
 
@@ -899,17 +984,11 @@ class MainViewModel(
 
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val routePoints = if (isLoop) {
-                // 循环路线不需要追加起点，由 autoRouteLoop 自行处理往返
-                state.routePoints
-            } else {
-                state.routePoints
-            }
-
+            
             locationRepository.startSpoofing(
                 context, startPoint.lat, startPoint.lng,
                 if (isLoop) state.routeSimMode.name else "STILL",
-                0f, now, routePoints, isLoop, state.appCoordinateSystems,
+                0f, now, pointsToRun, isLoop, state.appCoordinateSystems,
                 state.collectedWifiJson, state.collectedCellJson, state.collectedBluetoothJson,
                 state.mockWifi, state.mockCell, state.mockBluetooth, state.enableJitter
             )
@@ -921,7 +1000,6 @@ class MainViewModel(
         if (isLoop) {
             startAutoRouteLoop()
         }
-        // 手动模式不需要 sync loop，由摇杆直接驱动
     }
 
     /** 停止路线模拟，重置所有状态 */

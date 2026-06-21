@@ -162,20 +162,33 @@ object TrajectorySimulator {
         val gapDistance = haversineDistance(points.last(), points.first())
         val isLoop = gapDistance < 100.0
 
-        val from: RoutePoint
-        val to: RoutePoint
+        var from: RoutePoint = points.first()
+        var to: RoutePoint = points.first()
         var fraction: Double = 1.0
 
         if (isLoop) {
-            val fullLoopDistance = totalDistance + gapDistance
+            val fullLoopDistance = (0 until points.size).sumOf { i ->
+                val nextI = if (i == points.size - 1) 0 else i + 1
+                haversineDistance(points[i], points[nextI]) + points[i].waitSec * speedMs
+            }
             if (fullLoopDistance > 0) {
                 remainingDist %= fullLoopDistance
             }
             
             var segStartIdx = 0
             while (true) {
-                val isLastToFirst = (segStartIdx == points.size - 1)
                 val fromPoint = points[segStartIdx]
+                val waitDist = fromPoint.waitSec * speedMs
+                
+                if (remainingDist <= waitDist) {
+                    from = fromPoint
+                    to = fromPoint
+                    fraction = 0.0
+                    break
+                }
+                remainingDist -= waitDist
+
+                val isLastToFirst = (segStartIdx == points.size - 1)
                 val toPoint = if (isLastToFirst) points.first() else points[segStartIdx + 1]
                 
                 val segLen = haversineDistance(fromPoint, toPoint)
@@ -191,20 +204,46 @@ object TrajectorySimulator {
             }
         } else {
             var segStartIdx = 0
+            var found = false
             while (segStartIdx < points.size - 1) {
-                val segLen = haversineDistance(points[segStartIdx], points[segStartIdx + 1])
+                val fromPoint = points[segStartIdx]
+                val waitDist = fromPoint.waitSec * speedMs
+                
+                if (remainingDist <= waitDist) {
+                    from = fromPoint
+                    to = fromPoint
+                    fraction = 0.0
+                    found = true
+                    break
+                }
+                remainingDist -= waitDist
+
+                val toPoint = points[segStartIdx + 1]
+                val segLen = haversineDistance(fromPoint, toPoint)
                 if (remainingDist <= segLen) {
+                    from = fromPoint
+                    to = toPoint
+                    fraction = if (segLen > 0) (remainingDist / segLen).coerceIn(0.0, 1.0) else 1.0
+                    found = true
                     break
                 }
                 remainingDist -= segLen
                 segStartIdx++
             }
 
-            from = points[segStartIdx]
-            to = if (segStartIdx < points.size - 1) points[segStartIdx + 1] else points.last()
-
-            val segLen = haversineDistance(from, to)
-            fraction = if (segLen > 0) (remainingDist / segLen).coerceIn(0.0, 1.0) else 1.0
+            if (!found) {
+                val lastPoint = points.last()
+                val waitDist = lastPoint.waitSec * speedMs
+                if (remainingDist <= waitDist) {
+                    from = lastPoint
+                    to = lastPoint
+                    fraction = 0.0
+                } else {
+                    from = lastPoint
+                    to = lastPoint
+                    fraction = 1.0
+                }
+            }
         }
 
         val bearing = bearing(from, to)
