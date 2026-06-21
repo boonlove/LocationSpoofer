@@ -139,7 +139,6 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                         .clickable { darkModeExpanded = true }
                         .padding(horizontal = 16.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -352,7 +351,7 @@ fun PasswordField(
     singleLine: Boolean = false,
     colors: TextFieldColors = OutlinedTextFieldDefaults.colors()
 ) {
-    var privacyEnabled by rememberSaveable { mutableStateOf(true) }
+    var privacyEnabled by remember { mutableStateOf(true) }
     var isFocused by remember { mutableStateOf(false) }
 
     OutlinedTextField(
