@@ -18,6 +18,7 @@ import com.suseoaa.locationspoofer.data.repository.LocationRepository
 import com.suseoaa.locationspoofer.data.repository.SettingsRepository
 import com.suseoaa.locationspoofer.provider.SpooferProvider
 import com.suseoaa.locationspoofer.service.SpoofingService
+import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -285,11 +286,7 @@ class MainViewModel(
                 locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
     }
 
-    private val activeEngine = if (uiState.value.mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AUTO) {
-        if (isDomesticEnvironment()) com.suseoaa.locationspoofer.data.model.MapEngine.AMAP else com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE
-    } else {
-        uiState.value.mapEngine
-    }
+    private val activeEngine = uiState.value.mapEngine.activeEngine(isDomesticEnvironment())
 
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.Main) {

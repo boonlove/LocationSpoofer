@@ -53,6 +53,7 @@ import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SimMode
+import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
 import com.suseoaa.locationspoofer.ui.theme.AccentOrange
@@ -84,11 +85,7 @@ fun FullScreenMapPage(
     val focusManager = LocalFocusManager.current
     var showApiKeyWarning by remember { mutableStateOf(false) }
 
-    val activeEngine = if (uiState.mapEngine == MapEngine.AUTO) {
-        if (isDomestic) MapEngine.AMAP else MapEngine.GOOGLE
-    } else {
-        uiState.mapEngine
-    }
+    val activeEngine = uiState.mapEngine.activeEngine(isDomestic)
 
     // 拦截返回键：如果有搜索结果，按返回键先关闭搜索结果
     BackHandler(enabled = showSearchResults) {
@@ -190,7 +187,7 @@ fun FullScreenMapPage(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 地图
-        AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, isDark = uiState.darkMode.isDark(), modifier = Modifier.fillMaxSize()) { map ->
+        AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, isDark = isDark, modifier = Modifier.fillMaxSize()) { map ->
             mapRef = map
             map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042

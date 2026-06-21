@@ -19,6 +19,7 @@ import com.suseoaa.locationspoofer.data.model.AppMapType
 
 import com.google.android.gms.maps.CameraUpdateFactory as GCameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 import com.google.android.gms.maps.MapView as GMapView
 import com.google.android.gms.maps.model.BitmapDescriptorFactory as GBitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng as GLatLng
@@ -484,11 +485,7 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
         mapController?.setDarkMode(isDark, context)
     }
 
-    val activeEngine = if (mapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AUTO) {
-        if (isDomestic) com.suseoaa.locationspoofer.data.model.MapEngine.AMAP else com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE
-    } else {
-        mapEngine
-    }
+    val activeEngine = mapEngine.activeEngine(isDomestic)
 
     if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP) {
         val amapView = remember {

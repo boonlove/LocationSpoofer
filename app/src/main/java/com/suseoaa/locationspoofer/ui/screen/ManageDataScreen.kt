@@ -146,7 +146,7 @@ fun ManageDataScreen(
                     AppMapView(
                         mapEngine = uiState.mapEngine,
                         isDomestic = viewModel.isDomesticEnvironment(),
-                        isDark = uiState.darkMode.isDark(),
+                        isDark = isDark,
                         modifier = Modifier.fillMaxSize(),
                         onMapReady = { controller ->
                             mapController = controller

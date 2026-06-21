@@ -84,6 +84,7 @@ import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.BuildConfig
 import com.suseoaa.locationspoofer.data.model.MapEngine
+import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 
 data class AppPoiItem(val title: String, val snippet: String, val lat: Double, val lng: Double)
 
@@ -152,11 +153,7 @@ fun SpoofingScreen(
 
     var hasAutoCheckedUpdates by remember { mutableStateOf(false) }
 
-    val activeEngine = if (uiState.mapEngine == MapEngine.AUTO) {
-        if (isDomestic) MapEngine.AMAP else MapEngine.GOOGLE
-    } else {
-        uiState.mapEngine
-    }
+    val activeEngine = uiState.mapEngine.activeEngine(isDomestic)
 
     LaunchedEffect(Unit) {
         if (!hasAutoCheckedUpdates) {
@@ -377,7 +374,7 @@ fun SpoofingScreen(
 
         // 地图缩略图
         Box(modifier = Modifier.fillMaxWidth().height(280.dp)) {
-            AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, isDark = uiState.darkMode.isDark(), modifier = Modifier.fillMaxSize()) { map ->
+            AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, isDark = isDark, modifier = Modifier.fillMaxSize()) { map ->
                 smallMapRef = map
                 map.disableUiControls()
                 val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042

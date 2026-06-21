@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.suseoaa.locationspoofer.ui.extensions.isDark
 import com.suseoaa.locationspoofer.ui.screen.BlockingScreen
 import com.suseoaa.locationspoofer.ui.screen.FullScreenMapPage
 import com.suseoaa.locationspoofer.ui.screen.InitializingScreen

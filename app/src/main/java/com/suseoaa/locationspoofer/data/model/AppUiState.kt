@@ -1,8 +1,6 @@
 package com.suseoaa.locationspoofer.data.model
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.Composable
 import com.suseoaa.locationspoofer.R
 
 enum class WifiLoadStatus { IDLE, LOADING, DONE }
@@ -51,13 +49,6 @@ enum class DarkMode {
     SYSTEM,
     LIGHT,
     DARK;
-
-    @Composable
-    fun isDark(): Boolean = when (this) {
-        DARK -> true
-        LIGHT -> false
-        else -> isSystemInDarkTheme()
-    }
 }
 
 data class AppState(
