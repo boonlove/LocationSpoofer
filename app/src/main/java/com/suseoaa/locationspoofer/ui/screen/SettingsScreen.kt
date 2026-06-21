@@ -16,14 +16,22 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.suseoaa.locationspoofer.R
@@ -267,7 +275,7 @@ fun SettingsScreen(
 
             // Animated Key Inputs
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.AMAP) {
-                OutlinedTextField(
+                PasswordField(
                     value = localAmapApiKey,
                     onValueChange = { localAmapApiKey = it },
                     label = { Text(stringResource(R.string.custom_amap_key)) },
@@ -280,7 +288,7 @@ fun SettingsScreen(
 
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.BAIDU) {
                 Column {
-                    OutlinedTextField(
+                    PasswordField(
                         value = localBaiduApiKey,
                         onValueChange = { localBaiduApiKey = it },
                         label = { Text(stringResource(R.string.custom_baidu_key)) },
@@ -289,7 +297,7 @@ fun SettingsScreen(
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentBlue, unfocusedBorderColor = MaterialTheme.colorScheme.outline, focusedLabelColor = AccentBlue)
                     )
-                    OutlinedTextField(
+                    PasswordField(
                         value = localBaiduStyleId,
                         onValueChange = { localBaiduStyleId = it },
                         label = { Text(stringResource(R.string.custom_baidu_style_id)) },
@@ -302,7 +310,7 @@ fun SettingsScreen(
             }
 
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.GOOGLE) {
-                OutlinedTextField(
+                PasswordField(
                     value = localGoogleApiKey,
                     onValueChange = { localGoogleApiKey = it },
                     label = { Text(stringResource(R.string.custom_google_key)) },
@@ -332,4 +340,45 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    singleLine: Boolean = false,
+    colors: TextFieldColors = OutlinedTextFieldDefaults.colors()
+) {
+    var privacyEnabled by rememberSaveable { mutableStateOf(true) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.onFocusChanged { isFocused = it.isFocused; if (!it.isFocused) privacyEnabled = true },
+        label = label,
+        placeholder = placeholder,
+        visualTransformation =
+            if (!privacyEnabled || isFocused) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+        trailingIcon = {
+            IconButton(
+                enabled = !isFocused,
+                onClick = { privacyEnabled = !privacyEnabled }
+            ) {
+                Icon(
+                    imageVector = if (!privacyEnabled || isFocused) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    contentDescription = null
+                )
+            }
+        },
+        singleLine = singleLine,
+        colors = colors
+    )
 }
