@@ -1795,6 +1795,11 @@ fun performPoiSearch(
                     if (rCode == 1000 && result != null) {
                         onResult(result.pois?.map { AppPoiItem(it.title ?: "", it.snippet ?: "", it.latLonPoint.latitude, it.latLonPoint.longitude) } ?: emptyList())
                     } else {
+                        if (rCode == 10003 || rCode == 10012 || rCode == 10013 || rCode == 10014 || rCode == 1800 || rCode == 18000) {
+                            android.widget.Toast.makeText(context, "高德搜索API调用失败(可能是额度耗尽)，请检查控制台或更换Key！", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (rCode != 1000) {
+                            android.widget.Toast.makeText(context, "高德搜索失败(错误码:$rCode)", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                         onResult(emptyList())
                     }
                 }
@@ -1803,6 +1808,10 @@ fun performPoiSearch(
             search.searchPOIAsyn()
         } catch (e: Exception) {
             e.printStackTrace()
+            val msg = e.message ?: ""
+            if (e is com.amap.api.services.core.AMapException || msg.contains("limit", ignoreCase = true) || msg.contains("额度")) {
+                android.widget.Toast.makeText(context, "高德搜索异常(可能是额度耗尽)：$msg", android.widget.Toast.LENGTH_LONG).show()
+            }
             onResult(emptyList())
         }
     } else {

@@ -961,7 +961,17 @@ class MainViewModel(
                 e.printStackTrace()
                 withContext(Dispatchers.Main) {
                     _uiState.update { it.copy(isFetchingRoute = false) }
-                    android.widget.Toast.makeText(context, "路线请求异常: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                    var msg = "路线请求异常: ${e.message}"
+                    if (e is com.amap.api.services.core.AMapException) {
+                        val errCode = e.errorCode
+                        val errMsg = e.errorMessage ?: ""
+                        msg = "高德API异常(码:$errCode): $errMsg"
+                        if (errCode == 10003 || errCode == 10012 || errCode == 10013 || errCode == 1800 || errCode == 18000 || 
+                            errMsg.contains("额度") || errMsg.contains("limit", ignoreCase = true)) {
+                            msg = "高德API调用失败(可能是额度耗尽)，将退回直线模拟！\n错误详情: $errMsg"
+                        }
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                     startSimulationWithPoints(points, state)
                 }
             }
