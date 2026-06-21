@@ -29,6 +29,8 @@ In modern Android risk control environments, the standard developer options feat
 
 **LocationSpoofer** is a system-level virtual positioning and radio environment cloning solution designed specifically to counter these deep anti-cheating mechanisms. By leveraging **KernelSU / Magisk / APatch** for root privileges and the **LSPosed (libxposed)** framework to inject hook routines into targeted processes, LocationSpoofer intercepts and fakes all positioning and wireless networking API responses with high physical fidelity. This ensures the target apps receive highly consistent location fingerprints without detecting any virtualization.
 
+The latest version adds more complete **Wi-Fi environment simulation** and **cell tower simulation**. It can build realistic radio fingerprints around the spoofed coordinates from local street-scan records, WiGLE cloud Wi-Fi data, and OpenCellID cell tower data, then inject consistent responses into target app processes through `WifiManager`, `TelephonyManager`, `PhoneStateListener`, and `TelephonyCallback` APIs.
+
 ---
 
 ## ✨ Core Features & Technical Deep Dive
@@ -62,8 +64,11 @@ Anti-cheat engines compare your GPS coordinates against the Wi-Fi scan results r
 * **Spatial Inverse Distance Weighting (IDW) Interpolation**: During virtual movements, the Xposed module searches the local Room SQLite DB for physical records within a 50-meter radius of the target coordinates. It computes weights based on the inverse square distance:
   $$w_i = \frac{1}{d_i^2}$$
   to interpolate nearby Wi-Fi RSSI, Cell signal strength dbm, and BLE Bluetooth RSSI. As you move, the signals dynamically fade and strengthen in a smooth gradient, avoiding abrupt jumps that trigger fraud alerts.
+* **Wi-Fi Scan and Connection-State Simulation**: Hooks `WifiManager.getScanResults()`, `getConnectionInfo()`, `getConfiguredNetworks()`, `getDhcpInfo()`, and related APIs to return coordinate-matched SSID/BSSID/RSSI/frequency/channel/capability data, along with consistent Wi-Fi enabled state, connected network, gateway, and DHCP details.
 * **Brand OUI Prefix Matching**: When generating fake scans in non-recorded zones, the generator assigns real MAC prefixes (OUI) belonging to mainstream network manufacturers (e.g. TP-Link, Huawei, ZTE, Xiaomi, Cisco, Netgear) instead of random MAC addresses.
-* **Cloud WiGLE API Integration**: Integrates WiGLE developer API tokens to pull real Wi-Fi network coordinates around the spoofed latitude and longitude in real-time.
+* **Cloud WiGLE API Integration**: Integrates WiGLE developer API tokens to pull real Wi-Fi network coordinates around the spoofed latitude and longitude in real-time, then stores them locally for later offline replay.
+* **OpenCellID Cell Tower Import**: Supports OpenCellID API keys to query real nearby cellular towers for the target coordinates, with GCJ-02 to WGS-84 coordinate conversion, bbox expansion, field normalization, and local caching.
+* **Cellular and Carrier API Simulation**: Covers `TelephonyManager.getAllCellInfo()`, `getCellLocation()`, `getNetworkOperator()`, `getServiceState()`, `getSignalStrength()`, `listen()`, `requestCellInfoUpdate()`, `registerTelephonyCallback()`, and related read paths. It supports GSM/WCDMA/LTE/NR identities, MCC/MNC/LAC/CID/TAC/PCI/NCI, RSRP/dbm signal strength, and carrier name spoofing. When cloud data lacks LTE/NR records, the module prepends a synthetic LTE primary cell for apps that only inspect 4G cell information.
 
 ### 5. 🛰️ Satellite Sky Matrix & NMEA Protocol Generator
 * **GNSS Status Hijacking**: Hooks `GnssStatus` to simulate a fully populated constellation of 20+ active satellites (GPS, BeiDou, GLONASS) detailing unique PRN IDs, signal-to-noise ratios (CNR/SNR), elevations, azimuths, and Used-In-Fix status flags.

@@ -30,6 +30,8 @@
 
 **LocationSpoofer** 是专为应对此类高强度风控而设计的系统级虚拟定位与无线电环境克隆方案。它基于 **KernelSU / Magisk / APatch** 获取底层 Root 权限，并利用 **LSPosed (libxposed)** 框架注入目标进程，以极高的物理契合度拦截并伪造所有与定位、网络环境相关的底层 API 响应，确保应用在无法察觉的情况下获取高度一致的虚假位置指纹。
 
+最新版本新增了更完整的 **Wi-Fi 环境模拟** 与 **移动基站模拟**：可从本地扫街数据、WiGLE 云端热点数据以及 OpenCellID 基站数据中构建目标坐标附近的真实无线电指纹，并在目标 App 进程内同步伪造 `WifiManager`、`TelephonyManager`、`PhoneStateListener` 与 `TelephonyCallback` 等接口返回，让位置、Wi-Fi、运营商、基站小区与信号强度保持一致。
+
 ---
 
 ## ✨ 核心特性与技术内幕
@@ -63,8 +65,11 @@
 * **空间反距离加权（IDW）插值**：当虚拟定位在地图上运动时，系统会在 Room 本地数据库中检索 50 米范围内的历史采集点。使用反距离平方比作为权重：
   $$w_i = \frac{1}{d_i^2}$$
   对周边所有 Wi-Fi RSSI 信号强度、蜂窝 dbm 级蓝牙 RSSI 进行动态差值计算。这使手机在虚拟移动时，Wi-Fi 信号会在后台平滑衰减和增强，模拟最真实的信号过渡，绝无指纹突变带来的安全隐患。
+* **Wi-Fi 扫描与连接态模拟**：Hook `WifiManager.getScanResults()`、`getConnectionInfo()`、`getConfiguredNetworks()`、`getDhcpInfo()` 等接口，按目标坐标返回伪造的 SSID/BSSID/RSSI/频率/信道/加密能力，同时同步 Wi-Fi 开关状态、连接网络、网关与 DHCP 信息。
 * **真实品牌 OUI 前缀匹配**：在无本地采集数据的空白区域，系统采用 TP-Link、Huawei、ZTE、Xiaomi、Cisco 等真实中国主流品牌路由器的合法 MAC 前缀（Organizationally Unique Identifier）生成虚拟 Wi-Fi BSSID，拒绝因随机生成非法 MAC 而被反作弊厂商识破。
-* **云端联合伪装 (WiGLE API)**：可配置 WiGLE API 密钥，实时在线拉取全球指定经纬度周围真实物理存在的 Wi-Fi 热点。
+* **云端联合伪装 (WiGLE API)**：可配置 WiGLE API 密钥，实时在线拉取全球指定经纬度周围真实物理存在的 Wi-Fi 热点，并写入本地环境数据库，后续可离线复用。
+* **OpenCellID 基站数据导入**：可配置 OpenCellID API Key，按目标坐标查询附近真实蜂窝小区，自动完成 GCJ-02 到 WGS-84 坐标转换、bbox 扩展查询、字段归一化与本地缓存。
+* **移动基站与运营商接口模拟**：覆盖 `TelephonyManager.getAllCellInfo()`、`getCellLocation()`、`getNetworkOperator()`、`getServiceState()`、`getSignalStrength()`、`listen()`、`requestCellInfoUpdate()`、`registerTelephonyCallback()` 等读取路径，支持 GSM/WCDMA/LTE/NR 小区信息、MCC/MNC/LAC/CID/TAC/PCI/NCI、RSRP/dbm 信号强度与运营商名称模拟；当云端数据缺少 LTE/NR 时，会补充合成 LTE 主小区以兼容只读取 4G 的检测软件。
 
 ### 5. 🛰️ 卫星矩阵与 NMEA 协议生成器
 * **GNSS Status 劫持**：Hook 系统的 `GnssStatus` 类，模拟多达 20+ 颗包括 GPS、北斗、GLONASS 的卫星分布矩阵，注入真实的 PRN 标识、信噪比（CNR）、俯仰角、方位角等，并正确汇报 `usedInFix`（参与定位计算）状态。
