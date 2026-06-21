@@ -42,6 +42,7 @@ class MainViewModel(
     private val environmentScanner: com.suseoaa.locationspoofer.utils.EnvironmentScanner,
     private val environmentDao: com.suseoaa.locationspoofer.data.db.EnvironmentDao,
     private val wifiRepository: com.suseoaa.locationspoofer.data.repository.WifiRepository,
+    private val opencellidClient: com.suseoaa.locationspoofer.utils.OpenCellIdClient,
     private val context: Context
 ) : ViewModel() {
 
@@ -73,7 +74,8 @@ class MainViewModel(
             enableJitter = settingsRepository.enableJitter,
             altitudeInput = settingsRepository.altitude,
             satelliteCountInput = settingsRepository.satelliteCount,
-            wigleToken = settingsRepository.getWigleApiToken()
+            wigleToken = settingsRepository.getWigleApiToken(),
+            opencellidToken = settingsRepository.getOpencellidApiToken()
         )
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
@@ -640,63 +642,104 @@ class MainViewModel(
             return
         }
         
-        viewModelScope.launch(Dispatchers.IO) {
-            val allRecords = environmentDao.getAllCompleteLocations()
-            val validRecords = mutableListOf<com.suseoaa.locationspoofer.data.db.CompleteLocation>()
-            
-            for (record in allRecords) {
-                val loc = record.location
-                val dLat = Math.toRadians(lat - loc.lat)
-                val dLng = Math.toRadians(lng - loc.lng)
-                val a = kotlin.math.sin(dLat / 2).let { it * it } + 
-                        kotlin.math.cos(Math.toRadians(loc.lat)) * 
-                        kotlin.math.cos(Math.toRadians(lat)) * 
-                        kotlin.math.sin(dLng / 2).let { it * it }
-                val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-                
-                if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
-                    validRecords.add(record)
-                }
+        viewModelScope.launch {
+            evaluateMockCapabilitiesSuspend(lat, lng)
+        }
+    }
+
+    private suspend fun evaluateMockCapabilitiesSuspend(lat: Double, lng: Double) {
+        val allRecords = withContext(Dispatchers.IO) { environmentDao.getAllCompleteLocations() }
+        val validRecords = mutableListOf<com.suseoaa.locationspoofer.data.db.CompleteLocation>()
+
+        for (record in allRecords) {
+            val loc = record.location
+            val dLat = Math.toRadians(lat - loc.lat)
+            val dLng = Math.toRadians(lng - loc.lng)
+            val a = kotlin.math.sin(dLat / 2).let { it * it } +
+                    kotlin.math.cos(Math.toRadians(loc.lat)) *
+                    kotlin.math.cos(Math.toRadians(lat)) *
+                    kotlin.math.sin(dLng / 2).let { it * it }
+            val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+
+            if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
+                validRecords.add(record)
             }
-            
-            withContext(Dispatchers.Main) {
-                if (validRecords.isEmpty()) {
-                    _uiState.update { 
-                        it.copy(
-                            canMockWifi = false, canMockCell = false, canMockBluetooth = false,
-                            collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]",
-                            wifiApCount = 0,
-                            wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
-                        ) 
-                    }
-                } else {
-                    val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
-                    val hasW = wifiJson != "[]"
-                    val hasC = cellJson != "[]"
-                    val hasB = btJson != "[]"
-                    
-                    val wifiCount = try {
-                        val obj = org.json.JSONObject(wifiJson)
-                        val nearby = obj.optJSONArray("nearbyWifi")
-                        nearby?.length() ?: 0
-                    } catch (e: Exception) { 0 }
-                    
-                    _uiState.update { 
-                        it.copy(
-                            canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
-                            collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson,
-                            wifiApCount = wifiCount,
-                            wifiLoadStatus = if (hasW) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
-                        ) 
-                    }
+        }
+
+        withContext(Dispatchers.Main) {
+            if (validRecords.isEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        canMockWifi = false, canMockCell = false, canMockBluetooth = false,
+                        collectedWifiJson = "[]", collectedCellJson = "[]", collectedBluetoothJson = "[]",
+                        wifiApCount = 0,
+                        wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
+                    )
+                }
+            } else {
+                val (wifiJson, cellJson, btJson) = locationToJson(validRecords, lat, lng)
+                val hasW = try {
+                    val obj = org.json.JSONObject(wifiJson)
+                    val nearby = obj.optJSONArray("nearbyWifi")
+                    val connected = obj.opt("connectedWifi")
+                    (nearby != null && nearby.length() > 0) || (connected != null && !obj.isNull("connectedWifi"))
+                } catch (e: Exception) {
+                    false
+                }
+                val hasC = try {
+                    val arr = org.json.JSONArray(cellJson)
+                    arr.length() > 0
+                } catch (e: Exception) {
+                    false
+                }
+                val hasB = try {
+                    val arr = org.json.JSONArray(btJson)
+                    arr.length() > 0
+                } catch (e: Exception) {
+                    false
+                }
+
+                val wifiCount = try {
+                    val obj = org.json.JSONObject(wifiJson)
+                    val nearby = obj.optJSONArray("nearbyWifi")
+                    nearby?.length() ?: 0
+                } catch (e: Exception) { 0 }
+
+                _uiState.update {
+                    it.copy(
+                        canMockWifi = hasW, canMockCell = hasC, canMockBluetooth = hasB,
+                        collectedWifiJson = wifiJson, collectedCellJson = cellJson, collectedBluetoothJson = btJson,
+                        wifiApCount = wifiCount,
+                        wifiLoadStatus = if (hasW) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
+                    )
                 }
             }
         }
     }
 
-    private suspend fun hasLocalScansWithin50m(lat: Double, lng: Double): Boolean {
+    private suspend fun hasLocalWifiWithin50m(lat: Double, lng: Double): Boolean {
         val allRecords = withContext(Dispatchers.IO) { environmentDao.getAllCompleteLocations() }
         for (record in allRecords) {
+            if (record.wifis.isEmpty()) continue
+            val loc = record.location
+            val dLat = Math.toRadians(lat - loc.lat)
+            val dLng = Math.toRadians(lng - loc.lng)
+            val a = kotlin.math.sin(dLat / 2).let { it * it } +
+                    kotlin.math.cos(Math.toRadians(loc.lat)) *
+                    kotlin.math.cos(Math.toRadians(lat)) *
+                    kotlin.math.sin(dLng / 2).let { it * it }
+            val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+            if (distance <= 50.0) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private suspend fun hasLocalCellsWithin50m(lat: Double, lng: Double): Boolean {
+        val allRecords = withContext(Dispatchers.IO) { environmentDao.getAllCompleteLocations() }
+        for (record in allRecords) {
+            if (record.cells.isEmpty()) continue
             val loc = record.location
             val dLat = Math.toRadians(lat - loc.lat)
             val dLng = Math.toRadians(lng - loc.lng)
@@ -706,9 +749,15 @@ class MainViewModel(
                     kotlin.math.sin(dLng / 2).let { it * it }
             val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
             if (distance <= 50.0) {
+                val cellCount = record.cells.size
+                val cellInfoStr = record.cells.map { cell ->
+                    "Type: ${cell.device.type}, MCC: ${cell.device.mcc}, MNC: ${cell.device.mnc}, LAC: ${cell.device.lac}, CID: ${cell.device.cid}, DBM: ${cell.locationCell.dbm}"
+                }.joinToString("; ")
+                android.util.Log.d("OpenCellID", "hasLocalCellsWithin50m: Found cached cells within 50m of ($lat, $lng) at location ID ${record.location.id}. Distance: ${String.format("%.2f", distance)}m, Cell Count: $cellCount. Bypassing network request. Cached cells: $cellInfoStr")
                 return true
             }
         }
+        android.util.Log.d("OpenCellID", "hasLocalCellsWithin50m: No cached cells within 50m of ($lat, $lng). Will perform network request.")
         return false
     }
 
@@ -826,6 +875,119 @@ class MainViewModel(
         }
     }
 
+    private suspend fun fetchCellFromOpenCellIdSync(lat: Double, lng: Double) {
+        val tokenToUse = settingsRepository.getOpencellidApiToken()
+        if (tokenToUse.isBlank()) {
+            android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Token is blank. Skipping request and database insertion.")
+            return
+        }
+        android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Starting request for coordinates ($lat, $lng)")
+        val wgs84 = com.suseoaa.locationspoofer.utils.CoordinateUtils.gcj02ToWgs84(lat, lng)
+        val wgsLat = wgs84.lat
+        val wgsLng = wgs84.lng
+        android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Converted GCJ-02 ($lat, $lng) -> WGS-84 ($wgsLat, $wgsLng) for OpenCellID query")
+
+        try {
+            val rawJsonArrayString = opencellidClient.fetchCellData(wgsLat, wgsLng, tokenToUse)
+            val cellsArray = org.json.JSONArray(rawJsonArrayString)
+            android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Received cell list size: ${cellsArray.length()}")
+            if (cellsArray.length() > 0) {
+                val formattedCells = normalizeCellArrayForStorage(cellsArray)
+                if (formattedCells.length() == 0) {
+                    android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: No usable cells after normalization.")
+                    return
+                }
+
+                withContext(Dispatchers.IO) {
+                    saveEnvironmentData(lat, lng, "{}", formattedCells.toString(), "[]")
+                    val newestLocation = environmentDao.getAllLocations().firstOrNull { it.lat == lat && it.lng == lng }
+                    if (newestLocation != null) {
+                        environmentDao.updateMetadata(newestLocation.id, "OpenCellID 导入", "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})")
+                    }
+                    android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Successfully inserted ${formattedCells.length()} cells into database.")
+                }
+
+                withContext(Dispatchers.Main) {
+                    evaluateMockCapabilities()
+                    // Refresh count
+                    viewModelScope.launch(Dispatchers.IO) {
+                        val count = environmentDao.getRecordCount()
+                        _uiState.update { it.copy(environmentRecordCount = count) }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun normalizeCellArrayForStorage(cellsArray: org.json.JSONArray): org.json.JSONArray {
+        val formattedCells = org.json.JSONArray()
+        for (i in 0 until cellsArray.length()) {
+            val cell = cellsArray.optJSONObject(i) ?: continue
+            val area = cellArea(cell)
+            val identity = cellIdentity(cell)
+            if (area <= 0 || identity <= 0) {
+                android.util.Log.d("OpenCellID", "normalizeCellArrayForStorage: Skipping invalid cell: $cell")
+                continue
+            }
+
+            val type = normalizeCellType(cell.optString("type", cell.optString("radio", "LTE")))
+            val cellObj = org.json.JSONObject().apply {
+                put("type", type)
+                put("radio", cell.optString("radio", type))
+                put("mcc", positiveCellInt(cell, "mcc", default = 460))
+                put("mnc", positiveCellInt(cell, "mnc", "net", default = 0))
+                put("tac", area)
+                put("lac", area)
+                put("ci", identity)
+                put("cid", identity)
+                put("cellid", identity)
+                put("pci", positiveCellInt(cell, "pci", default = (identity % 504).coerceIn(0, 503)))
+                put("dbm", cellSignalDbm(cell, i))
+                put("isRegistered", cell.optBoolean("isRegistered", i == 0))
+            }
+            formattedCells.put(cellObj)
+        }
+        return formattedCells
+    }
+
+    private fun normalizeCellType(rawType: String): String {
+        return when (rawType.uppercase(java.util.Locale.US)) {
+            "GSM" -> "GSM"
+            "UMTS", "WCDMA" -> "WCDMA"
+            "NR", "NR5G", "5G" -> "NR"
+            else -> "LTE"
+        }
+    }
+
+    private fun cellArea(cell: org.json.JSONObject): Int =
+        positiveCellInt(cell, "tac", "lac", "area", default = 0)
+
+    private fun cellIdentity(cell: org.json.JSONObject): Int =
+        positiveCellInt(cell, "ci", "cid", "cellid", "cell", default = 0)
+
+    private fun positiveCellInt(cell: org.json.JSONObject, vararg keys: String, default: Int): Int {
+        for (key in keys) {
+            if (!cell.has(key) || cell.isNull(key)) continue
+            val value = cell.optInt(key, Int.MIN_VALUE)
+            if (value > 0) return value
+            val parsed = cell.optString(key).toIntOrNull()
+            if (parsed != null && parsed > 0) return parsed
+        }
+        return default
+    }
+
+    private fun cellSignalDbm(cell: org.json.JSONObject, index: Int): Int {
+        val direct = cell.optInt("dbm", Int.MIN_VALUE)
+        if (direct in -140..-40) return direct
+        val average = cell.optInt("averageSignalStrength", Int.MIN_VALUE)
+        if (average in -140..-40) return average
+        val signal = cell.optInt("signal", Int.MIN_VALUE)
+        if (signal in -140..-40) return signal
+        return (-70 - index * 3).coerceAtLeast(-110)
+    }
+
     // 定点模拟
 
     @android.annotation.SuppressLint("MissingPermission")
@@ -851,9 +1013,14 @@ class MainViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingConfig = true) }
             
-            if (state.mockWifi && !hasLocalScansWithin50m(lat, lng)) {
+            if (state.mockWifi && !hasLocalWifiWithin50m(lat, lng)) {
                 fetchWifiFromWigleSync(lat, lng)
             }
+            if (state.mockCell && !hasLocalCellsWithin50m(lat, lng)) {
+                fetchCellFromOpenCellIdSync(lat, lng)
+            }
+
+            evaluateMockCapabilitiesSuspend(lat, lng)
             
             val updatedState = _uiState.value
             val now = System.currentTimeMillis()
@@ -866,7 +1033,7 @@ class MainViewModel(
                 updatedState.collectedCellJson,
                 updatedState.collectedBluetoothJson,
                 updatedState.mockWifi && updatedState.canMockWifi,
-                updatedState.mockCell && updatedState.canMockCell,
+                updatedState.mockCell,
                 updatedState.mockBluetooth && updatedState.canMockBluetooth,
                 updatedState.enableJitter
             )
@@ -1022,11 +1189,6 @@ class MainViewModel(
             )
         }
         evaluateMockCapabilities()
-        viewModelScope.launch {
-            if (_uiState.value.mockWifi && !hasLocalScansWithin50m(lat, lng)) {
-                fetchWifiFromWigleSync(lat, lng)
-            }
-        }
     }
 
     /** 清除地图选点状态 */
@@ -1611,6 +1773,11 @@ class MainViewModel(
         _uiState.update { it.copy(wigleToken = token) }
     }
 
+    fun setOpencellidApiToken(token: String) {
+        settingsRepository.setOpencellidApiToken(token)
+        _uiState.update { it.copy(opencellidToken = token) }
+    }
+
     @Suppress("DEPRECATION")
     private fun getAppSignatureSHA1(): String {
         try {
@@ -1750,17 +1917,59 @@ class MainViewModel(
             val cellArr = org.json.JSONArray(cellJson)
             for (i in 0 until cellArr.length()) {
                 val obj = cellArr.getJSONObject(i)
-                val type = obj.optString("type", "UNKNOWN")
-                val cellKey = "${type}_${obj.optInt("mcc")}_${obj.optInt("mnc")}_${obj.optInt("tac", 0)}_${obj.optInt("ci", 0)}_${obj.optInt("cid", 0)}_${obj.optInt("basestationId", 0)}"
+                val type = normalizeCellType(obj.optString("type", obj.optString("radio", "UNKNOWN")))
+                val area = cellArea(obj)
+                val identity = cellIdentity(obj)
+                val tac = when (type) {
+                    "LTE", "NR" -> area
+                    else -> positiveCellInt(obj, "tac", default = 0)
+                }
+                val lac = when (type) {
+                    "GSM", "WCDMA" -> area
+                    else -> positiveCellInt(obj, "lac", default = 0)
+                }
+                val ci = when (type) {
+                    "LTE" -> identity
+                    else -> positiveCellInt(obj, "ci", default = 0)
+                }
+                val cid = when (type) {
+                    "GSM", "WCDMA" -> identity
+                    else -> positiveCellInt(obj, "cid", default = 0)
+                }
+                val nci = if (type == "NR") {
+                    obj.optLong("nci", identity.toLong()).takeIf { it > 0L } ?: identity.toLong()
+                } else {
+                    obj.optLong("nci", 0L)
+                }
+                val basestationId = if (type == "CDMA") {
+                    positiveCellInt(obj, "basestationId", "cellid", "cell", default = 0)
+                } else {
+                    positiveCellInt(obj, "basestationId", default = 0)
+                }
+                if (area <= 0 && identity <= 0 && basestationId <= 0) continue
+                val cellKey = "${type}_${positiveCellInt(obj, "mcc", default = 460)}_${positiveCellInt(obj, "mnc", "net", default = 0)}_${tac}_${ci}_${cid}_${basestationId}_${nci}"
                 val device = com.suseoaa.locationspoofer.data.db.CellDevice(
-                    cellKey = cellKey, type = type, mcc = obj.optInt("mcc", 460), mnc = obj.optInt("mnc", 0),
-                    tac = obj.optInt("tac", 0), ci = obj.optInt("ci", 0), pci = obj.optInt("pci", 0),
-                    lac = obj.optInt("lac", 0), cid = obj.optInt("cid", 0), psc = obj.optInt("psc", 0),
-                    nci = obj.optLong("nci", 0L), networkId = obj.optInt("networkId", 0), systemId = obj.optInt("systemId", 0),
-                    basestationId = obj.optInt("basestationId", 0)
+                    cellKey = cellKey, type = type,
+                    mcc = positiveCellInt(obj, "mcc", default = 460),
+                    mnc = positiveCellInt(obj, "mnc", "net", default = 0),
+                    tac = tac, ci = ci,
+                    pci = positiveCellInt(obj, "pci", default = if (identity > 0) (identity % 504).coerceIn(0, 503) else 0),
+                    lac = lac, cid = cid,
+                    psc = positiveCellInt(obj, "psc", default = 0),
+                    nci = nci,
+                    networkId = positiveCellInt(obj, "networkId", default = 0),
+                    systemId = positiveCellInt(obj, "systemId", default = 0),
+                    basestationId = basestationId
                 )
                 environmentDao.insertCellDevice(device)
-                environmentDao.insertLocationCell(com.suseoaa.locationspoofer.data.db.LocationCell(locId, cellKey, obj.optInt("dbm", -80), obj.optBoolean("isRegistered", false)))
+                environmentDao.insertLocationCell(
+                    com.suseoaa.locationspoofer.data.db.LocationCell(
+                        locId,
+                        cellKey,
+                        cellSignalDbm(obj, i),
+                        obj.optBoolean("isRegistered", i == 0)
+                    )
+                )
             }
         } catch (e: Exception) {}
 

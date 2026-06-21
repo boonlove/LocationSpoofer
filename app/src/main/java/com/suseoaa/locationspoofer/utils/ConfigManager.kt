@@ -68,15 +68,33 @@ class ConfigManager(private val rootManager: RootManager) {
             appCoordinateSystems.forEach { (pkg, sys) -> coordSysObj.put(pkg, sys) }
             put("app_coordinate_systems", coordSysObj)
         }
+        val cellCount = json.optJSONArray("cell_json")?.length() ?: 0
+        android.util.Log.d(
+            "OpenCellID",
+            "saveConfig: active=$active mockCell=$mockCell lat=$lat lng=$lng cellJsonCount=$cellCount"
+        )
 
-        // 使用heredoc写入,避免JSON中的特殊字符(单引号等)被shell误解析
-        val escapedJson = json.toString().replace("\\", "\\\\").replace("\"", "\\\"")
+        // 使用 quoted heredoc 写入，避免 JSON 中的引号、美元符号等被 shell 解析。
+        val jsonText = json.toString()
         val command = """
-            echo "$escapedJson" > /data/local/tmp/locationspoofer_config.json
-            chmod 777 /data/local/tmp/locationspoofer_config.json
-            chcon u:object_r:shell_data_file:s0 /data/local/tmp/locationspoofer_config.json
+            cat > /data/local/tmp/locationspoofer_config.json <<'LOCATIONSPOOFER_JSON'
+            $jsonText
+            LOCATIONSPOOFER_JSON
+            chmod 666 /data/local/tmp/locationspoofer_config.json
+            chcon u:object_r:shell_data_file:s0 /data/local/tmp/locationspoofer_config.json 2>/dev/null || true
+
+            cat > /data/system/locationspoofer_config.json <<'LOCATIONSPOOFER_JSON_SYSTEM'
+            $jsonText
+            LOCATIONSPOOFER_JSON_SYSTEM
+            chown system:system /data/system/locationspoofer_config.json 2>/dev/null || true
+            chmod 644 /data/system/locationspoofer_config.json
+            chcon u:object_r:system_data_file:s0 /data/system/locationspoofer_config.json 2>/dev/null || true
         """.trimIndent()
 
-        rootManager.executeCommand(command)
+        val result = rootManager.executeCommand(command)
+        android.util.Log.d(
+            "OpenCellID",
+            "saveConfig: wrote config copies to /data/local/tmp and /data/system, result=${result.take(200)}"
+        )
     }
 }

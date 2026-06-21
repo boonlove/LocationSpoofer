@@ -188,4 +188,8 @@
     <string name="wigle_config">WiGLE API 配置</string>
     <string name="custom_wigle_token">WiGLE API 密钥 (Basic Auth Base64)</string>
     <string name="custom_wigle_token_hint">输入您的 WiGLE 密钥...</string>
+
+    <string name="opencellid_config">OpenCellID API 配置</string>
+    <string name="custom_opencellid_token">OpenCellID API 密钥</string>
+    <string name="custom_opencellid_token_hint">输入您的 OpenCellID 密钥...</string>
 </resources>

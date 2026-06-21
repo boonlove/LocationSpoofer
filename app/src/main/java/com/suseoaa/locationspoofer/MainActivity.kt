@@ -23,7 +23,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Density
 import com.suseoaa.locationspoofer.ui.extensions.isDark
 import com.suseoaa.locationspoofer.ui.screen.BlockingScreen
 import com.suseoaa.locationspoofer.ui.screen.FullScreenMapPage
@@ -75,6 +77,10 @@ class MainActivity : ComponentActivity() {
                 val uiState by viewModel.uiState.collectAsState()
                 val isDark = uiState.darkMode.isDark()
                 val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
+                val baseDensity = LocalDensity.current
+                val appDensity = remember(baseDensity.density, baseDensity.fontScale) {
+                    Density(baseDensity.density, baseDensity.fontScale.coerceAtMost(1.15f))
+                }
 
                 // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新
                 // 使用 remember(uiState.currentLanguage) 确保语言切换时重新计算 Context
@@ -90,7 +96,8 @@ class MainActivity : ComponentActivity() {
 
                 CompositionLocalProvider(
                     LocalContext provides wrappedContext,
-                    LocalConfiguration provides configuration
+                    LocalConfiguration provides configuration,
+                    LocalDensity provides appDensity
                 ) {
                     MaterialTheme(colorScheme = colorScheme) {
                         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

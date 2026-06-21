@@ -174,4 +174,8 @@
     <string name="wigle_config">WiGLE API Configuration</string>
     <string name="custom_wigle_token">WiGLE API Token (Basic Auth Base64)</string>
     <string name="custom_wigle_token_hint">Enter your WiGLE token...</string>
+
+    <string name="opencellid_config">OpenCellID API Configuration</string>
+    <string name="custom_opencellid_token">OpenCellID API Token</string>
+    <string name="custom_opencellid_token_hint">Enter your OpenCellID token...</string>
 </resources>

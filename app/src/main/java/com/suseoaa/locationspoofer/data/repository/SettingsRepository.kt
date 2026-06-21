@@ -60,6 +60,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.wigleApiToken = value
     }
 
+    fun getOpencellidApiToken(): String = settingsManager.opencellidApiToken
+
+    fun setOpencellidApiToken(value: String) {
+        settingsManager.opencellidApiToken = value
+    }
+
     fun getBaiduStyleId(): String = settingsManager.baiduStyleId
 
     fun setBaiduStyleId(value: String) {

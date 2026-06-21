@@ -2024,7 +2024,7 @@ fun StartSpoofingDialog(
                     }
                 }
                 
-                if (uiState.canMockCell) {
+                if (uiState.canMockCell || uiState.opencellidToken.isNotBlank()) {
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.CellTower, null, tint = AccentOrange, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
