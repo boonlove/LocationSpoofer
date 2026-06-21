@@ -311,7 +311,7 @@ fun FullScreenMapPage(
                                     Spacer(Modifier.width(6.dp))
                                     Column {
                                         Text(poi.title, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                        Text(poi.snippet, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                                        Text(poi.snippet, fontSize = 10.sp, color = AppColors.textSecondary(isDark))
                                     }
                                 }
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
