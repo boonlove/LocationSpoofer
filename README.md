@@ -8,6 +8,7 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](LICENSE)
 [![Android CI status](https://github.com/boonlove/LocationSpoofer/actions/workflows/android.yml/badge.svg)](https://github.com/boonlove/LocationSpoofer/actions)
 [![Downloads](https://img.shields.io/github/downloads/boonlove/LocationSpoofer/total.svg)](https://github.com/boonlove/LocationSpoofer/releases)
+[![Latest Release Downloads](https://img.shields.io/github/downloads/boonlove/LocationSpoofer/latest/total.svg)](https://github.com/boonlove/LocationSpoofer/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green.svg)](https://developer.android.com)
 [![KernelSU](https://img.shields.io/badge/Root-KernelSU-orange.svg)](https://kernelsu.org)
 [![LSPosed](https://img.shields.io/badge/Framework-LSPosed-purple.svg)](https://github.com/LSPosed/LSPosed)
@@ -21,16 +22,27 @@
 
 > **📢 本项目由 [`HuangZhuoRui/LocationSpoofer`](https://github.com/HuangZhuoRui/LocationSpoofer) 分叉而来**。<br>
 > **📢 加入我们的 [Telegram 交流群](https://t.me/+CsxZGItXdW40ZWVl) 进行**~~技术探讨、催更、~~**吹牛逼、搞抽象。**
+>
+> **📖 查看 [LocationSpoofer 详细使用教程](https://docs.google.com/document/d/1fFEz3k7ATdN2dwY1L3RJn1QuzgokIsslNa88-vUPxPk/edit?usp=sharing)**
 
 ---
 
 ## 📖 项目简介
 
-在现代 Android 系统的风控环境中，传统的“模拟位置（Mock Location）”开发者选项早已被各类反作弊 SDK（如高德风控、腾讯安全、网易易盾等）列为高风险特征。它们不仅能够轻松检测到 `isFromMockProvider` 标志，还会通过收集周围的 **Wi-Fi BSSID 列表**、**移动基站蜂窝小区的蜂窝指纹**、**附近 BLE 蓝牙信标**，甚至通过对定位数据序列进行傅里叶变换（FFT）来识别规律的静态或线性模拟轨迹。
+在现代 Android 系统的风控环境中，传统的“模拟位置（Mock Location）”开发者选项早已被各类反作弊 SDK（如高德风控、腾讯安全、网易易盾等）列为高风险特征。它们不仅能够轻松检测到 `isFromMockProvider` 标志，还会通过收集周围的以下信息来识别异常：
 
-**LocationSpoofer** 是专为应对此类高强度风控而设计的系统级虚拟定位与无线电环境克隆方案。它基于 **KernelSU / Magisk / APatch** 获取底层 Root 权限，并利用 **LSPosed (libxposed)** 框架注入目标进程，以极高的物理契合度拦截并伪造所有与定位、网络环境相关的底层 API 响应，确保应用在无法察觉的情况下获取高度一致的虚假位置指纹。
+*   **Wi-Fi BSSID 列表**
+*   **移动基站蜂窝小区的蜂窝指纹**
+*   **附近 BLE 蓝牙信标**
+*   甚至通过对定位数据序列进行傅里叶变换（FFT）来识别规律的静态或线性模拟轨迹。
 
-最新版本新增了更完整的 **Wi-Fi 环境模拟** 与 **移动基站模拟**：可从本地扫街数据、WiGLE 云端热点数据以及 OpenCellID 基站数据中构建目标坐标附近的真实无线电指纹，并在目标 App 进程内同步伪造 `WifiManager`、`TelephonyManager`、`PhoneStateListener` 与 `TelephonyCallback` 等接口返回，让位置、Wi-Fi、运营商、基站小区与信号强度保持一致。
+**LocationSpoofer** 是专为应对此类高强度风控而设计的**系统级虚拟定位与无线电环境克隆方案**。
+它基于 **KernelSU / Magisk / APatch** 获取底层 Root 权限，并利用 **LSPosed (libxposed)** 框架注入目标进程，以极高的物理契合度拦截并伪造所有与定位、网络环境相关的底层 API 响应，确保应用在无法察觉的情况下获取高度一致的虚假位置指纹。
+
+> [!TIP]
+> **🌟 最新版本重要更新**
+> 
+> 新增了更完整的 **Wi-Fi 环境模拟** 与 **移动基站模拟**：可从本地扫街数据、WiGLE 云端热点数据以及 OpenCellID 基站数据中构建目标坐标附近的真实无线电指纹，并在目标 App 进程内同步伪造 `WifiManager`、`TelephonyManager`、`PhoneStateListener` 与 `TelephonyCallback` 等接口返回，让位置、Wi-Fi、运营商、基站小区与信号强度保持一致。
 
 ---
 
