@@ -535,7 +535,9 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
         )
     } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
         val baiduMapView = remember { 
-            val view = com.baidu.mapapi.map.TextureMapView(context)
+            val view = com.baidu.mapapi.map.TextureMapView(context).apply {
+                showZoomControls(false)
+            }
             view
         }
         DisposableEffect(lifecycle, baiduMapView) {
