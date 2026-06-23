@@ -139,7 +139,7 @@
 > [!NOTE]
 > **关于跨进程通信 (IPC) 的设计决策**：
 > 目标 App 进程在沙盒内运行时，由于 Android 11+ 包可见性及 SELinux 策略，若使用 `ContentProvider` 会导致主线程卡顿并产生 `Failed to find provider info` 错误。
-> 宿主 App 借助 Root 权限将配置以 JSON 格式写入 `/data/local/tmp/locationspoofer_config.json`，并赋予 `777` 权限及 `shell_data_file` SELinux 上下文。
+> 宿主 App 借助 Root 权限将配置以 JSON 格式写入 `/data/local/tmp/locationspoofer_config_fork.json`，并赋予 `777` 权限及 `shell_data_file` SELinux 上下文。
 > 目标沙盒内的 `LocationHooker` 启动一个**后台守护线程**，每 1000ms 异步读取文件并存储在 Volatile 内存中。主线程的 Hook 方法读取配置时永远是 0-IO 延迟，彻底杜绝了因频繁读取配置导致的目标 App 界面丢帧与卡顿。
 
 ---

@@ -139,7 +139,7 @@ This project is built on the **MVVM** architecture, implementing a custom Root-p
 > [!NOTE]
 > **IPC Design Decisions**:
 > Sandboxed app processes cannot query a custom `ContentProvider` on Android 11+ due to package visibility rules and SELinux isolation, resulting in slow responses or `Failed to find provider info` crashes.
-> To address this, the host app uses root shell permissions to write configuration parameters to `/data/local/tmp/locationspoofer_config.json`, changing permissions to `777` and applying the `shell_data_file` SELinux context.
+> To address this, the host app uses root shell permissions to write configuration parameters to `/data/local/tmp/locationspoofer_config_fork.json`, changing permissions to `777` and applying the `shell_data_file` SELinux context.
 > The sandboxed module's `LocationHooker` launches a **background daemon thread** that polls the file every 1000ms and updates a volatile in-memory cache. The main thread hooks fetch settings from memory with 0-IO latency, completely preventing UI drop-frames.
 
 ---

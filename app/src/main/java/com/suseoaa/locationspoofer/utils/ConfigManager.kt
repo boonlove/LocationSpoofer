@@ -77,18 +77,18 @@ class ConfigManager(private val rootManager: RootManager) {
         // 使用 quoted heredoc 写入，避免 JSON 中的引号、美元符号等被 shell 解析。
         val jsonText = json.toString()
         val command = """
-            cat > /data/local/tmp/locationspoofer_config.json <<'LOCATIONSPOOFER_JSON'
+            cat > /data/local/tmp/locationspoofer_config_fork.json <<'LOCATIONSPOOFER_JSON'
             $jsonText
             LOCATIONSPOOFER_JSON
-            chmod 666 /data/local/tmp/locationspoofer_config.json
-            chcon u:object_r:shell_data_file:s0 /data/local/tmp/locationspoofer_config.json 2>/dev/null || true
+            chmod 666 /data/local/tmp/locationspoofer_config_fork.json
+            chcon u:object_r:shell_data_file:s0 /data/local/tmp/locationspoofer_config_fork.json 2>/dev/null || true
 
-            cat > /data/system/locationspoofer_config.json <<'LOCATIONSPOOFER_JSON_SYSTEM'
+            cat > /data/system/locationspoofer_config_fork.json <<'LOCATIONSPOOFER_JSON_SYSTEM'
             $jsonText
             LOCATIONSPOOFER_JSON_SYSTEM
-            chown system:system /data/system/locationspoofer_config.json 2>/dev/null || true
-            chmod 644 /data/system/locationspoofer_config.json
-            chcon u:object_r:system_data_file:s0 /data/system/locationspoofer_config.json 2>/dev/null || true
+            chown system:system /data/system/locationspoofer_config_fork.json 2>/dev/null || true
+            chmod 644 /data/system/locationspoofer_config_fork.json
+            chcon u:object_r:system_data_file:s0 /data/system/locationspoofer_config_fork.json 2>/dev/null || true
         """.trimIndent()
 
         val result = rootManager.executeCommand(command)

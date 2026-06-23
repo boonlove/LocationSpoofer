@@ -3663,8 +3663,8 @@ class LocationHooker : XposedModule() {
     @Volatile
     private var configPollIntervalMs = 1_000L
     private val pollingLock = Any()
-    private val localConfigPath = "/data/local/tmp/locationspoofer_config.json"
-    private val systemConfigPath = "/data/system/locationspoofer_config.json"
+    private val localConfigPath = "/data/local/tmp/locationspoofer_config_fork.json"
+    private val systemConfigPath = "/data/system/locationspoofer_config_fork.json"
 
     private fun logOpenCellConfigLoaded(source: String, config: JSONObject) {
         val cellArray = config.optJSONArray("cell_json")
