@@ -126,6 +126,7 @@ class EnvironmentScanner(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     suspend fun scanCell(): String = withContext(Dispatchers.IO) {
+        /**
         val connectivityManager = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
         var isWifiConnected = false
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -149,6 +150,7 @@ class EnvironmentScanner(private val context: Context) {
             // 如果连接了 Wi-Fi，就不采集基站
             return@withContext "[]"
         }
+         **/
 
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val jsonArray = JSONArray()
