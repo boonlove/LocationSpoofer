@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppMapType
+import com.suseoaa.locationspoofer.ui.extensions.isEnable
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 
 @Composable
@@ -132,16 +133,18 @@ fun MapTypeDialog(
                         modifier = Modifier.weight(1f)
                     )
 
-                    MapTypeItem(
-                        title = "谷歌地图",
-                        icon = Icons.Rounded.Map,
-                        isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE,
-                        onClick = {
-                            onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE)
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE.isEnable()) {  // 地图引擎不可用时不显示该地图引擎
+                        MapTypeItem(
+                            title = "谷歌地图",
+                            icon = Icons.Rounded.Map,
+                            isSelected = currentMapEngine == com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE,
+                            onClick = {
+                                onMapEngineSelected(com.suseoaa.locationspoofer.data.model.MapEngine.GOOGLE)
+                                onDismiss()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 TextButton(

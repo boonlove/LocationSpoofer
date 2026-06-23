@@ -38,6 +38,7 @@ import com.suseoaa.locationspoofer.R
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.data.model.MapEngine
+import com.suseoaa.locationspoofer.ui.extensions.isEnable
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.viewmodel.SettingsViewModel
@@ -247,6 +248,7 @@ fun SettingsScreen(
                     MapEngine.GOOGLE to "谷歌"
                 )
                 engines.forEach { (engine, label) ->
+                    if (!engine.isEnable()) return@forEach  // 地图引擎不可用时不显示该地图引擎
                     val isSelected = uiState.mapEngine == engine
                     Box(
                         modifier = Modifier

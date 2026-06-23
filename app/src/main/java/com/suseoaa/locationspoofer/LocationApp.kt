@@ -61,8 +61,9 @@ class LocationApp : Application(), XposedServiceHelper.OnServiceListener {
         }
 
         val googleApiKey = prefs.getString("google_api_key", "")
-        if (!Places.isInitialized() && !googleApiKey.isNullOrEmpty()) {
-            Places.initialize(this, googleApiKey)
+        if (!Places.isInitialized() && (!googleApiKey.isNullOrEmpty() || BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank())) {
+            val keyToUse = if (!googleApiKey.isNullOrEmpty()) googleApiKey else BuildConfig.GOOGLE_MAPS_API_KEY
+            Places.initialize(this, keyToUse)
         }
 
         startKoin {
