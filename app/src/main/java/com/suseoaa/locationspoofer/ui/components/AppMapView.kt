@@ -34,6 +34,7 @@ enum class MarkerType { GREEN, RED, ORANGE, DEFAULT }
 
 interface AppMapController {
     fun clear()
+    fun clearResources()
     fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float)
     fun addCircle(lat: Double, lng: Double, radius: Double, fillColorInt: Int, strokeColorInt: Int, strokeWidth: Float)
     fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker
@@ -58,6 +59,7 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
     }
 
     override fun clear() { map.clear() }
+    override fun clearResources() { }
     override fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float) {
         map.addPolyline(
             AMapPolylineOptions().color(colorInt).width(width).apply {
@@ -187,6 +189,7 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
     }
 
     override fun clear() { map.clear() }
+    override fun clearResources() { }
     override fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float) {
         map.addPolyline(
             GPolylineOptions().color(colorInt).width(width).apply {
@@ -304,6 +307,7 @@ class BaiduMapControllerImpl(
     private val context: android.content.Context,
     private val styleId: String = ""
 ) : AppMapController {
+    private val bitmapDescriptorCache = mutableMapOf<MarkerType, com.baidu.mapapi.map.BitmapDescriptor>()
     private var isDarkMode: Boolean = false
     private var currentMapType: AppMapType = AppMapType.NORMAL
 
@@ -325,6 +329,7 @@ class BaiduMapControllerImpl(
     }
 
     override fun clear() { map.clear() }
+    override fun clearResources() { bitmapDescriptorCache.clear() }
     override fun addPolyline(points: List<Pair<Double, Double>>, colorInt: Int, width: Float) {
         if (points.size < 2) return
         val latLngList = points.map { com.baidu.mapapi.model.LatLng(it.first, it.second) }
@@ -345,12 +350,15 @@ class BaiduMapControllerImpl(
         )
     }
     override fun addMarker(lat: Double, lng: Double, title: String, type: MarkerType): AppMapMarker {
-        // 以下所使用 png 资源来自于高德地图，构建时自动打包到 assets
-        val icon = when(type) {
-            MarkerType.GREEN -> bitmapDescriptorFromAssets(context, "GREEN.png")
-            MarkerType.RED -> bitmapDescriptorFromAssets(context, "RED.png")
-            MarkerType.ORANGE -> bitmapDescriptorFromAssets(context, "ORANGE.png")
-            else -> bitmapDescriptorFromAssets(context, "RED.png")
+        val icon = bitmapDescriptorCache.getOrPut(type) {
+            // 以下所使用 png 资源来自于高德地图，构建时自动打包到 assets
+            val fileName = when (type) {
+                MarkerType.GREEN -> "GREEN.png"
+                MarkerType.RED -> "RED.png"
+                MarkerType.ORANGE -> "ORANGE.png"
+                else -> "RED.png"
+            }
+            bitmapDescriptorFromAssets(context, fileName)
         }
         val marker = map.addOverlay(
             com.baidu.mapapi.map.MarkerOptions()
@@ -550,6 +558,7 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
                         if (!isDestroyed) {
                             isDestroyed = true
                             baiduMapView.onDestroy()
+                            mapController?.clearResources()
                         }
                     }
                     else -> {}
@@ -563,6 +572,7 @@ fun AppMapView(mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine, isDo
                     isDestroyed = true
                     baiduMapView.onPause()
                     baiduMapView.onDestroy()
+                    mapController?.clearResources()
                 }
             }
         }
