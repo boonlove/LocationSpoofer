@@ -1754,28 +1754,33 @@ class MainViewModel(
     }
 
     fun setAmapApiKey(key: String) {
-        settingsRepository.setAmapApiKey(key)
-        _uiState.update { it.copy(amapApiKey = key) }
+        val sanitizedKey = key.replace("\\s+".toRegex(), "")
+        settingsRepository.setAmapApiKey(sanitizedKey)
+        _uiState.update { it.copy(amapApiKey = sanitizedKey) }
     }
 
     fun setBaiduApiKey(key: String) {
-        settingsRepository.setBaiduApiKey(key)
-        _uiState.update { it.copy(baiduApiKey = key) }
+        val sanitizedKey = key.replace("\\s+".toRegex(), "")
+        settingsRepository.setBaiduApiKey(sanitizedKey)
+        _uiState.update { it.copy(baiduApiKey = sanitizedKey) }
     }
 
     fun setGoogleApiKey(key: String) {
-        settingsRepository.setGoogleApiKey(key)
-        _uiState.update { it.copy(googleApiKey = key) }
+        val sanitizedKey = key.replace("\\s+".toRegex(), "")
+        settingsRepository.setGoogleApiKey(sanitizedKey)
+        _uiState.update { it.copy(googleApiKey = sanitizedKey) }
     }
 
     fun setWigleApiToken(token: String) {
-        settingsRepository.setWigleApiToken(token)
-        _uiState.update { it.copy(wigleToken = token) }
+        val sanitizedToken = token.replace("\\s+".toRegex(), "")
+        settingsRepository.setWigleApiToken(sanitizedToken)
+        _uiState.update { it.copy(wigleToken = sanitizedToken) }
     }
 
     fun setOpencellidApiToken(token: String) {
-        settingsRepository.setOpencellidApiToken(token)
-        _uiState.update { it.copy(opencellidToken = token) }
+        val sanitizedToken = token.replace("\\s+".toRegex(), "")
+        settingsRepository.setOpencellidApiToken(sanitizedToken)
+        _uiState.update { it.copy(opencellidToken = sanitizedToken) }
     }
 
     @Suppress("DEPRECATION")

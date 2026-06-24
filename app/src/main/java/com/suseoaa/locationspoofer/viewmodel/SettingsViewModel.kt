@@ -7,5 +7,5 @@ class SettingsViewModel(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
     fun getBaiduStyleId(): String = settingsRepository.getBaiduStyleId()
-    fun setBaiduStyleId(styleId: String) = settingsRepository.setBaiduStyleId(styleId)
+    fun setBaiduStyleId(styleId: String) = settingsRepository.setBaiduStyleId(styleId.replace("\\s+".toRegex(), ""))
 }
