@@ -361,14 +361,16 @@ fun FullScreenMapPage(
                     }
                 }
 
-                MapFab(
-                    icon = Icons.Rounded.MyLocation,
-                    contentDescription = stringResource(R.string.locate_to_current),
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = AccentBlue
-                ) {
-                    viewModel.fetchCurrentLocation(context) { lLat, lLng ->
-                        mapRef?.animateCamera(lLat, lLng, 16f)
+                AnimatedVisibility(visible = (stage == RoutePlanStage.SELECTING && routePoints.isEmpty()) || stage == RoutePlanStage.IDLE) {
+                    MapFab(
+                        icon = Icons.Rounded.MyLocation,
+                        contentDescription = stringResource(R.string.locate_to_current),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = AccentBlue
+                    ) {
+                        viewModel.fetchCurrentLocation(context) { lLat, lLng ->
+                            mapRef?.animateCamera(lLat, lLng, 16f)
+                        }
                     }
                 }
             }
