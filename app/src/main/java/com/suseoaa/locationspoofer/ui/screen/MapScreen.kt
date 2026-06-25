@@ -97,11 +97,6 @@ fun FullScreenMapPage(
     val isManual = uiState.routeRunMode == RouteRunMode.MANUAL
     val routePoints = uiState.routePoints
 
-    // 同步地图类型
-    LaunchedEffect(mapRef, uiState.mapType) {
-        mapRef?.setMapType(uiState.mapType)
-    }
-
     // 同步路点标记和折线到地图
     var liveMarker by remember { mutableStateOf<AppMapMarker?>(null) }
     LaunchedEffect(routePoints, mapRef, uiState.manageDataList) {
@@ -182,6 +177,23 @@ fun FullScreenMapPage(
             if (currentLat != null && currentLng != null) {
                 mapRef?.animateCamera(currentLat, currentLng, 18f)
             }
+        }
+    }
+
+    // 同步地图类型，地图引擎为高德地图时，需要额外并延迟设置一次地图中心点，否则地图中心点会定位在北京
+    LaunchedEffect(mapRef, uiState.mapType) {
+        mapRef?.setMapType(uiState.mapType)
+        if (activeEngine == MapEngine.AMAP && lat != null && lng != null) {
+            kotlinx.coroutines.delay(100)
+            mapRef?.moveCamera(lat, lng, 18f)
+        }
+    }
+
+    // 地图引擎为高德地图时，需要额外并延迟设置一次地图中心点，否则地图中心点会定位在北京
+    LaunchedEffect(Unit) {
+        if (activeEngine == MapEngine.AMAP && lat != null && lng != null) {
+            kotlinx.coroutines.delay(100)
+            mapRef?.moveCamera(lat, lng, 18f)
         }
     }
 
