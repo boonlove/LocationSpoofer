@@ -350,7 +350,7 @@ fun FullScreenMapPage(
                     showMapTypeDialog = true
                 }
 
-                AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.READY || stage == RoutePlanStage.IDLE) {
+                AnimatedVisibility(visible = stage == RoutePlanStage.SELECTING && routePoints.isEmpty()) {
                     MapFab(
                         icon = Icons.Rounded.Bookmarks,
                         contentDescription = stringResource(R.string.route_library),
