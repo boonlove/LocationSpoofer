@@ -84,6 +84,7 @@ import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.BuildConfig
 import com.suseoaa.locationspoofer.data.model.MapEngine
+import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 
 data class AppPoiItem(val title: String, val snippet: String, val lat: Double, val lng: Double)
@@ -1140,15 +1141,24 @@ fun ActionButtons(viewModel: MainViewModel, uiState: AppState, onOpenMap: () -> 
             targetValue = MaterialTheme.colorScheme.error,
             animationSpec = tween(300), label = "stop_color"
         )
+        val isPlanning = uiState.routePlanStage == RoutePlanStage.RUNNING
+        val onClickAction: () -> Unit = {
+            if (isPlanning) {
+                viewModel.stopRoutePlanning()
+            } else {
+                viewModel.stopSpoofing()
+            }
+        }
+        val buttonText = stringResource(if (isPlanning) R.string.stop_planning else R.string.stop_simulation)
         Button(
-            onClick = { viewModel.stopSpoofing() },
+            onClick = onClickAction,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(containerColor = stopColor)
         ) {
             Icon(Icons.Rounded.Stop, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.stop_simulation), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(buttonText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     } else {
         Row(
