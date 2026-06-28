@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.LocalActivityResultRegistryOwner
@@ -69,6 +70,20 @@ class MainActivity : ComponentActivity() {
         }
 
         checkAndRequestPermissions()
+
+        // 拦截 Back 键：模拟定位开启时进入画中画，而非关闭 Activity
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (viewModel.uiState.value.isSpoofingActive) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val params = android.app.PictureInPictureParams.Builder().build()
+                        enterPictureInPictureMode(params)
+                    }
+                } else {
+                    finish()
+                }
+            }
+        })
 
         setContent {
             CompositionLocalProvider(
