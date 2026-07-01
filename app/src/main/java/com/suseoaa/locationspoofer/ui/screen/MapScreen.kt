@@ -325,7 +325,7 @@ fun FullScreenMapPage(
                                     Spacer(Modifier.width(6.dp))
                                     Column {
                                         Text(poi.title, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                        Text(poi.snippet, fontSize = 10.sp, color = AppColors.textSecondary(isDark))
+                                        Text(poi.snippet, fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                                     }
                                 }
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -552,7 +552,6 @@ fun FullScreenMapPage(
     // 地点收藏列表
     if (showSavedLocations) {
         SavedLocationsDialog(
-            isDark = isDark,
             savedLocations = uiState.savedLocations,
             onDismiss = { showSavedLocations = false },
             onSelect = { loc ->
@@ -589,7 +588,7 @@ fun FullScreenMapPage(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(route.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = AppColors.textSecondary(isDark))
+                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                                     }
                                     IconButton(onClick = { viewModel.deleteSavedRoute(route) }) {
                                         Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error)

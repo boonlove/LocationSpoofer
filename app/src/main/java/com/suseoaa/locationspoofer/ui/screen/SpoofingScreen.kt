@@ -492,7 +492,6 @@ fun SpoofingScreen(
                 SectionHeader(Icons.Outlined.Bookmarks, stringResource(R.string.collection_list), isDark)
                 Spacer(Modifier.height(8.dp))
                 SavedLocationsCard(
-                    isDark = isDark,
                     savedLocations = uiState.savedLocations,
                     onSelect = { loc ->
                         viewModel.loadSavedLocation(loc)
@@ -719,7 +718,6 @@ fun SpoofingScreen(
 
     if (showSavedLocations) {
         SavedLocationsDialog(
-            isDark = isDark,
             savedLocations = uiState.savedLocations,
             onDismiss = { showSavedLocations = false },
             onSelect = { loc ->
@@ -1579,7 +1577,6 @@ fun ApiKeyWarningDialog(
 
 @Composable
 fun SavedLocationsDialog(
-    isDark: Boolean,
     savedLocations: List<SavedLocation>,
     onDismiss: () -> Unit,
     onSelect: (SavedLocation) -> Unit,
@@ -1594,7 +1591,7 @@ fun SavedLocationsDialog(
                 Text(stringResource(R.string.saved_locations), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                 Spacer(Modifier.height(12.dp))
                 if (savedLocations.isEmpty()) {
-                    Text(stringResource(R.string.no_saved_locations), color = MaterialTheme.colorScheme.outline, fontSize = 14.sp)
+                    Text(stringResource(R.string.no_saved_locations), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), fontSize = 14.sp)
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(savedLocations) { loc ->
@@ -1607,7 +1604,7 @@ fun SavedLocationsDialog(
                                 Spacer(Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(loc.name, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                    Text("${loc.lat}, ${loc.lng}", fontSize = 12.sp, color = AppColors.textSecondary(isDark))
+                                    Text("${loc.lat}, ${loc.lng}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                                 }
                                 IconButton(onClick = { onDelete(loc) }) {
                                     Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
@@ -1717,7 +1714,6 @@ fun HomeSearchBar(
 
 @Composable
 fun SavedLocationsCard(
-    isDark: Boolean,
     savedLocations: List<SavedLocation>,
     onSelect: (SavedLocation) -> Unit,
     onDelete: (SavedLocation) -> Unit
@@ -1739,7 +1735,7 @@ fun SavedLocationsCard(
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(loc.name, fontWeight = FontWeight.Medium, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
-                        Text("${loc.lat}, ${loc.lng}", fontSize = 11.sp, color = AppColors.textSecondary(isDark))
+                        Text("${loc.lat}, ${loc.lng}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                     }
                     IconButton(onClick = { onDelete(loc) }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Rounded.DeleteOutline, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
