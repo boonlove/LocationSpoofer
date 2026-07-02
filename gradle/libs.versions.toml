@@ -1,24 +1,24 @@
 [versions]
-agp = "8.4.0"
-kotlin = "1.9.23"
-coreKtx = "1.13.1"
-lifecycleRuntimeKtx = "2.7.0"
-activityCompose = "1.9.0"
-composeBom = "2024.05.00"
-koin = "3.5.3"
+agp = "8.13.2"
+kotlin = "2.0.21"
+coreKtx = "1.15.0"
+lifecycleRuntimeKtx = "2.10.0"
+activityCompose = "1.9.3"
+composeBom = "2025.10.00"
+koin = "3.5.6"
 libxposed = "101.0.1"
 libxposedService = "101.0.0"
 amap = "10.0.600"
-amapLocation = "6.4.9"
+amapLocation = "11.2.000"
 amapSearch = "9.7.0"
-baiduMap = "7.6.4"
-baiduLocation = "9.6.4"
+baiduMap = "8.1.0"
+baiduLocation = "9.6.8"
 okhttp = "4.12.0"
 googleMaps = "20.0.0"
 playServicesLocation = "21.2.0"
 places = "3.4.0"
 room = "2.6.1"
-ksp = "1.9.23-1.0.20"
+ksp = "2.0.21-1.0.27"
 kotlinxSerializationJson = "1.6.3"
 
 [libraries]
@@ -56,3 +56,4 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 android-application = { id = "com.android.application", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+jetbrains-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
