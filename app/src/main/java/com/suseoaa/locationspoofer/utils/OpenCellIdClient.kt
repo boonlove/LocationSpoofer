@@ -1,6 +1,5 @@
 package com.suseoaa.locationspoofer.utils
 
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -15,20 +14,16 @@ class OpenCellIdClient {
     /** 验证 token 是否有效 */
     suspend fun validateToken(token: String): Boolean = withContext(Dispatchers.IO) {
         if (token.isBlank()) {
-            Log.d("OpenCellID", "validateToken: Token is blank")
             return@withContext false
         }
-        Log.d("OpenCellID", "validateToken: Validating token...")
         return@withContext try {
             val url = "https://opencellid.org/cell/getInArea?key=$token&BBOX=0.0,0.0,0.0,0.0&format=json"
             val request = Request.Builder()
                 .url(url)
                 .build()
             val response = client.newCall(request).execute()
-            Log.d("OpenCellID", "validateToken: Response status = ${response.code}")
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: return@withContext false
-                Log.d("OpenCellID", "validateToken: Response body = $body")
                 val json = JSONObject(body)
                 if (json.has("error")) {
                     // code 1 means "No cells found", which actually validates that the key exists and works.
@@ -38,11 +33,9 @@ class OpenCellIdClient {
                     true
                 }
             } else {
-                Log.d("OpenCellID", "validateToken: Request unsuccessful")
                 false
             }
         } catch (e: Exception) {
-            Log.e("OpenCellID", "validateToken: Error: ${e.message}", e)
             false
         }
     }
@@ -51,7 +44,6 @@ class OpenCellIdClient {
     suspend fun fetchCellData(lat: Double, lng: Double, token: String): String =
         withContext(Dispatchers.IO) {
             if (token.isBlank()) {
-                Log.d("OpenCellID", "fetchCellData: Token is blank, returning empty array")
                 return@withContext "[]"
             }
 
@@ -60,46 +52,33 @@ class OpenCellIdClient {
             try {
                 for (box in searchBoxes) {
                     val url = "https://opencellid.org/cell/getInArea?key=$token&BBOX=${box.latMin},${box.lonMin},${box.latMax},${box.lonMax}&format=json&limit=20"
-                    Log.d("OpenCellID", "fetchCellData: [Request] getInArea bbox=$box format=json limit=20")
                     val request = Request.Builder()
                         .url(url)
                         .build()
 
                     val response = client.newCall(request).execute()
                     val code = response.code
-                    val message = response.message
-                    Log.d("OpenCellID", "fetchCellData: [Response] Code: $code, Message: $message")
                     if (response.isSuccessful) {
                         val body = response.body?.string()
                         if (body == null) {
-                            Log.d("OpenCellID", "fetchCellData: Body is null, trying next radius")
                             continue
                         }
                         val jsonObject = JSONObject(body)
                         val cells = jsonObject.optJSONArray("cells")
-                        Log.d(
-                            "OpenCellID",
-                            "fetchCellData: [Response] cells=${cells?.length() ?: 0} error=${jsonObject.optString("error", "")} code=${jsonObject.optInt("code", 0)}"
-                        )
                         if (cells == null || cells.length() == 0) {
-                            Log.d("OpenCellID", "fetchCellData: No cells found in bbox=$box (code=${jsonObject.optInt("code")}).")
                             continue
                         }
                         val normalizedCells = normalizeOpenCellIdCells(cells)
                         if (normalizedCells.length() == 0) {
-                            Log.d("OpenCellID", "fetchCellData: No usable cells after normalization in bbox=$box.")
                             continue
                         }
-                        Log.d("OpenCellID", "fetchCellData: Found ${normalizedCells.length()} usable real cell towers in bbox=$box")
                         return@withContext normalizedCells.toString()
                     } else {
-                        Log.d("OpenCellID", "fetchCellData: Request unsuccessful (code=$code), trying next radius")
+                        // Request unsuccessful, try next radius
                     }
                 }
-                Log.d("OpenCellID", "fetchCellData: No cells found in all search radii. Returning empty array.")
                 return@withContext "[]"
             } catch (e: Exception) {
-                Log.e("OpenCellID", "fetchCellData: Exception: ${e.message}", e)
                 return@withContext "[]"
             }
         }
@@ -151,7 +130,6 @@ class OpenCellIdClient {
             val area = positiveInt(source, "tac", "lac", "area", default = 0)
             val cellId = positiveInt(source, "ci", "cid", "cellid", "cell", default = 0)
             if (area <= 0 || cellId <= 0) {
-                Log.d("OpenCellID", "normalizeOpenCellIdCells: Skipping unusable cell: $source")
                 continue
             }
 

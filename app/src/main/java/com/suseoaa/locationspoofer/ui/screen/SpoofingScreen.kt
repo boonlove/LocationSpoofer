@@ -1860,7 +1860,6 @@ fun performPoiSearch(
             placesClient.findAutocompletePredictions(autocompleteRequest)
                 .addOnSuccessListener { autocompleteResponse ->
                     val predictions = autocompleteResponse.autocompletePredictions
-                    android.util.Log.d("SpoofingScreen", "Autocomplete got ${predictions.size} predictions")
                     if (predictions.isEmpty()) {
                         android.widget.Toast.makeText(context, "No predictions found for: $keyword", android.widget.Toast.LENGTH_SHORT).show()
                         onResult(emptyList())
@@ -1902,12 +1901,10 @@ fun performPoiSearch(
                 }
                 .addOnFailureListener { exception ->
                     android.widget.Toast.makeText(context, "Search Error: ${exception.message}", android.widget.Toast.LENGTH_LONG).show()
-                    android.util.Log.e("SpoofingScreen", "Autocomplete failed: ${exception.message}", exception)
                     onResult(emptyList())
                 }
         } catch (e: Exception) {
             android.widget.Toast.makeText(context, "Search Catch Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-            android.util.Log.e("SpoofingScreen", "Places API exception: ${e.message}", e)
             onResult(emptyList())
         }
     }

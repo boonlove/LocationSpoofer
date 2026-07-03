@@ -69,10 +69,6 @@ class ConfigManager(private val rootManager: RootManager) {
             put("app_coordinate_systems", coordSysObj)
         }
         val cellCount = json.optJSONArray("cell_json")?.length() ?: 0
-        android.util.Log.d(
-            "OpenCellID",
-            "saveConfig: active=$active mockCell=$mockCell lat=$lat lng=$lng cellJsonCount=$cellCount"
-        )
 
         // 使用 quoted heredoc 写入，避免 JSON 中的引号、美元符号等被 shell 解析。
         val jsonText = json.toString()
@@ -92,9 +88,5 @@ class ConfigManager(private val rootManager: RootManager) {
         """.trimIndent()
 
         val result = rootManager.executeCommand(command)
-        android.util.Log.d(
-            "OpenCellID",
-            "saveConfig: wrote config copies to /data/local/tmp and /data/system, result=${result.take(200)}"
-        )
     }
 }

@@ -749,15 +749,9 @@ class MainViewModel(
                     kotlin.math.sin(dLng / 2).let { it * it }
             val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
             if (distance <= 50.0) {
-                val cellCount = record.cells.size
-                val cellInfoStr = record.cells.map { cell ->
-                    "Type: ${cell.device.type}, MCC: ${cell.device.mcc}, MNC: ${cell.device.mnc}, LAC: ${cell.device.lac}, CID: ${cell.device.cid}, DBM: ${cell.locationCell.dbm}"
-                }.joinToString("; ")
-                android.util.Log.d("OpenCellID", "hasLocalCellsWithin50m: Found cached cells within 50m of ($lat, $lng) at location ID ${record.location.id}. Distance: ${String.format("%.2f", distance)}m, Cell Count: $cellCount. Bypassing network request. Cached cells: $cellInfoStr")
                 return true
             }
         }
-        android.util.Log.d("OpenCellID", "hasLocalCellsWithin50m: No cached cells within 50m of ($lat, $lng). Will perform network request.")
         return false
     }
 
@@ -878,23 +872,18 @@ class MainViewModel(
     private suspend fun fetchCellFromOpenCellIdSync(lat: Double, lng: Double) {
         val tokenToUse = settingsRepository.getOpencellidApiToken()
         if (tokenToUse.isBlank()) {
-            android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Token is blank. Skipping request and database insertion.")
             return
         }
-        android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Starting request for coordinates ($lat, $lng)")
         val wgs84 = com.suseoaa.locationspoofer.utils.CoordinateUtils.gcj02ToWgs84(lat, lng)
         val wgsLat = wgs84.lat
         val wgsLng = wgs84.lng
-        android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Converted GCJ-02 ($lat, $lng) -> WGS-84 ($wgsLat, $wgsLng) for OpenCellID query")
 
         try {
             val rawJsonArrayString = opencellidClient.fetchCellData(wgsLat, wgsLng, tokenToUse)
             val cellsArray = org.json.JSONArray(rawJsonArrayString)
-            android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Received cell list size: ${cellsArray.length()}")
             if (cellsArray.length() > 0) {
                 val formattedCells = normalizeCellArrayForStorage(cellsArray)
                 if (formattedCells.length() == 0) {
-                    android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: No usable cells after normalization.")
                     return
                 }
 
@@ -904,7 +893,6 @@ class MainViewModel(
                     if (newestLocation != null) {
                         environmentDao.updateMetadata(newestLocation.id, "OpenCellID 导入", "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})")
                     }
-                    android.util.Log.d("OpenCellID", "fetchCellFromOpenCellIdSync: Successfully inserted ${formattedCells.length()} cells into database.")
                 }
 
                 withContext(Dispatchers.Main) {
@@ -928,7 +916,6 @@ class MainViewModel(
             val area = cellArea(cell)
             val identity = cellIdentity(cell)
             if (area <= 0 || identity <= 0) {
-                android.util.Log.d("OpenCellID", "normalizeCellArrayForStorage: Skipping invalid cell: $cell")
                 continue
             }
 

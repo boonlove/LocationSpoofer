@@ -199,32 +199,11 @@ object XposedHelpers {
 object XposedBridge {
     private val openCellLogLastTimes = ConcurrentHashMap<String, Long>()
 
-    fun log(msg: String) {
-        android.util.Log.i("LocationSpoofer_Xposed", msg)
-        try { XposedHelpers.module.log(android.util.Log.INFO, "LocationSpoofer", msg) } catch (e: Throwable) {}
-    }
-    fun logOpenCellId(msg: String) {
-        val text = "[XposedCell] $msg"
-        android.util.Log.d("OpenCellID", text)
-        try { XposedHelpers.module.log(android.util.Log.DEBUG, "OpenCellID", text) } catch (e: Throwable) {}
-    }
-    fun logOpenCellId(msg: String, t: Throwable) {
-        val text = "[XposedCell] $msg"
-        android.util.Log.e("OpenCellID", text, t)
-        try { XposedHelpers.module.log(android.util.Log.ERROR, "OpenCellID", text, t) } catch (e: Throwable) {}
-    }
-    fun logOpenCellIdEvery(key: String, msg: String, intervalMs: Long = 10_000L) {
-        val now = System.currentTimeMillis()
-        val last = openCellLogLastTimes[key]
-        if (last == null || now - last >= intervalMs) {
-            openCellLogLastTimes[key] = now
-            logOpenCellId(msg)
-        }
-    }
-    fun log(t: Throwable) {
-        android.util.Log.e("LocationSpoofer_Xposed", "Error", t)
-        try { XposedHelpers.module.log(android.util.Log.ERROR, "LocationSpoofer", "Error", t) } catch (e: Throwable) {}
-    }
+    fun log(msg: String) {}
+    fun logOpenCellId(msg: String) {}
+    fun logOpenCellId(msg: String, t: Throwable) {}
+    fun logOpenCellIdEvery(key: String, msg: String, intervalMs: Long = 10_000L) {}
+    fun log(t: Throwable) {}
     fun hookAllMethods(clazz: Class<*>, methodName: String, callback: XC_MethodHook) {
         var hooked = false
         for (m in clazz.declaredMethods) {

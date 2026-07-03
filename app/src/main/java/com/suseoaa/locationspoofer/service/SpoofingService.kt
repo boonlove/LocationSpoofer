@@ -141,7 +141,6 @@ class SpoofingService : Service() {
             )
             locationManager.setTestProviderEnabled(provider, true)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "设置TestProvider失败: $provider", e)
         }
     }
 
@@ -149,7 +148,6 @@ class SpoofingService : Service() {
         try {
             locationManager.removeTestProvider(provider)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "移除TestProvider失败: $provider", e)
         }
     }
 
@@ -170,7 +168,6 @@ class SpoofingService : Service() {
             }
             locationManager.setTestProviderLocation(provider, location)
         } catch (e: Exception) {
-            Log.e("SpoofingService", "推送位置失败: $provider", e)
         }
     }
 
