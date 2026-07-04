@@ -523,7 +523,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { showAppCoordinateScreen = true }
             ) {
@@ -553,7 +553,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { 
                     onExpandScannerMap()
@@ -588,7 +588,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.clickable { 
                     viewModel.toggleManageDataScreen(true)
@@ -616,7 +616,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = AppColors.cardBackground(isDark)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
