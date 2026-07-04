@@ -154,7 +154,8 @@ fun SettingsScreen(
 
                 DropdownMenu(
                     expanded = darkModeExpanded,
-                    onDismissRequest = { darkModeExpanded = false }
+                    onDismissRequest = { darkModeExpanded = false},
+                    containerColor = MaterialTheme.colorScheme.surface
                 ) {
                     darkModeOptions.forEach { (darkMode, label) ->
                         DropdownMenuItem(

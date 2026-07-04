@@ -78,6 +78,7 @@ import com.suseoaa.locationspoofer.ui.components.DraggableBottomSheet
 import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
 import com.suseoaa.locationspoofer.ui.components.rememberBottomSheetState
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.ui.draw.drawWithCache
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -289,7 +290,7 @@ fun SpoofingScreen(
         Icon(
             Icons.Rounded.AddLocationAlt, null,
             tint = AccentBlue.copy(alpha = 0.8f),
-            modifier = Modifier.align(Alignment.Center).size(32.dp).padding(bottom = 16.dp)
+            modifier = Modifier.align(Alignment.Center).size(32.dp).padding(bottom = 16.dp) // 准星底部对齐中心
         )
 
         // 浮动按钮组（全屏/图层/定位），竖向排列，避让 Sheet 可见高度
@@ -409,7 +410,7 @@ fun SpoofingScreen(
                     if (mode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
                         focusManager.clearFocus()
                         // Perform local search immediately
-                        scope.launch {
+                        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             val results = viewModel.performLocalSearch()
                             searchResults = results
                             showSearchResults = results.isNotEmpty()
@@ -423,7 +424,7 @@ fun SpoofingScreen(
                 onSearch = {
                     focusManager.clearFocus()
                     if (uiState.searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
-                        scope.launch {
+                        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             val results = viewModel.performLocalSearch()
                             searchResults = results
                             showSearchResults = results.isNotEmpty()
@@ -431,7 +432,7 @@ fun SpoofingScreen(
                     } else if ( (uiState.amapApiKey.isBlank() && activeEngine == MapEngine.AMAP) ||
                         (uiState.baiduApiKey.isBlank() && activeEngine == MapEngine.BAIDU) ||
                         (uiState.googleApiKey.isBlank() && activeEngine == MapEngine.GOOGLE)
-                        ) {
+                    ) {
                         showApiKeyWarning = true
                     } else if (searchQuery.isNotBlank()) {
                         performPoiSearch(context, activeEngine, searchQuery, isDomestic) { results ->
@@ -447,7 +448,7 @@ fun SpoofingScreen(
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-4).dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 ) {
                     LazyColumn(modifier = Modifier.heightIn(max = 350.dp)) {
                         items(searchResults.take(15)) { poi ->
@@ -487,9 +488,11 @@ fun SpoofingScreen(
             expandedFraction = expandedFraction,
             halfFraction = halfFraction,
             collapsedContent = {
-                if (uiState.isSpoofingActive) {
-                    WifiStatusCard(uiState)
-                    Spacer(Modifier.height(12.dp))
+                AnimatedVisibility (uiState.isSpoofingActive) {
+                    Column {
+                        WifiStatusCard(uiState)
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
                 CoordinateInputCard(
                     viewModel = viewModel,
@@ -694,7 +697,8 @@ fun SpoofingScreen(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(if (isDark) Color(0xFF24A1DE).copy(alpha = 0.2f) else Color(0xFFE8F4FA))
+                        .background(MaterialTheme.colorScheme.background)
+                        .drawWithCache { onDrawBehind { drawRect(if (isDark) Color(0xFF24A1DE).copy(alpha = 0.2f) else Color(0xFFE8F4FA)) } }
                         .clickable { uriHandler.openUri("https://t.me/+CsxZGItXdW40ZWVl") }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
@@ -1053,7 +1057,8 @@ fun WifiStatusCard(uiState: AppState) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(style.bgColor)
+            .background(MaterialTheme.colorScheme.background)
+            .drawWithCache { onDrawBehind { drawRect(style.bgColor) } }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +45,7 @@ fun AppCoordinateScreen(
         onSurface = MaterialTheme.colorScheme.onSurface,
         surfaceVariant = MaterialTheme.colorScheme.surfaceVariant,
         onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+        surfaceContainerHigh = MaterialTheme.colorScheme.surfaceContainerHigh,
         primary = MaterialTheme.colorScheme.primary,
         onPrimary = MaterialTheme.colorScheme.onPrimary,
         primaryContainer = MaterialTheme.colorScheme.primaryContainer,
@@ -80,7 +82,11 @@ fun AppCoordinateScreen(
                         Spacer(Modifier.width(8.dp))
                         Switch(
                             checked = showSystemApps,
-                            onCheckedChange = { showSystemApps = it }
+                            onCheckedChange = { showSystemApps = it },
+                            colors = SwitchDefaults.colors(
+                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surface
+                            )
                         )
                     }
                 },
@@ -156,7 +162,7 @@ fun AppItem(
     ) {
         AppIconImage(
             packageName = appInfo.packageName,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
