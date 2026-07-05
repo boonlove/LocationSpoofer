@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +54,8 @@ import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
 import com.suseoaa.locationspoofer.data.model.RouteRunMode
 import com.suseoaa.locationspoofer.data.model.SimMode
+import com.suseoaa.locationspoofer.ui.components.Joystick
+import com.suseoaa.locationspoofer.ui.components.JoystickValue
 import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
@@ -237,6 +240,7 @@ fun FullScreenMapPage(
         }
 
         // 手动模式运行时的定位标志
+        /**
         if (isRunning && isManual) {
             Icon(
                 Icons.Rounded.PersonPin, null,
@@ -246,6 +250,7 @@ fun FullScreenMapPage(
                     .size(48.dp)
             )
         }
+        */
 
         // 顶部栏（含搜索）
         if (!isInPipMode) {
@@ -462,15 +467,39 @@ fun FullScreenMapPage(
             // 摇杆（仅手动模式运行中）
             AnimatedVisibility(
                 visible = isRunning && isManual,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 180.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp),
                 enter = slideInVertically(tween(250)) { it / 2 } + fadeIn(tween(250)),
                 exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(tween(200))
             ) {
-                JoystickPanel(
-                    viewModel = viewModel,
-                    maxSpeedMs = uiState.routeSimMode.speedMs.toFloat()
+                // 摇杆状态：按下时启动持续移动循环，抬起时 intensity=0 自动停止
+                var joystickValue by remember { mutableStateOf(JoystickValue()) }
+
+                LaunchedEffect(joystickValue) {
+                    if (joystickValue.active && joystickValue.intensity > 0) {
+                        while (true) {
+                            // atan2(y, x) 弧度 → 方位角（北为 0，顺时针）
+                            val bearing = (Math.toDegrees(joystickValue.angle.toDouble()) + 90 + 360) % 360
+                            viewModel.moveByJoystick(
+                                bearing,
+                                joystickValue.intensity,
+                                uiState.routeSimMode.speedMs.toFloat()
+                            )
+                            // 100ms 步长：与 moveByJoystick 内部 elapsedSec=0.05 匹配，
+                            // 保证每次经纬度变化超过 String.format("%.6f") 精度阈值；
+                            // 同时给 animateCamera 足够执行时间，避免高频更新导致动画被频繁取消
+                            kotlinx.coroutines.delay(100)
+                        }
+                    }
+                }
+
+                Joystick(
+                    radius = 90.dp,
+                    thumbRadius = 24.dp,
+                    holdEnabled = true,
+                    baseColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                    baseStrokeColor = MaterialTheme.colorScheme.outline,
+                    thumbColor = AccentBlue,
+                    onValueChange = { joystickValue = it }
                 )
             }
         }
