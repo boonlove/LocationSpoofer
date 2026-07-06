@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -117,6 +118,9 @@ fun SpoofingScreen(
     onExpandMap: () -> Unit,
     onExpandScannerMap: () -> Unit,
     onExpandSettings: () -> Unit,
+    initialSheetValue: BottomSheetValue = BottomSheetValue.HALF,
+    onSheetValueChanged: (BottomSheetValue) -> Unit = {},
+    scrollState: ScrollState = ScrollState(0),
     updateViewModel: com.suseoaa.locationspoofer.viewmodel.UpdateViewModel = org.koin.androidx.compose.koinViewModel()
 ) {
     var showSavedLocations by remember { mutableStateOf(false) }
@@ -264,7 +268,12 @@ fun SpoofingScreen(
                 BottomSheetValue.HALF at (expandedHeightPx - halfHeightPx)
             }
         }
-        val sheetState = rememberBottomSheetState(BottomSheetValue.HALF, initialAnchors)
+        // 用外部传入的初始值创建 sheetState，使页面切换返回后能恢复到原状态
+        val sheetState = rememberBottomSheetState(initialSheetValue, initialAnchors)
+        // 同步 currentValue 到外部，由 MainScreen 持久化（不受 AnimatedContent 切换影响）
+        LaunchedEffect(sheetState.currentValue) {
+            onSheetValueChanged(sheetState.currentValue)
+        }
 
         // 全屏地图背景
         AppMapView(
@@ -487,6 +496,7 @@ fun SpoofingScreen(
             scrimColor = MaterialTheme.colorScheme.background.copy(0.8f),
             expandedFraction = expandedFraction,
             halfFraction = halfFraction,
+            scrollState = scrollState,
             collapsedContent = {
                 AnimatedVisibility (uiState.isSpoofingActive) {
                     Column {

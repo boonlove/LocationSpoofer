@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -199,6 +200,7 @@ fun rememberBottomSheetState(
  *
  * @param collapsedContent 始终可见的内容（COLLAPSED 时唯一可见），一般放 CoordinateInputCard。
  * @param content          其余可滚动内容，内部应自行使用 verticalScroll。
+ * @param scrollState      可滚动区的滚动状态，由外部传入以便提升和持久化。
  */
 @Composable
 fun DraggableBottomSheet(
@@ -209,6 +211,7 @@ fun DraggableBottomSheet(
     dragHandle: @Composable (() -> Unit)? = { DefaultDragHandle() },
     expandedFraction: Float = 0.50f,
     halfFraction: Float = 0.375f,
+    scrollState: ScrollState = rememberScrollState(),
     collapsedContent: @Composable () -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -270,7 +273,6 @@ fun DraggableBottomSheet(
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                 // 可滚动区：collapsedContent + content 共享同一个 verticalScroll
                 Box(Modifier.weight(1f).fillMaxWidth().padding(top = 20.dp)) {
-                    val scrollState = rememberScrollState()
                     Column(
                         Modifier.fillMaxSize()
                             .verticalScroll(scrollState)

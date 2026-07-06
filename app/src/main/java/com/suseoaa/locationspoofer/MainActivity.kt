@@ -15,18 +15,21 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
+import com.suseoaa.locationspoofer.ui.components.BottomSheetValue
 import com.suseoaa.locationspoofer.ui.extensions.isDark
 import com.suseoaa.locationspoofer.ui.screen.BlockingScreen
 import com.suseoaa.locationspoofer.ui.screen.FullScreenMapPage
@@ -203,6 +206,10 @@ fun MainScreen(
     var isFullScreenMap by remember { mutableStateOf(false) }
     var isScannerMap by remember { mutableStateOf(false) }
     var isSettingsScreen by remember { mutableStateOf(false) }
+    // Sheet 状态提升到 AnimatedContent 外部，页面切换返回后可恢复
+    var savedSheetValue by rememberSaveable { mutableStateOf(BottomSheetValue.HALF) }
+    // 滚动状态提升到 AnimatedContent 外部，页面切换返回后可恢复滚动位置
+    val sheetScrollState = rememberScrollState()
 
     val closeMapAndResetRouteIfNeeded = {
         if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
@@ -281,7 +288,10 @@ fun MainScreen(
                     isDark = isDark,
                     onExpandMap = { isFullScreenMap = true },
                     onExpandScannerMap = { isScannerMap = true },
-                    onExpandSettings = { isSettingsScreen = true }
+                    onExpandSettings = { isSettingsScreen = true },
+                    initialSheetValue = savedSheetValue,
+                    onSheetValueChanged = { savedSheetValue = it },
+                    scrollState = sheetScrollState
                 )
             }
         }
