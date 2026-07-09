@@ -9,16 +9,30 @@ val androidMinSdkVersion by extra(26)
 val androidTargetSdkVersion by extra(36)
 val androidCompileSdkVersion by extra(36)
 val androidApplicationId by extra("com.suseoaa.locationspoofer.fork")
-val appVersionName by extra(getVersionName())
-val appVersionCode by extra(getVersionCode())
+val androidVersionName by extra(getVersionName())
+val androidVersionCode by extra(getVersionCode())
+
+fun getGitRef(): String {
+    val process = Runtime.getRuntime().exec(
+        arrayOf("git", "show-ref", "--verify", "--quiet", "refs/heads/main")
+    )
+
+    return if (process.waitFor() == 0) {
+        "main"
+    } else {
+        "HEAD"
+    }
+}
 
 fun getGitCommitCount(): Int {
-    val process = Runtime.getRuntime().exec(arrayOf("git", "rev-list", "--count", "HEAD"))
+    val ref = getGitRef()
+    val process = Runtime.getRuntime().exec(arrayOf("git", "rev-list", "--count", ref))
     return process.inputStream.bufferedReader().use { it.readText().trim().toInt() }
 }
 
 fun getGitDescribe(): String {
-    val process = Runtime.getRuntime().exec(arrayOf("git", "describe", "--tags", "--abbrev=0"))
+    val ref = getGitRef()
+    val process = Runtime.getRuntime().exec(arrayOf("git", "describe", "--tags", "--abbrev=0", ref))
     val result = process.inputStream.bufferedReader().use { it.readText().trim() }
     return result.ifEmpty { "v1.0.0" }
 }

@@ -1,8 +1,10 @@
 # ─── Local ───────────────────────────────────────────────
 *.DS_Store
+.opencode
 .claude
 .idea/
 *.iml
+AGENTS.md
 local.properties
 local.yml
 

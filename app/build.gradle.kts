@@ -12,8 +12,8 @@ val androidMinSdkVersion: Int by rootProject.extra
 val androidTargetSdkVersion: Int by rootProject.extra
 val androidCompileSdkVersion: Int by rootProject.extra
 val androidApplicationId: String by rootProject.extra
-val appVersionName: String by rootProject.extra
-val appVersionCode: Int by rootProject.extra
+val androidVersionName: String by rootProject.extra
+val androidVersionCode: Int by rootProject.extra
 
 android {
     namespace = "com.suseoaa.locationspoofer"
@@ -63,8 +63,8 @@ android {
         applicationId = androidApplicationId
         minSdk = androidMinSdkVersion
         targetSdk = androidTargetSdkVersion
-        versionCode = appVersionCode
-        versionName = appVersionName
+        versionCode = androidVersionCode
+        versionName = androidVersionName
 
         vectorDrawables {
             useSupportLibrary = true
@@ -135,7 +135,7 @@ android {
 
 base {
     archivesName.set(
-        "LocationSpoofer_v${appVersionName}_${appVersionCode}"
+        "LocationSpoofer_v${androidVersionName}_${androidVersionCode}"
     )
 }
 
