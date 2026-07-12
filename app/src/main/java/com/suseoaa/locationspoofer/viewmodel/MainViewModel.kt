@@ -1213,62 +1213,42 @@ class MainViewModel(
         }
     }
 
+    /** 路线查询结果，携带路线点列表和异常状态码/消息 */
+    private data class RouteFetchResult(
+        val points: List<RoutePoint>?,
+        val errorCode: Int? = null,
+        val errorMsg: String? = null
+    )
+
     private fun fetchRealRouteAndStart(points: List<RoutePoint>, state: AppState) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                com.amap.api.services.core.ServiceSettings.updatePrivacyShow(context, true, true)
-                com.amap.api.services.core.ServiceSettings.updatePrivacyAgree(context, true)
-                
-                val routeSearch = com.amap.api.services.route.RouteSearch(context)
                 val allRealPoints = mutableListOf<RoutePoint>()
                 var hasError = false
-                
-                for (i in 0 until points.size - 1) {
-                    // 从起点到终点，中间点作为途经点
-                    val start = com.amap.api.services.core.LatLonPoint(points[i].lat, points[i].lng)
-                    val end = com.amap.api.services.core.LatLonPoint(points[i + 1].lat, points[i + 1].lng)
-                    val fromAndTo = com.amap.api.services.route.RouteSearch.FromAndTo(start, end)
+                var lastErrorCode: Int? = null
+                var lastErrorMsg: String? = null
 
-                    // 创建驾车路线查询 (0: 速度优先，不考虑路况)
-                    val query = com.amap.api.services.route.RouteSearch.DriveRouteQuery(
-                        fromAndTo, com.amap.api.services.route.RouteSearch.DrivingDefault, null, null, ""
-                    )
-                    
-                    val result = routeSearch.calculateDriveRoute(query)
-                    if (result != null && result.paths.isNotEmpty()) {
-                        val path = result.paths[0]
-                        val segmentPoints = mutableListOf<RoutePoint>()
-                        val stepEndIndices = mutableListOf<Int>()
-                        for (step in path.steps) {
-                            for (polyline in step.polyline) {
-                                segmentPoints.add(RoutePoint(polyline.latitude, polyline.longitude, 0.0))
-                            }
-                            if (segmentPoints.isNotEmpty()) {
-                                stepEndIndices.add(segmentPoints.size - 1)
-                            }
+                for (i in 0 until points.size - 1) {
+                    val fetcher = if (activeEngine == MapEngine.BAIDU) ::fetchBaiduDriveRoute else ::fetchAmapDriveRoute
+                    fetcher(points[i], points[i + 1]) { result ->
+                        if (result.points != null && result.points.isNotEmpty()) {
+                            allRealPoints.addAll(result.points)
+                        } else {
+                            hasError = true
+                            lastErrorCode = result.errorCode
+                            lastErrorMsg = result.errorMsg
                         }
-                        val trafficLights = path.totalTrafficlights
-                        if (trafficLights > 0 && stepEndIndices.isNotEmpty()) {
-                            stepEndIndices.shuffled().take(trafficLights).forEach { idx ->
-                                segmentPoints[idx] = segmentPoints[idx].copy(waitSec = 15.0)
-                            }
-                        }
-                        allRealPoints.addAll(segmentPoints)
-                    } else {
-                        hasError = true
-                        break
                     }
+                    if (hasError) break
                 }
-                
-                if (!hasError && allRealPoints.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        _uiState.update { it.copy(isFetchingRoute = false) }
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(isFetchingRoute = false) }
+                    if (!hasError && allRealPoints.isNotEmpty()) {
                         startSimulationWithPoints(allRealPoints, state)
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        _uiState.update { it.copy(isFetchingRoute = false) }
-                        android.widget.Toast.makeText(context, "路线规划失败或部分失败，使用直线模拟", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        val msg = formatRouteFetchError(lastErrorCode, lastErrorMsg)
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
                         startSimulationWithPoints(points, state)
                     }
                 }
@@ -1276,21 +1256,188 @@ class MainViewModel(
                 e.printStackTrace()
                 withContext(Dispatchers.Main) {
                     _uiState.update { it.copy(isFetchingRoute = false) }
-                    var msg = "路线请求异常: ${e.message}"
-                    if (e is com.amap.api.services.core.AMapException) {
-                        val errCode = e.errorCode
-                        val errMsg = e.errorMessage ?: ""
-                        msg = "高德API异常(码:$errCode): $errMsg"
-                        if (errCode == 10003 || errCode == 10012 || errCode == 10013 || errCode == 1800 || errCode == 18000 || 
-                            errMsg.contains("额度") || errMsg.contains("limit", ignoreCase = true)) {
-                            msg = "高德API调用失败(可能是额度耗尽)，将退回直线模拟！\n错误详情: $errMsg"
-                        }
-                    }
-                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(context, "路线请求异常: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                     startSimulationWithPoints(points, state)
                 }
             }
         }
+    }
+
+    /** 根据引擎类型和错误码格式化路线查询失败提示 */
+    private fun formatRouteFetchError(errorCode: Int?, errorMsg: String?): String {
+        if (errorCode == null && errorMsg == null) {
+            return "路线规划失败或部分失败，使用直线模拟"
+        }
+        val msg = errorMsg ?: ""
+        return if (activeEngine == MapEngine.BAIDU) {
+            when {
+                msg.contains("KEY_ERROR") || msg.contains("PERMISSION") || msg.contains("NO_ADVANCED") ->
+                    "百度API调用失败(API不可用或权限不足)，将退回直线模拟！\n错误详情: $msg"
+                msg.contains("NETWORK") || msg.contains("超时") ->
+                    "百度API网络异常，将退回直线模拟！\n错误详情: $msg"
+                errorCode != null ->
+                    "百度API异常(码:$errorCode): $msg"
+                else ->
+                    "百度API调用失败，将退回直线模拟！\n错误详情: $msg"
+            }
+        } else {
+            when {
+                errorCode != null && (errorCode == 10003 || errorCode == 10012 || errorCode == 10013 ||
+                        errorCode == 1800 || errorCode == 18000 ||
+                        msg.contains("额度") || msg.contains("limit", ignoreCase = true)) ->
+                    "高德API调用失败(可能是额度耗尽)，将退回直线模拟！\n错误详情: $msg"
+                errorCode != null ->
+                    "高德API异常(码:$errorCode): $msg"
+                else ->
+                    "高德API调用失败，将退回直线模拟！\n错误详情: $msg"
+            }
+        }
+    }
+
+    /**
+     * 查询高德驾车路线并转换为 RoutePoint 列表（含红绿灯等待模拟）
+     * 高德 SDK 专用实现。内部捕获 AMapException 并通过 callback 返回状态码。
+     *
+     * @param start 起点坐标
+     * @param end   终点坐标
+     * @param callback 结果回调：成功返回 RouteFetchResult(points)，失败返回 RouteFetchResult(null, errCode, errMsg)
+     */
+    private suspend fun fetchAmapDriveRoute(
+        start: RoutePoint,
+        end: RoutePoint,
+        callback: (RouteFetchResult) -> Unit
+    ) {
+        try {
+            val startPoint = com.amap.api.services.core.LatLonPoint(start.lat, start.lng)
+            val endPoint = com.amap.api.services.core.LatLonPoint(end.lat, end.lng)
+            val fromAndTo = com.amap.api.services.route.RouteSearch.FromAndTo(startPoint, endPoint)
+
+            // 创建驾车路线查询 (0: 速度优先，不考虑路况)
+            val query = com.amap.api.services.route.RouteSearch.DriveRouteQuery(
+                fromAndTo, com.amap.api.services.route.RouteSearch.DrivingDefault, null, null, ""
+            )
+
+            val routeSearch = com.amap.api.services.route.RouteSearch(context)
+            val result = routeSearch.calculateDriveRoute(query)
+
+            if (result != null && result.paths.isNotEmpty()) {
+                val path = result.paths[0]
+                val segmentPoints = mutableListOf<RoutePoint>()
+                val stepEndIndices = mutableListOf<Int>()
+                for (step in path.steps) {
+                    for (polyline in step.polyline) {
+                        segmentPoints.add(RoutePoint(polyline.latitude, polyline.longitude, 0.0))
+                    }
+                    if (segmentPoints.isNotEmpty()) {
+                        stepEndIndices.add(segmentPoints.size - 1)
+                    }
+                }
+                val trafficLights = path.totalTrafficlights
+                if (trafficLights > 0 && stepEndIndices.isNotEmpty()) {
+                    stepEndIndices.shuffled().take(trafficLights).forEach { idx ->
+                        segmentPoints[idx] = segmentPoints[idx].copy(waitSec = 15.0)
+                    }
+                }
+                callback(RouteFetchResult(segmentPoints))
+            } else {
+                callback(RouteFetchResult(null))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (e is com.amap.api.services.core.AMapException) {
+                callback(RouteFetchResult(null, e.errorCode, e.errorMessage ?: ""))
+            } else {
+                callback(RouteFetchResult(null, null, e.message))
+            }
+        }
+    }
+
+    /**
+     * 查询百度驾车路线并转换为 RoutePoint 列表（含红绿灯等待模拟）
+     * 百度地图 SDK 专用实现。百度 SDK 路线规划为异步回调，内部用 CountDownLatch 转同步。
+     * 内部捕获 API 异常状态（如 KEY_ERROR、PERMISSION_UNFINISHED 等）并通过 callback 返回。
+     *
+     * @param start 起点坐标
+     * @param end   终点坐标
+     * @param callback 结果回调：成功返回 RouteFetchResult(points)，失败返回 RouteFetchResult(null, errCode, errMsg)
+     */
+    private suspend fun fetchBaiduDriveRoute(
+        start: RoutePoint,
+        end: RoutePoint,
+        callback: (RouteFetchResult) -> Unit
+    ) {
+        val routePlanSearch = com.baidu.mapapi.search.route.RoutePlanSearch.newInstance()
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var resultPoints: List<RoutePoint>? = null
+        var errorCode: Int? = null
+        var errorMsg: String? = null
+
+        routePlanSearch.setOnGetRoutePlanResultListener(object : com.baidu.mapapi.search.route.OnGetRoutePlanResultListener {
+            override fun onGetDrivingRouteResult(result: com.baidu.mapapi.search.route.DrivingRouteResult?) {
+                if (result != null && result.error == com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR
+                    && result.routeLines != null && result.routeLines.isNotEmpty()) {
+                    val line = result.routeLines[0]
+                    val segmentPoints = mutableListOf<RoutePoint>()
+                    val stepEndIndices = mutableListOf<Int>()
+                    for (step in line.allStep) {
+                        for (wayPoint in step.wayPoints) {
+                            segmentPoints.add(RoutePoint(wayPoint.latitude, wayPoint.longitude, 0.0))
+                        }
+                        if (segmentPoints.isNotEmpty()) {
+                            stepEndIndices.add(segmentPoints.size - 1)
+                        }
+                    }
+                    val trafficLights = line.lightNum
+                    if (trafficLights > 0 && stepEndIndices.isNotEmpty()) {
+                        stepEndIndices.shuffled().take(trafficLights).forEach { idx ->
+                            segmentPoints[idx] = segmentPoints[idx].copy(waitSec = 15.0)
+                        }
+                    }
+                    resultPoints = segmentPoints
+                } else if (result != null && result.error != com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR) {
+                    errorCode = result.error.ordinal
+                    errorMsg = result.error.name
+                }
+                latch.countDown()
+            }
+
+            override fun onGetWalkingRouteResult(p0: com.baidu.mapapi.search.route.WalkingRouteResult?) {}
+            override fun onGetTransitRouteResult(p0: com.baidu.mapapi.search.route.TransitRouteResult?) {}
+            override fun onGetMassTransitRouteResult(p0: com.baidu.mapapi.search.route.MassTransitRouteResult?) {}
+            override fun onGetIndoorRouteResult(p0: com.baidu.mapapi.search.route.IndoorRouteResult?) {}
+            override fun onGetBikingRouteResult(p0: com.baidu.mapapi.search.route.BikingRouteResult?) {}
+            override fun onGetIntegralRouteResult(p0: com.baidu.mapapi.search.route.IntegralRouteResult?) {}
+        })
+
+        try {
+            val startNode = com.baidu.mapapi.search.route.PlanNode.withLocation(
+                com.baidu.mapapi.model.LatLng(start.lat, start.lng)
+            )
+            val endNode = com.baidu.mapapi.search.route.PlanNode.withLocation(
+                com.baidu.mapapi.model.LatLng(end.lat, end.lng)
+            )
+
+            val option = com.baidu.mapapi.search.route.DrivingRoutePlanOption()
+                .from(startNode)
+                .to(endNode)
+                .policy(com.baidu.mapapi.search.route.DrivingRoutePlanOption.DrivingPolicy.ECAR_TIME_FIRST)
+                .trafficPolicy(com.baidu.mapapi.search.route.DrivingRoutePlanOption.DrivingTrafficPolicy.ROUTE_PATH)
+
+            routePlanSearch.drivingSearch(option)
+
+            if (!latch.await(15, java.util.concurrent.TimeUnit.SECONDS)) {
+                errorCode = -1
+                errorMsg = "百度路线请求超时"
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            errorCode = null
+            errorMsg = e.message
+        } finally {
+            routePlanSearch.destroy()
+        }
+
+        callback(RouteFetchResult(resultPoints, errorCode, errorMsg))
     }
 
     private fun startSimulationWithPoints(pointsToRun: List<RoutePoint>, state: AppState) {
