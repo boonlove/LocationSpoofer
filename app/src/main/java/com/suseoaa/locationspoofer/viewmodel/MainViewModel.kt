@@ -290,7 +290,8 @@ class MainViewModel(
                 locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
     }
 
-    private val activeEngine = uiState.value.mapEngine.activeEngine(isDomesticEnvironment())
+    private val activeEngine
+        get() = uiState.value.mapEngine.activeEngine(isDomesticEnvironment())
 
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.Main) {
