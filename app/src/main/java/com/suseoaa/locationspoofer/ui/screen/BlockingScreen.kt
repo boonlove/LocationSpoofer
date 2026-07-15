@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,10 +38,18 @@ fun InitializingScreen(isDark: Boolean) {
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
             ) {
+                /**
                 Icon(
                     Icons.Rounded.MyLocation,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+                */
+                Icon(
+                    painter = painterResource(R.mipmap.icon),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
                     modifier = Modifier.size(36.dp)
                 )
             }
