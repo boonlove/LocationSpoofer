@@ -218,9 +218,11 @@ fun DraggableBottomSheet(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
-        val screenHeightPx = with(density) { maxHeight.toPx() }
-        val expandedHeightPx = screenHeightPx * expandedFraction
-        val halfHeightPx = screenHeightPx * halfFraction
+        // dp 作为主单位，AnchoredDraggableState 的 anchors/offset 基于 px 时再转换
+        val expandedHeightDp = maxHeight * expandedFraction
+        val halfHeightDp = maxHeight * halfFraction
+        val expandedHeightPx = with(density) { expandedHeightDp.toPx() }
+        val halfHeightPx = with(density) { halfHeightDp.toPx() }
 
         // 测量 collapsedContent 的高度 + 顶部 padding，作为 COLLAPSED 锚点
         // coerceIn 防止 collapsedContent 过高导致锚点乱序（COLLAPSED ≤ HALF）
@@ -257,7 +259,7 @@ fun DraggableBottomSheet(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(with(density) { expandedHeightPx.toDp() })
+                .height(expandedHeightDp)
                 .offset {
                     val o = sheetState.offset
                     IntOffset(0, if (o.isNaN()) 0 else o.roundToInt())

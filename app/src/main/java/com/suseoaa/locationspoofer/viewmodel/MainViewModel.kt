@@ -80,6 +80,9 @@ class MainViewModel(
     )
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
 
+    private val _spoofingUiState = MutableStateFlow(com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState())
+    val spoofingUiState: StateFlow<com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState> = _spoofingUiState.asStateFlow()
+
     private var locationSyncJob: Job? = null
     private var autoRouteJob: Job? = null
     private var continuousScanJob: Job? = null
@@ -2326,5 +2329,32 @@ class MainViewModel(
 
     fun setIgnoredVersion(version: String) {
         settingsRepository.setIgnoredVersion(version)
+    }
+
+    fun handleSpoofingIntent(intent: com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent) {
+        when (intent) {
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetApiKeyWarningVisible -> _spoofingUiState.update { it.copy(showApiKeyWarningDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSaveDialogVisible -> _spoofingUiState.update { it.copy(showSaveDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSavedLocationsVisible -> _spoofingUiState.update { it.copy(showSavedLocationsDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetUpdateDialogVisible -> _spoofingUiState.update { it.copy(showUpdateDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetMapTypeDialogVisible -> _spoofingUiState.update { it.copy(showMapTypeDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetCustomCoordDialogVisible -> _spoofingUiState.update { it.copy(showCustomCoordDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetStartSpoofingDialogVisible -> _spoofingUiState.update { it.copy(showStartSpoofingDialog = intent.visible) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetAppCoordinateScreenVisible -> _spoofingUiState.update { it.copy(showAppCoordinateScreen = intent.visible) }
+
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSheetState -> _spoofingUiState.update { it.copy(sheetState = intent.sheetValue) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetScrollOffset -> _spoofingUiState.update { it.copy(scrollOffset = intent.scrollValue) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSheetExpanded -> _spoofingUiState.update { it.copy(isSheetExpanded = intent.expanded) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSearchActive -> _spoofingUiState.update { it.copy(isSearchActive = intent.active) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.UpdateSearchQuery -> _spoofingUiState.update { it.copy(searchQuery = intent.query) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.PerformSearch -> {
+                // Implement search logic later via another intent or directly here if preferred
+            }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.ClearSearchResults -> _spoofingUiState.update { it.copy(searchResults = emptyList(), showSearchResults = false) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSearchResults -> _spoofingUiState.update { it.copy(searchResults = intent.results, showSearchResults = intent.show) }
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.ConfirmMapPoint -> confirmMapPoint(intent.lat, intent.lng)
+
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.RequestCurrentLocation -> {} // Typically requires Context, will pass to a callback instead
+        }
     }
 }

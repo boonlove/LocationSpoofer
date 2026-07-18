@@ -206,10 +206,6 @@ fun MainScreen(
     var isFullScreenMap by remember { mutableStateOf(false) }
     var isScannerMap by remember { mutableStateOf(false) }
     var isSettingsScreen by remember { mutableStateOf(false) }
-    // Sheet 状态提升到 AnimatedContent 外部，页面切换返回后可恢复
-    var savedSheetValue by rememberSaveable { mutableStateOf(BottomSheetValue.HALF) }
-    // 滚动状态提升到 AnimatedContent 外部，页面切换返回后可恢复滚动位置
-    val sheetScrollState = rememberScrollState()
 
     val closeMapAndResetRouteIfNeeded = {
         if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
@@ -288,10 +284,7 @@ fun MainScreen(
                     isDark = isDark,
                     onExpandMap = { isFullScreenMap = true },
                     onExpandScannerMap = { isScannerMap = true },
-                    onExpandSettings = { isSettingsScreen = true },
-                    initialSheetValue = savedSheetValue,
-                    onSheetValueChanged = { savedSheetValue = it },
-                    scrollState = sheetScrollState
+                    onExpandSettings = { isSettingsScreen = true }
                 )
             }
         }

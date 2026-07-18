@@ -6,8 +6,8 @@ plugins {
 }
 
 val androidMinSdkVersion by extra(26)
-val androidTargetSdkVersion by extra(36)
-val androidCompileSdkVersion by extra(36)
+val androidTargetSdkVersion by extra(35)
+val androidCompileSdkVersion by extra(35)
 val androidApplicationId by extra("com.suseoaa.locationspoofer.fork")
 val androidVersionName by extra(getVersionName())
 val androidVersionCode by extra(getVersionCode())

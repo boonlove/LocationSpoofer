@@ -60,7 +60,7 @@ val AppColorSchemeLight = lightColorScheme(
 object AppColors {
     fun textSecondary(isDark: Boolean) = if (isDark) TextSecondaryDark else TextSecondaryLight
     fun surface(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceLight
-    fun cardBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardCustomLight
+    fun cardBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardLight
     fun topBarBackground(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceCardCustomLight
     fun background(isDark: Boolean) = if (isDark) DarkBg else LightBg
 }
