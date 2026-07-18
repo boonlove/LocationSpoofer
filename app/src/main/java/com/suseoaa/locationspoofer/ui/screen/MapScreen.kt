@@ -120,13 +120,18 @@ fun FullScreenMapPage(
                 routePoints.lastIndex -> MarkerType.RED
                 else -> MarkerType.DEFAULT
             }
-            
+
             // 如果开启了真实路线且处于运行状态，则不绘制中间密集的轨迹点
             if (uiState.useRealRoute && uiState.routePlanStage == RoutePlanStage.RUNNING && type == MarkerType.DEFAULT) {
                 return@forEachIndexed
             }
-            
-            map.addMarker(p.lat, p.lng, if (type == MarkerType.RED && uiState.useRealRoute && uiState.routePlanStage == RoutePlanStage.RUNNING) "终点" else "${idx + 1}", type)
+
+            map.addMarker(
+                p.lat,
+                p.lng,
+                if (type == MarkerType.RED && uiState.useRealRoute && uiState.routePlanStage == RoutePlanStage.RUNNING) "终点" else "${idx + 1}",
+                type
+            )
         }
 
         // 确保被 clear() 清除的实时位置图标能够重新绘制
@@ -206,7 +211,12 @@ fun FullScreenMapPage(
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 地图
-        AppMapView(mapEngine = uiState.mapEngine, isDomestic = isDomestic, isDark = isDark, modifier = Modifier.fillMaxSize()) { map ->
+        AppMapView(
+            mapEngine = uiState.mapEngine,
+            isDomestic = isDomestic,
+            isDark = isDark,
+            modifier = Modifier.fillMaxSize()
+        ) { map ->
             mapRef = map
             map.disableUiControls()
             val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
@@ -219,7 +229,10 @@ fun FullScreenMapPage(
             Icon(
                 Icons.Rounded.AddLocationAlt, null,
                 tint = AccentBlue.copy(alpha = 0.8f),
-                modifier = Modifier.align(Alignment.Center).size(40.dp).padding(bottom = 16.dp)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+                    .padding(bottom = 16.dp)
             )
         }
 
@@ -228,7 +241,9 @@ fun FullScreenMapPage(
             Icon(
                 Icons.Rounded.PersonPin, null,
                 tint = AccentOrange,
-                modifier = Modifier.align(Alignment.Center).size(48.dp)
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(48.dp)
             )
         }
 
@@ -237,110 +252,164 @@ fun FullScreenMapPage(
             Column(
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
-            TopBar(
-                stage = stage,
-                routePointCount = routePoints.size,
-                isManual = isManual,
-                onBack = onClose,
-                canUndo = stage == RoutePlanStage.SELECTING && routePoints.isNotEmpty(),
-                onUndo = { viewModel.undoLastRoutePoint() },
-                onReset = { viewModel.resetRoutePoint() }
-            )
-            // 搜索栏
-            if (stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.IDLE) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    androidx.compose.foundation.text.BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        ),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            focusManager.clearFocus()
-                            if ((uiState.amapApiKey.isBlank() && activeEngine == MapEngine.AMAP) ||
-                                (uiState.baiduApiKey.isBlank() && activeEngine == MapEngine.BAIDU) ||
-                                (uiState.googleApiKey.isBlank() && activeEngine == MapEngine.GOOGLE)
-                                ) {
-                                showApiKeyWarning = true
-                            } else if (searchQuery.isNotBlank()) {
-                                performPoiSearch(context, activeEngine, searchQuery, isDomestic) { r ->
-                                    searchResults = r
-                                    showSearchResults = r.isNotEmpty()
-                                }
-                            }
-                        }),
+                TopBar(
+                    stage = stage,
+                    routePointCount = routePoints.size,
+                    isManual = isManual,
+                    onBack = onClose,
+                    canUndo = stage == RoutePlanStage.SELECTING && routePoints.isNotEmpty(),
+                    onUndo = { viewModel.undoLastRoutePoint() },
+                    onReset = { viewModel.resetRoutePoint() }
+                )
+                // 搜索栏
+                if (stage == RoutePlanStage.SELECTING || stage == RoutePlanStage.IDLE) {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .shadow(4.dp, RoundedCornerShape(22.dp))
-                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f), RoundedCornerShape(22.dp))
-                            .padding(horizontal = 16.dp),
-                        decorationBox = { innerTextField ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Search, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
-                                Spacer(Modifier.width(8.dp))
-                                Box(modifier = Modifier.weight(1f)) {
-                                    if (searchQuery.isEmpty()) {
-                                        Text(stringResource(R.string.search_location_hint), fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onBackground
+                            ),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                focusManager.clearFocus()
+                                if (
+                                    (uiState.amapApiKey.isBlank() && activeEngine == MapEngine.AMAP) ||
+                                    (uiState.baiduApiKey.isBlank() && activeEngine == MapEngine.BAIDU)
+                                ) {
+                                    showApiKeyWarning = true
+                                } else if (searchQuery.isNotBlank()) {
+                                    performPoiSearch(
+                                        context,
+                                        activeEngine,
+                                        searchQuery,
+                                        isDomestic
+                                    ) { r ->
+                                        searchResults = r
+                                        showSearchResults = r.isNotEmpty()
                                     }
-                                    innerTextField()
                                 }
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                            }),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .shadow(4.dp, RoundedCornerShape(22.dp))
+                                .background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                    RoundedCornerShape(22.dp)
+                                )
+                                .padding(horizontal = 16.dp),
+                            decorationBox = { innerTextField ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Rounded.Search,
+                                        null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                stringResource(R.string.search_location_hint),
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(
+                                                    alpha = 0.5f
+                                                )
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(
+                                            onClick = { searchQuery = "" },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Close,
+                                                null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.onBackground.copy(
+                                                    alpha = 0.5f
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    )
-                }
-                // 搜索结果
-                AnimatedVisibility(visible = showSearchResults && searchResults.isNotEmpty()) {
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                    ) {
-                        LazyColumn(modifier = Modifier.heightIn(max = 350.dp)) {
-                            items(searchResults.take(15)) { poi ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .clickable {
-                                        val pLat = poi.lat
-                                        val pLng = poi.lng
-                                        mapRef?.animateCamera(pLat, pLng, 16f)
-                                        showSearchResults = false
-                                        searchQuery = poi.title
+                        )
+                    }
+                    // 搜索结果
+                    AnimatedVisibility(visible = showSearchResults && searchResults.isNotEmpty()) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp)
+                        ) {
+                            LazyColumn(modifier = Modifier.heightIn(max = 350.dp)) {
+                                items(searchResults.take(15)) { poi ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                val pLat = poi.lat
+                                                val pLng = poi.lng
+                                                mapRef?.animateCamera(pLat, pLng, 16f)
+                                                showSearchResults = false
+                                                searchQuery = poi.title
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Place,
+                                            null,
+                                            tint = AccentBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Column {
+                                            Text(
+                                                poi.title,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                poi.snippet,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                            )
                                         }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Rounded.Place, null, tint = AccentBlue, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Column {
-                                        Text(poi.title, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
-                                        Text(poi.snippet, fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
                                     }
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outline.copy(
+                                            alpha = 0.3f
+                                        )
+                                    )
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                             }
                         }
                     }
                 }
             }
-        }
         } // TopBar 的 if(!isInPipMode) 结束
 
         // 右侧定位和图层按钮
         if (!isInPipMode) {
             Column(
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MapFab(
@@ -364,7 +433,7 @@ fun FullScreenMapPage(
                 }
 
                 AnimatedVisibility(visible = (stage == RoutePlanStage.SELECTING && routePoints.isEmpty()) || stage == RoutePlanStage.IDLE) {
-                    Column (
+                    Column(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         MapFab(
@@ -393,11 +462,16 @@ fun FullScreenMapPage(
             // 摇杆（仅手动模式运行中）
             AnimatedVisibility(
                 visible = isRunning && isManual,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 180.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 180.dp),
                 enter = slideInVertically(tween(250)) { it / 2 } + fadeIn(tween(250)),
                 exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(tween(200))
             ) {
-                JoystickPanel(viewModel = viewModel, maxSpeedMs = uiState.routeSimMode.speedMs.toFloat())
+                JoystickPanel(
+                    viewModel = viewModel,
+                    maxSpeedMs = uiState.routeSimMode.speedMs.toFloat()
+                )
             }
         }
 
@@ -410,7 +484,11 @@ fun FullScreenMapPage(
                         val tLng = mapRef?.cameraTargetLng
                         if (tLat != null && tLng != null) {
                             viewModel.confirmMapPoint(tLat, tLng)
-                            Toast.makeText(context, context.getString(R.string.coordinate_selected), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.coordinate_selected),
+                                Toast.LENGTH_SHORT
+                            ).show()
                             onClose()
                         }
                     },
@@ -529,15 +607,24 @@ fun FullScreenMapPage(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(Modifier.height(24.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        androidx.compose.material3.TextButton(onClick = { showSaveRouteDialog = false }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        androidx.compose.material3.TextButton(onClick = {
+                            showSaveRouteDialog = false
+                        }) {
                             Text(stringResource(R.string.cancel))
                         }
                         Spacer(Modifier.width(8.dp))
                         Button(onClick = {
                             if (routeName.isNotBlank()) {
                                 viewModel.saveRoute(routeName, routePoints)
-                                Toast.makeText(context, context.getString(R.string.save_success), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.save_success),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                                 showSaveRouteDialog = false
                             }
                         }) {
@@ -567,40 +654,81 @@ fun FullScreenMapPage(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(stringResource(R.string.route_library), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        stringResource(R.string.route_library),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(Modifier.height(16.dp))
                     if (uiState.savedRoutes.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                            Text(stringResource(R.string.no_saved_routes), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                stringResource(R.string.no_saved_routes),
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                            )
                         }
                     } else {
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             items(uiState.savedRoutes) { route ->
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        viewModel.loadSavedRoute(route)
-                                        showSavedRoutesDialog = false
-                                    }.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.loadSavedRoute(route)
+                                            showSavedRoutesDialog = false
+                                        }
+                                        .padding(vertical = 12.dp, horizontal = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(route.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                        Text(stringResource(R.string.route_nodes_count, route.points.size), fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                                        Text(
+                                            route.name,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            stringResource(
+                                                R.string.route_nodes_count,
+                                                route.points.size
+                                            ),
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                        )
                                     }
                                     IconButton(onClick = { viewModel.deleteSavedRoute(route) }) {
-                                        Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error)
+                                        Icon(
+                                            Icons.Rounded.Delete,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
                                     }
                                 }
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.outline.copy(
+                                        alpha = 0.2f
+                                    )
+                                )
                             }
                         }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        androidx.compose.material3.TextButton(onClick = { showSavedRoutesDialog = false }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        androidx.compose.material3.TextButton(onClick = {
+                            showSavedRoutesDialog = false
+                        }) {
                             Text(stringResource(R.string.close))
                         }
                     }
@@ -638,7 +766,11 @@ private fun TopBar(
             modifier = Modifier.size(44.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), tint = MaterialTheme.colorScheme.onBackground)
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    stringResource(R.string.back),
+                    tint = MaterialTheme.colorScheme.onBackground
+                )
             }
         }
 
@@ -652,9 +784,19 @@ private fun TopBar(
                 Text(
                     text = when (stage) {
                         RoutePlanStage.IDLE -> ""
-                        RoutePlanStage.SELECTING -> stringResource(R.string.selecting_points_hint, routePointCount)
-                        RoutePlanStage.READY -> stringResource(R.string.route_ready_hint, routePointCount)
-                        RoutePlanStage.RUNNING -> if (isManual) stringResource(R.string.joystick_controlling) else stringResource(R.string.route_looping)
+                        RoutePlanStage.SELECTING -> stringResource(
+                            R.string.selecting_points_hint,
+                            routePointCount
+                        )
+
+                        RoutePlanStage.READY -> stringResource(
+                            R.string.route_ready_hint,
+                            routePointCount
+                        )
+
+                        RoutePlanStage.RUNNING -> if (isManual) stringResource(R.string.joystick_controlling) else stringResource(
+                            R.string.route_looping
+                        )
                     },
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
@@ -709,7 +851,10 @@ private fun BottomActionBar(
             .fillMaxWidth()
             .background(
                 Brush.verticalGradient(
-                    listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
+                    listOf(
+                        Color.Transparent,
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
+                    )
                 )
             )
             .navigationBarsPadding()
@@ -717,59 +862,90 @@ private fun BottomActionBar(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         when (stage) {
-            RoutePlanStage.IDLE -> { /* 不会到达此处 */ }
+            RoutePlanStage.IDLE -> { /* 不会到达此处 */
+            }
 
             RoutePlanStage.SELECTING -> {
                 Text(
-                    stringResource(R.string.selected_points_count, routePoints.size, if (routePoints.size < 2) stringResource(R.string.at_least_two_points) else ""),
+                    stringResource(
+                        R.string.selected_points_count,
+                        routePoints.size,
+                        if (routePoints.size < 2) stringResource(R.string.at_least_two_points) else ""
+                    ),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Button(
                         onClick = onConfirmPoint,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                     ) {
                         Icon(Icons.Rounded.AddLocation, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.confirm_point), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.confirm_point),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
                     }
                     Button(
                         onClick = onFinishSelecting,
                         enabled = routePoints.size >= 2,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
                     ) {
                         Icon(Icons.Rounded.CheckCircle, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.finish_selecting), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.finish_selecting),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
                     }
                     Button(
                         onClick = onSaveRoute,
                         enabled = routePoints.size >= 2,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
                     ) {
                         Icon(Icons.Rounded.Star, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(stringResource(R.string.save_route), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text(
+                            stringResource(R.string.save_route),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
 
             RoutePlanStage.READY -> {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     OutlinedButton(
                         onClick = onRestartSelecting,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(18.dp))
@@ -778,7 +954,9 @@ private fun BottomActionBar(
                     }
                     OutlinedButton(
                         onClick = { onSaveRoute() },
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(Icons.Rounded.Star, null, modifier = Modifier.size(18.dp))
@@ -787,7 +965,9 @@ private fun BottomActionBar(
                     }
                     Button(
                         onClick = onStartPlanning,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(52.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentGreen)
                     ) {
@@ -801,7 +981,9 @@ private fun BottomActionBar(
             RoutePlanStage.RUNNING -> {
                 Button(
                     onClick = onStopRoute,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -898,13 +1080,15 @@ private fun RoutePlanConfigDialog(
                                     onClick = { onSpeedChange(mode) },
                                     label = {
                                         Text(
-                                            "${when(mode){
-                                                SimMode.WALKING -> stringResource(R.string.walking)
-                                                SimMode.RUNNING -> stringResource(R.string.running)
-                                                SimMode.CYCLING -> stringResource(R.string.cycling)
-                                                SimMode.DRIVING -> stringResource(R.string.driving)
-                                                else -> stringResource(R.string.custom)
-                                            }}\n${mode.speedMs.toInt()}m/s",
+                                            "${
+                                                when (mode) {
+                                                    SimMode.WALKING -> stringResource(R.string.walking)
+                                                    SimMode.RUNNING -> stringResource(R.string.running)
+                                                    SimMode.CYCLING -> stringResource(R.string.cycling)
+                                                    SimMode.DRIVING -> stringResource(R.string.driving)
+                                                    else -> stringResource(R.string.custom)
+                                                }
+                                            }\n${mode.speedMs.toInt()}m/s",
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center
                                         )
@@ -960,7 +1144,11 @@ private fun RoutePlanConfigDialog(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text("使用真实路线规划", fontSize = 14.sp)
-                            Text("通过API获取实际道路轨迹，遇到红绿灯自动停下15秒", fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
+                            Text(
+                                "通过API获取实际道路轨迹，遇到红绿灯自动停下15秒",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                            )
                         }
                     }
                 }
@@ -972,15 +1160,24 @@ private fun RoutePlanConfigDialog(
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp)
                     ) { Text(stringResource(R.string.cancel)) }
                     Button(
                         onClick = onStartRoute,
-                        modifier = Modifier.weight(1f).height(48.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                    ) { Text(stringResource(R.string.start_simulation), fontWeight = FontWeight.Bold) }
+                    ) {
+                        Text(
+                            stringResource(R.string.start_simulation),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -1020,7 +1217,11 @@ fun JoystickPanel(viewModel: MainViewModel, maxSpeedMs: Float = 10f) {
                     val dist = sqrt(raw.x * raw.x + raw.y * raw.y)
                     thumbOffset = if (dist <= maxRadius) raw else raw * (maxRadius / dist)
                     val angle = atan2(thumbOffset.y.toDouble(), thumbOffset.x.toDouble())
-                    val intensity = (sqrt(thumbOffset.x * thumbOffset.x + thumbOffset.y * thumbOffset.y) / maxRadius).coerceIn(0f, 1f)
+                    val intensity =
+                        (sqrt(thumbOffset.x * thumbOffset.x + thumbOffset.y * thumbOffset.y) / maxRadius).coerceIn(
+                            0f,
+                            1f
+                        )
                     joystickState = Pair(angle, intensity)
                 }
             },
@@ -1066,9 +1267,20 @@ fun SaveNameDialog(title: String, onConfirm: (String) -> Unit, onDismiss: () -> 
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.name)) },
+                singleLine = true
+            )
         },
-        confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onConfirm(name) }) { Text(stringResource(R.string.save)) } },
+        confirmButton = {
+            TextButton(onClick = { if (name.isNotBlank()) onConfirm(name) }) {
+                Text(
+                    stringResource(R.string.save)
+                )
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }

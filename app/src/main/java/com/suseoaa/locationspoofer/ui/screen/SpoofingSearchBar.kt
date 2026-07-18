@@ -1,6 +1,7 @@
 package com.suseoaa.locationspoofer.ui.screen
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -85,6 +86,20 @@ import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.BuildConfig
 import androidx.compose.runtime.Composable
+import com.amap.api.maps.AMapException
+import com.amap.api.services.poisearch.PoiResult
+import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener
+import com.baidu.mapapi.search.poi.PoiCitySearchOption
+import com.baidu.mapapi.search.poi.PoiDetailResult
+import com.baidu.mapapi.search.poi.PoiDetailSearchResult
+import com.baidu.mapapi.search.poi.PoiIndoorResult
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.AutocompleteSessionToken
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.model.RectangularBounds
+import com.google.android.libraries.places.api.net.FetchPlaceRequest
+import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
+import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.theme.*
 
 @Composable
@@ -172,17 +187,17 @@ fun HomeSearchBar(
 private var cachedPlacesClient: com.google.android.libraries.places.api.net.PlacesClient? = null
 
 fun performPoiSearch(
-    context: android.content.Context,
-    activeEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
+    context: Context,
+    activeEngine: MapEngine,
     keyword: String,
     isDomestic: Boolean,
     onResult: (List<AppPoiItem>) -> Unit
 ) {
-    if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
+    if (activeEngine == MapEngine.BAIDU) {
         try {
             val mPoiSearch = com.baidu.mapapi.search.poi.PoiSearch.newInstance()
             mPoiSearch.setOnGetPoiSearchResultListener(object :
-                com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener {
+                OnGetPoiSearchResultListener {
                 override fun onGetPoiResult(result: com.baidu.mapapi.search.poi.PoiResult?) {
                     if (result == null || result.error != com.baidu.mapapi.search.core.SearchResult.ERRORNO.NO_ERROR) {
                         onResult(emptyList())
@@ -201,11 +216,11 @@ fun performPoiSearch(
                     mPoiSearch.destroy()
                 }
 
-                override fun onGetPoiDetailResult(p0: com.baidu.mapapi.search.poi.PoiDetailResult?) {}
-                override fun onGetPoiDetailResult(p0: com.baidu.mapapi.search.poi.PoiDetailSearchResult?) {}
-                override fun onGetPoiIndoorResult(p0: com.baidu.mapapi.search.poi.PoiIndoorResult?) {}
+                override fun onGetPoiDetailResult(p0: PoiDetailResult?) {}
+                override fun onGetPoiDetailResult(p0: PoiDetailSearchResult?) {}
+                override fun onGetPoiIndoorResult(p0: PoiIndoorResult?) {}
             })
-            val option = com.baidu.mapapi.search.poi.PoiCitySearchOption()
+            val option = PoiCitySearchOption()
                 .city("全国")
                 .keyword(keyword)
                 .pageNum(0)
@@ -215,7 +230,7 @@ fun performPoiSearch(
             e.printStackTrace()
             onResult(emptyList())
         }
-    } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP) {
+    } else if (activeEngine == MapEngine.AMAP) {
         try {
             val query = PoiSearch.Query(keyword, "", "")
             query.pageSize = 10
@@ -223,7 +238,7 @@ fun performPoiSearch(
             val search = PoiSearch(context, query)
             search.setOnPoiSearchListener(object : PoiSearch.OnPoiSearchListener {
                 override fun onPoiSearched(
-                    result: com.amap.api.services.poisearch.PoiResult?,
+                    result: PoiResult?,
                     rCode: Int
                 ) {
                     if (rCode == 1000 && result != null) {
@@ -237,16 +252,16 @@ fun performPoiSearch(
                         } ?: emptyList())
                     } else {
                         if (rCode == 10003 || rCode == 10012 || rCode == 10013 || rCode == 10014 || rCode == 1800 || rCode == 18000) {
-                            android.widget.Toast.makeText(
+                            Toast.makeText(
                                 context,
                                 "高德搜索API调用失败(可能是额度耗尽)，请检查控制台或更换Key！",
-                                android.widget.Toast.LENGTH_LONG
+                                Toast.LENGTH_LONG
                             ).show()
                         } else if (rCode != 1000) {
-                            android.widget.Toast.makeText(
+                            Toast.makeText(
                                 context,
                                 "高德搜索失败(错误码:$rCode)",
-                                android.widget.Toast.LENGTH_SHORT
+                                Toast.LENGTH_SHORT
                             ).show()
                         }
                         onResult(emptyList())
@@ -259,15 +274,15 @@ fun performPoiSearch(
         } catch (e: Exception) {
             e.printStackTrace()
             val msg = e.message ?: ""
-            if (e is com.amap.api.services.core.AMapException || msg.contains(
+            if (e is AMapException || msg.contains(
                     "limit",
                     ignoreCase = true
                 ) || msg.contains("额度")
             ) {
-                android.widget.Toast.makeText(
+                Toast.makeText(
                     context,
                     "高德搜索异常(可能是额度耗尽)：$msg",
-                    android.widget.Toast.LENGTH_LONG
+                    Toast.LENGTH_LONG
                 ).show()
             }
             onResult(emptyList())
@@ -275,7 +290,7 @@ fun performPoiSearch(
     } else {
         try {
             val placesClient =
-                cachedPlacesClient ?: com.google.android.libraries.places.api.Places.createClient(
+                cachedPlacesClient ?: Places.createClient(
                     context.applicationContext
                 ).also {
                     cachedPlacesClient = it
@@ -283,15 +298,15 @@ fun performPoiSearch(
             // 使用 Autocomplete 接口：全球关键词搜索，不限制国家/地区
             // 通过 sessionToken 分组请求，避免重复计费；不设置 country 限制以支持全球搜索
             val sessionToken =
-                com.google.android.libraries.places.api.model.AutocompleteSessionToken.newInstance()
+                AutocompleteSessionToken.newInstance()
             // 设置覆盖全球的矩形偏移，阻止服务器根据 IP 推断区域，实现真正全球搜索
             val worldBounds =
-                com.google.android.libraries.places.api.model.RectangularBounds.newInstance(
+                RectangularBounds.newInstance(
                     com.google.android.gms.maps.model.LatLng(-90.0, -180.0),
                     com.google.android.gms.maps.model.LatLng(90.0, 180.0)
                 )
             val autocompleteRequest =
-                com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest.builder()
+                FindAutocompletePredictionsRequest.builder()
                     .setQuery(keyword)
                     .setLocationBias(worldBounds)
                     .setSessionToken(sessionToken)
@@ -301,27 +316,27 @@ fun performPoiSearch(
                 .addOnSuccessListener { autocompleteResponse ->
                     val predictions = autocompleteResponse.autocompletePredictions
                     if (predictions.isEmpty()) {
-                        android.widget.Toast.makeText(
+                        Toast.makeText(
                             context,
                             "No predictions found for: $keyword",
-                            android.widget.Toast.LENGTH_SHORT
+                            Toast.LENGTH_SHORT
                         ).show()
                         onResult(emptyList())
                         return@addOnSuccessListener
                     }
                     // 批量获取前5条预测结果的详情（坐标）
                     val fetchFields = listOf(
-                        com.google.android.libraries.places.api.model.Place.Field.ID,
-                        com.google.android.libraries.places.api.model.Place.Field.NAME,
-                        com.google.android.libraries.places.api.model.Place.Field.LAT_LNG,
-                        com.google.android.libraries.places.api.model.Place.Field.ADDRESS
+                        Place.Field.ID,
+                        Place.Field.NAME,
+                        Place.Field.LAT_LNG,
+                        Place.Field.ADDRESS
                     )
                     val resultList = mutableListOf<AppPoiItem>()
                     val topPredictions = predictions.take(5)
                     var completedCount = 0
                     topPredictions.forEach { prediction ->
                         val fetchRequest =
-                            com.google.android.libraries.places.api.net.FetchPlaceRequest.newInstance(
+                            FetchPlaceRequest.newInstance(
                                 prediction.placeId,
                                 fetchFields
                             )
@@ -346,10 +361,10 @@ fun performPoiSearch(
                             .addOnCompleteListener {
                                 completedCount++
                                 if (completedCount == topPredictions.size) {
-                                    android.widget.Toast.makeText(
+                                    Toast.makeText(
                                         context,
                                         "Search Success: ${resultList.size} results",
-                                        android.widget.Toast.LENGTH_SHORT
+                                        Toast.LENGTH_SHORT
                                     ).show()
                                     onResult(resultList)
                                 }
@@ -357,18 +372,18 @@ fun performPoiSearch(
                     }
                 }
                 .addOnFailureListener { exception ->
-                    android.widget.Toast.makeText(
+                    Toast.makeText(
                         context,
                         "Search Error: ${exception.message}",
-                        android.widget.Toast.LENGTH_LONG
+                        Toast.LENGTH_LONG
                     ).show()
                     onResult(emptyList())
                 }
         } catch (e: Exception) {
-            android.widget.Toast.makeText(
+            Toast.makeText(
                 context,
                 "Search Catch Error: ${e.message}",
-                android.widget.Toast.LENGTH_LONG
+                Toast.LENGTH_LONG
             ).show()
             onResult(emptyList())
         }

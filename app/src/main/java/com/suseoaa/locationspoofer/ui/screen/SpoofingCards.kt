@@ -456,7 +456,11 @@ fun SavedLocationsCard(
 
 @Composable
 fun AppCoordinateConfigCard(isDark: Boolean, onClick: () -> Unit) {
-    SectionHeader(Icons.Rounded.Extension, androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_algo), isDark)
+    SectionHeader(
+        Icons.Rounded.Extension,
+        androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_algo),
+        isDark
+    )
     Spacer(Modifier.height(8.dp))
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -465,29 +469,60 @@ fun AppCoordinateConfigCard(isDark: Boolean, onClick: () -> Unit) {
         modifier = Modifier.clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(AccentBlue.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.Extension, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Rounded.Extension,
+                    null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.config_app_coordinate), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.config_app_coordinate_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.config_app_coordinate),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.config_app_coordinate_desc),
+                    color = AppColors.textSecondary(isDark),
+                    fontSize = 11.sp
+                )
             }
-            Icon(androidx.compose.material.icons.Icons.Rounded.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+            Icon(
+                androidx.compose.material.icons.Icons.Rounded.ChevronRight,
+                null,
+                tint = AppColors.textSecondary(isDark),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
 
 @Composable
-fun ScannerMapCard(isDark: Boolean, uiState: com.suseoaa.locationspoofer.data.model.AppState, onClick: () -> Unit) {
-    SectionHeader(Icons.Rounded.Radar, androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.spatial_env_collection), isDark)
+fun ScannerMapCard(
+    isDark: Boolean,
+    uiState: com.suseoaa.locationspoofer.data.model.AppState,
+    onClick: () -> Unit
+) {
+    SectionHeader(
+        Icons.Rounded.Radar,
+        androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.spatial_env_collection),
+        isDark
+    )
     Spacer(Modifier.height(8.dp))
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -496,11 +531,15 @@ fun ScannerMapCard(isDark: Boolean, uiState: com.suseoaa.locationspoofer.data.mo
         modifier = Modifier.clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(AccentGreen.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -508,17 +547,34 @@ fun ScannerMapCard(isDark: Boolean, uiState: com.suseoaa.locationspoofer.data.mo
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_map_scan), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-                val statusText = if (uiState.isContinuousScanning) androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_reference_points, uiState.environmentRecordCount) else androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.view_heatmap_start_scan)
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_map_scan),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+                val statusText =
+                    if (uiState.isContinuousScanning) androidx.compose.ui.res.stringResource(
+                        com.suseoaa.locationspoofer.R.string.scanning_reference_points,
+                        uiState.environmentRecordCount
+                    ) else androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.view_heatmap_start_scan)
                 Text(statusText, color = AppColors.textSecondary(isDark), fontSize = 11.sp)
             }
             if (uiState.isContinuousScanning) {
                 Box(
-                    modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(AccentGreen)
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(AccentGreen)
                 )
                 Spacer(Modifier.width(8.dp))
             }
-            Icon(androidx.compose.material.icons.Icons.Rounded.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+            Icon(
+                androidx.compose.material.icons.Icons.Rounded.ChevronRight,
+                null,
+                tint = AppColors.textSecondary(isDark),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -532,22 +588,45 @@ fun ManageDataCard(isDark: Boolean, onClick: () -> Unit) {
         modifier = Modifier.clickable { onClick() }
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Rounded.DeleteOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                Icon(
+                    Icons.Rounded.DeleteOutline,
+                    null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.title_manage_data), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.manage_collected_data_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.title_manage_data),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.manage_collected_data_desc),
+                    color = AppColors.textSecondary(isDark),
+                    fontSize = 11.sp
+                )
             }
-            Icon(androidx.compose.material.icons.Icons.Rounded.ChevronRight, null, tint = AppColors.textSecondary(isDark), modifier = Modifier.size(16.dp))
+            Icon(
+                androidx.compose.material.icons.Icons.Rounded.ChevronRight,
+                null,
+                tint = AppColors.textSecondary(isDark),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -560,27 +639,51 @@ fun ImportExportDataCard(isDark: Boolean, onImportClick: () -> Unit, onExportCli
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(AccentBlue.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(androidx.compose.material.icons.Icons.Rounded.ImportExport, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                Icon(
+                    androidx.compose.material.icons.Icons.Rounded.ImportExport,
+                    null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(18.dp)
+                )
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_data_sharing), color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_data_sharing_desc), color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_data_sharing),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+                Text(
+                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.env_data_sharing_desc),
+                    color = AppColors.textSecondary(isDark),
+                    fontSize = 11.sp
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onImportClick) {
-                    Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.import_data), color = AccentBlue)
+                    Text(
+                        androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.import_data),
+                        color = AccentBlue
+                    )
                 }
                 TextButton(onClick = onExportClick) {
-                    Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.export_data), color = AccentBlue)
+                    Text(
+                        androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.export_data),
+                        color = AccentBlue
+                    )
                 }
             }
         }
@@ -590,12 +693,14 @@ fun ImportExportDataCard(isDark: Boolean, onImportClick: () -> Unit, onExportCli
 @Composable
 fun FooterLinks(isDark: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-        
+
         // GitHub 图标
         Box(
             modifier = Modifier
@@ -620,9 +725,9 @@ fun FooterLinks(isDark: Boolean) {
                 )
             }
         }
-        
+
         Spacer(Modifier.width(16.dp))
-        
+
         // Telegram 图标
         Box(
             modifier = Modifier
@@ -669,7 +774,9 @@ fun SearchModeCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp))
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(AccentBlue.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -677,10 +784,19 @@ fun SearchModeCard(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("搜索源", color = MaterialTheme.colorScheme.onBackground, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
-                Text("选择地理信息检索方式", color = AppColors.textSecondary(isDark), fontSize = 11.sp)
+                Text(
+                    "搜索源",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 14.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                )
+                Text(
+                    "选择地理信息检索方式",
+                    color = AppColors.textSecondary(isDark),
+                    fontSize = 11.sp
+                )
             }
-            
+
             val isNetwork = searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK
             val activeColor = AccentBlue
             val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
@@ -690,7 +806,9 @@ fun SearchModeCard(
                     onClick = { onSearchModeChange(com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK) },
                     shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isNetwork) activeColor else inactiveColor),
-                    modifier = Modifier.weight(1f).height(32.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                 ) {
                     Text(
@@ -703,7 +821,9 @@ fun SearchModeCard(
                     onClick = { onSearchModeChange(com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) },
                     shape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (!isNetwork) activeColor else inactiveColor),
-                    modifier = Modifier.weight(1f).height(32.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                 ) {
                     Text(

@@ -92,41 +92,60 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
 
     fun getAppCoordinateSystems(): Map<String, String> = settingsManager.getAppCoordinateSystems()
 
-    fun setAppCoordinateSystems(map: Map<String, String>) = settingsManager.setAppCoordinateSystems(map)
+    fun setAppCoordinateSystems(map: Map<String, String>) =
+        settingsManager.setAppCoordinateSystems(map)
 
     var isSpoofingActive: Boolean
         get() = settingsManager.isSpoofingActive
-        set(value) { settingsManager.isSpoofingActive = value }
+        set(value) {
+            settingsManager.isSpoofingActive = value
+        }
 
     var lastSpoofedLat: String
         get() = settingsManager.lastSpoofedLat
-        set(value) { settingsManager.lastSpoofedLat = value }
+        set(value) {
+            settingsManager.lastSpoofedLat = value
+        }
 
     var lastSpoofedLng: String
         get() = settingsManager.lastSpoofedLng
-        set(value) { settingsManager.lastSpoofedLng = value }
+        set(value) {
+            settingsManager.lastSpoofedLng = value
+        }
 
     var mockWifi: Boolean
         get() = settingsManager.mockWifi
-        set(value) { settingsManager.mockWifi = value }
+        set(value) {
+            settingsManager.mockWifi = value
+        }
 
     var mockCell: Boolean
         get() = settingsManager.mockCell
-        set(value) { settingsManager.mockCell = value }
+        set(value) {
+            settingsManager.mockCell = value
+        }
 
     var mockBluetooth: Boolean
         get() = settingsManager.mockBluetooth
-        set(value) { settingsManager.mockBluetooth = value }
+        set(value) {
+            settingsManager.mockBluetooth = value
+        }
 
     var enableJitter: Boolean
         get() = settingsManager.enableJitter
-        set(value) { settingsManager.enableJitter = value }
+        set(value) {
+            settingsManager.enableJitter = value
+        }
 
     var altitude: String
         get() = settingsManager.altitude
-        set(value) { settingsManager.altitude = value }
+        set(value) {
+            settingsManager.altitude = value
+        }
 
     var satelliteCount: String
         get() = settingsManager.satelliteCount
-        set(value) { settingsManager.satelliteCount = value }
+        set(value) {
+            settingsManager.satelliteCount = value
+        }
 }

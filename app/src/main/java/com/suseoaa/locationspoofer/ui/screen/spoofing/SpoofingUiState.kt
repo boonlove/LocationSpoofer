@@ -17,7 +17,7 @@ data class SpoofingUiState(
     val showCustomCoordDialog: Boolean = false,
     val showStartSpoofingDialog: Boolean = false,
     val showAppCoordinateScreen: Boolean = false,
-    
+
     // Bottom Sheet & Search State
     val sheetState: BottomSheetValue = BottomSheetValue.HALF,
     val scrollOffset: Int = 0,
@@ -26,7 +26,7 @@ data class SpoofingUiState(
     val searchQuery: String = "",
     val searchResults: List<AppPoiItem> = emptyList(),
     val showSearchResults: Boolean = false,
-    
+
     // Notifications / Error
     val toastMessage: String? = null
 )

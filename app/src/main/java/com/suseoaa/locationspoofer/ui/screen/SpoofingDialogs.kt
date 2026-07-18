@@ -167,9 +167,11 @@ fun UpdateDialog(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
                 Text(
                     stringResource(R.string.update_dialog_title),
                     fontSize = 18.sp,
@@ -192,9 +194,11 @@ fun UpdateDialog(
                                         BuildConfig.VERSION_NAME.contains(release.versionName)
                             val isMergedRelease = missed.size > 1 && release == displayList.first()
 
-                            Column(modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         stringResource(R.string.version, release.versionName),
@@ -350,9 +354,11 @@ fun SavedLocationsDialog(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
                 Text(
                     stringResource(R.string.saved_locations),
                     fontSize = 18.sp,

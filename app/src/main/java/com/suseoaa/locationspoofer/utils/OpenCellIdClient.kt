@@ -17,7 +17,8 @@ class OpenCellIdClient {
             return@withContext false
         }
         return@withContext try {
-            val url = "https://opencellid.org/cell/getInArea?key=$token&BBOX=0.0,0.0,0.0,0.0&format=json"
+            val url =
+                "https://opencellid.org/cell/getInArea?key=$token&BBOX=0.0,0.0,0.0,0.0&format=json"
             val request = Request.Builder()
                 .url(url)
                 .build()
@@ -51,7 +52,8 @@ class OpenCellIdClient {
 
             try {
                 for (box in searchBoxes) {
-                    val url = "https://opencellid.org/cell/getInArea?key=$token&BBOX=${box.latMin},${box.lonMin},${box.latMax},${box.lonMax}&format=json&limit=20"
+                    val url =
+                        "https://opencellid.org/cell/getInArea?key=$token&BBOX=${box.latMin},${box.lonMin},${box.latMax},${box.lonMax}&format=json&limit=20"
                     val request = Request.Builder()
                         .url(url)
                         .build()
@@ -124,7 +126,8 @@ class OpenCellIdClient {
         val normalized = JSONArray()
         for (i in 0 until cells.length()) {
             val source = cells.optJSONObject(i) ?: continue
-            val type = normalizeRadioType(source.optString("radio", source.optString("type", "LTE")))
+            val type =
+                normalizeRadioType(source.optString("radio", source.optString("type", "LTE")))
             val mcc = positiveInt(source, "mcc", default = 460)
             val mnc = positiveInt(source, "mnc", "net", default = 0)
             val area = positiveInt(source, "tac", "lac", "area", default = 0)

@@ -14,17 +14,17 @@ class LocaleUtils {
             } else {
                 Locale.forLanguageTag(language)
             }
-            
+
             Locale.setDefault(locale)
-            
+
             val resources = context.resources
             val configuration = Configuration(resources.configuration)
-            
+
             configuration.setLocale(locale)
             val localeList = LocaleList(locale)
             configuration.setLocales(localeList)
             configuration.setLayoutDirection(locale)
-            
+
             return context.createConfigurationContext(configuration)
         }
     }

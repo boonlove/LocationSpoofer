@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -192,13 +195,13 @@ fun JoystickOverlay(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            androidx.compose.material3.IconButton(
+            IconButton(
                 onClick = onClose,
                 modifier = Modifier.size(32.dp)
             ) {
-                androidx.compose.material3.Icon(
-                    androidx.compose.material.icons.Icons.Rounded.Close,
-                    androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.close_joystick)
+                Icon(
+                    Icons.Rounded.Close,
+                    stringResource(com.suseoaa.locationspoofer.R.string.close_joystick)
                 )
             }
         }

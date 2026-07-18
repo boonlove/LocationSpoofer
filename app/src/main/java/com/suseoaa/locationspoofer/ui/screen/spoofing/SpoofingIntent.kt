@@ -16,7 +16,7 @@ sealed class SpoofingIntent {
     data class SetCustomCoordDialogVisible(val visible: Boolean) : SpoofingIntent()
     data class SetStartSpoofingDialogVisible(val visible: Boolean) : SpoofingIntent()
     data class SetAppCoordinateScreenVisible(val visible: Boolean) : SpoofingIntent()
-    
+
     // Bottom Sheet & Search UI
     data class SetSheetState(val sheetValue: BottomSheetValue) : SpoofingIntent()
     data class SetScrollOffset(val scrollValue: Int): SpoofingIntent()
@@ -25,8 +25,11 @@ sealed class SpoofingIntent {
     data class UpdateSearchQuery(val query: String) : SpoofingIntent()
     data object PerformSearch : SpoofingIntent()
     data class ClearSearchResults(val clearAll: Boolean = false) : SpoofingIntent()
-    data class SetSearchResults(val results: List<com.suseoaa.locationspoofer.ui.screen.AppPoiItem>, val show: Boolean) : SpoofingIntent()
-    
+    data class SetSearchResults(
+        val results: List<com.suseoaa.locationspoofer.ui.screen.AppPoiItem>,
+        val show: Boolean
+    ) : SpoofingIntent()
+
     // Map Actions
     data class ConfirmMapPoint(val lat: Double, val lng: Double) : SpoofingIntent()
     data object RequestCurrentLocation : SpoofingIntent()

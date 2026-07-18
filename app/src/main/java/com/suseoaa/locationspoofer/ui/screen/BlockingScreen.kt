@@ -26,7 +26,9 @@ fun InitializingScreen(isDark: Boolean) {
     val textSecondary = AppColors.textSecondary(isDark)
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -34,7 +36,9 @@ fun InitializingScreen(isDark: Boolean) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(
-                modifier = Modifier.size(72.dp).clip(CircleShape)
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
             ) {
@@ -86,7 +90,9 @@ fun BlockingScreen(icon: ImageVector, title: String, message: String, isDark: Bo
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Box(
-                modifier = Modifier.size(80.dp).clip(CircleShape)
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {

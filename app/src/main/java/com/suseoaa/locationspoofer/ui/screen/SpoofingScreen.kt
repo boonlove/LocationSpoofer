@@ -193,7 +193,10 @@ fun SpoofingScreen(
 
     val animatedMapHeight by animateDpAsState(
         targetValue = if (spoofingUiState.isSearchActive) screenHeightDp else if (spoofingUiState.isSheetExpanded) expandedMapHeight else collapsedMapHeight,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        )
     )
 
     var isDragging by remember { mutableStateOf(false) }
@@ -464,16 +467,25 @@ fun SpoofingScreen(
                             onSearchModeChange = { mode -> viewModel.setSearchMode(mode) },
                             onSearch = {
                                 focusManager.clearFocus()
-                                if (uiState.searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
+                                if (uiState.searchMode == SearchMode.LOCAL) {
                                     GlobalScope.launch(Dispatchers.Main) {
                                         val results = viewModel.performLocalSearch()
-                                        onIntent(SpoofingIntent.SetSearchResults(results, true))
+                                        onIntent(
+                                            SpoofingIntent.SetSearchResults(
+                                                results,
+                                                true
+                                            )
+                                        )
                                     }
                                 }else if (
                                     (activeEngine == MapEngine.AMAP && uiState.amapApiKey.isBlank()) ||
                                     (activeEngine == MapEngine.BAIDU && uiState.baiduApiKey.isBlank())
                                 ) {
-                                    onIntent(SpoofingIntent.SetApiKeyWarningVisible(true))
+                                    onIntent(
+                                        SpoofingIntent.SetApiKeyWarningVisible(
+                                            true
+                                        )
+                                    )
                                 } else if (spoofingUiState.searchQuery.isNotBlank()) {
                                     performPoiSearch(
                                         context,
@@ -481,7 +493,12 @@ fun SpoofingScreen(
                                         spoofingUiState.searchQuery,
                                         viewModel.isDomesticEnvironment()
                                     ) { results ->
-                                        onIntent(SpoofingIntent.SetSearchResults(results, true))
+                                        onIntent(
+                                            SpoofingIntent.SetSearchResults(
+                                                results,
+                                                true
+                                            )
+                                        )
                                     }
                                 }
                             },
@@ -511,13 +528,30 @@ fun SpoofingScreen(
                                                 )
                                                 viewModel.updateLongitude(
                                                     String.format(
-                                                        "%.6f", poi.lng
+                                                        "%.6f",
+                                                        poi.lng
                                                     )
                                                 )
-                                                smallMapRef?.animateCamera(poi.lat, poi.lng, 16f)
-                                                onIntent(SpoofingIntent.ClearSearchResults(false))
-                                                onIntent(SpoofingIntent.SetSearchActive(false))
-                                                onIntent(SpoofingIntent.UpdateSearchQuery(poi.title))
+                                                smallMapRef?.animateCamera(
+                                                    poi.lat,
+                                                    poi.lng,
+                                                    16f
+                                                )
+                                                onIntent(
+                                                    SpoofingIntent.ClearSearchResults(
+                                                        false
+                                                    )
+                                                )
+                                                onIntent(
+                                                    SpoofingIntent.SetSearchActive(
+                                                        false
+                                                    )
+                                                )
+                                                onIntent(
+                                                    SpoofingIntent.UpdateSearchQuery(
+                                                        poi.title
+                                                    )
+                                                )
                                             }
                                             .padding(horizontal = 14.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -602,7 +636,7 @@ fun SpoofingScreen(
             Spacer(Modifier.height(8.dp))
             SearchModeCard(isDark, uiState.searchMode) { mode ->
                 viewModel.setSearchMode(mode)
-                if (mode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
+                if (mode == SearchMode.LOCAL) {
                     focusManager.clearFocus()
                     GlobalScope.launch(Dispatchers.Main) {
                         val results = viewModel.performLocalSearch()
@@ -759,6 +793,18 @@ fun SpoofingScreen(
             currentMapEngine = uiState.mapEngine,
             onMapEngineSelected = { viewModel.setMapEngine(it) },
             onDismiss = { onIntent(SpoofingIntent.SetMapTypeDialogVisible(false)) }
+        )
+    }
+
+    AnimatedVisibility(
+        visible = spoofingUiState.showAppCoordinateScreen,
+        enter = androidx.compose.animation.slideInVertically(tween(400)) { it },
+        exit = androidx.compose.animation.slideOutVertically(tween(400)) { it }
+    ) {
+        AppCoordinateScreen(
+            viewModel = viewModel,
+            uiState = uiState,
+            onBack = { onIntent(SpoofingIntent.SetAppCoordinateScreenVisible(false)) }
         )
     }
 }

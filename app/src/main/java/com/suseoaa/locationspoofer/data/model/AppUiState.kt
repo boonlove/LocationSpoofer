@@ -23,10 +23,13 @@ enum class SearchMode {
 enum class RoutePlanStage {
     /** 未开始，默认状态 */
     IDLE,
+
     /** 正在点击地图添加路点 */
     SELECTING,
+
     /** 已结束选点，等待配置并启动 */
     READY,
+
     /** 路线模拟运行中 */
     RUNNING
 }
@@ -35,6 +38,7 @@ enum class RoutePlanStage {
 enum class RouteRunMode {
     /** 手动模式：摇杆控制移动方向和速度 */
     MANUAL,
+
     /** 循环模式：按路线自动来回移动 */
     LOOP
 }
@@ -112,7 +116,7 @@ data class AppState(
     val canMockWifi: Boolean = false,
     val canMockCell: Boolean = false,
     val canMockBluetooth: Boolean = false,
-    
+
     // Data Management
     val isManageDataScreen: Boolean = false,
     val manageDataList: List<com.suseoaa.locationspoofer.data.db.CompleteLocation> = emptyList(),

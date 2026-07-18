@@ -32,21 +32,21 @@ fun ScannerMapScreen(
 ) {
     var mapController by remember { mutableStateOf<AppMapController?>(null) }
     var showMapTypeDialog by remember { mutableStateOf(false) }
-    
+
     // 同步地图类型
     LaunchedEffect(mapController, uiState.mapType) {
         mapController?.setMapType(uiState.mapType)
     }
-    
+
     // 当地图准备就绪并且记录数量发生变化时绘制热力图圆圈
     LaunchedEffect(mapController, uiState.environmentRecordCount) {
         val controller = mapController ?: return@LaunchedEffect
         val locations = viewModel.getAllLocations()
         controller.clear()
-        
+
         // 绘制覆盖范围圆圈
         com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(controller, locations)
-        
+
         // 如果存在，则将相机移动到最新记录
         if (locations.isNotEmpty()) {
             val last = locations.last()
@@ -54,7 +54,9 @@ fun ScannerMapScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.background)) {
         AppMapView(
             mapEngine = uiState.mapEngine,
             isDomestic = uiState.currentLanguage == "zh",
@@ -65,7 +67,7 @@ fun ScannerMapScreen(
                 controller.disableUiControls()
             }
         )
-        
+
         // Top Bar
         Row(
             modifier = Modifier
@@ -82,7 +84,7 @@ fun ScannerMapScreen(
             ) {
                 Icon(Icons.Rounded.Close, "Close", tint = MaterialTheme.colorScheme.onSurface)
             }
-            
+
             // Status Chip
             Surface(
                 shape = CircleShape,
@@ -97,18 +99,25 @@ fun ScannerMapScreen(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(if (uiState.isContinuousScanning) AccentGreen else AppColors.textSecondary(isDark))
+                            .background(
+                                if (uiState.isContinuousScanning) AccentGreen else AppColors.textSecondary(
+                                    isDark
+                                )
+                            )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        if (uiState.isContinuousScanning) androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_status_active, uiState.environmentRecordCount) else androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_status_inactive),
+                        if (uiState.isContinuousScanning) androidx.compose.ui.res.stringResource(
+                            com.suseoaa.locationspoofer.R.string.scanning_status_active,
+                            uiState.environmentRecordCount
+                        ) else androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.scanning_status_inactive),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
         }
-        
+
         // Bottom Action
         Box(
             modifier = Modifier
@@ -123,10 +132,12 @@ fun ScannerMapScreen(
                 Icon(Icons.Rounded.Radar, null)
             }
         }
-        
+
         // 右侧悬浮按钮
         Column(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(

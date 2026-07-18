@@ -29,12 +29,18 @@ interface EnvironmentDao {
     suspend fun insertLocationCell(record: LocationCell)
 
     @Transaction
-    @Query("""
+    @Query(
+        """
         SELECT * FROM location_records 
         ORDER BY ((lat - :targetLat)*(lat - :targetLat) + (lng - :targetLng)*(lng - :targetLng)) ASC 
         LIMIT :limit
-    """)
-    suspend fun getNearestLocations(targetLat: Double, targetLng: Double, limit: Int = 3): List<CompleteLocation>
+    """
+    )
+    suspend fun getNearestLocations(
+        targetLat: Double,
+        targetLng: Double,
+        limit: Int = 3
+    ): List<CompleteLocation>
 
     @Query("SELECT * FROM location_records")
     suspend fun getAllLocations(): List<LocationRecord>

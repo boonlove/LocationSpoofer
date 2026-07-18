@@ -46,11 +46,11 @@ fun ManageDataScreen(
     val selectedIds = remember { mutableStateListOf<Long>() }
     var showClearAllConfirm by remember { mutableStateOf(false) }
     var mapController by remember { mutableStateOf<AppMapController?>(null) }
-    
+
     var editingItem by remember { mutableStateOf<CompleteLocation?>(null) }
 
     val dataList = uiState.manageDataList
-    
+
     LaunchedEffect(mapController, uiState.mapType) {
         mapController?.setMapType(uiState.mapType)
     }
@@ -107,7 +107,10 @@ fun ManageDataScreen(
                                 selectedIds.addAll(dataList.map { it.location.id })
                             }
                         }) {
-                            Icon(Icons.Rounded.SelectAll, contentDescription = stringResource(R.string.select_all))
+                            Icon(
+                                Icons.Rounded.SelectAll,
+                                contentDescription = stringResource(R.string.select_all)
+                            )
                         }
                         if (selectedIds.isNotEmpty()) {
                             IconButton(onClick = {
@@ -115,20 +118,33 @@ fun ManageDataScreen(
                                 isSelectionMode = false
                                 selectedIds.clear()
                             }) {
-                                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+                                Icon(
+                                    Icons.Rounded.Delete,
+                                    contentDescription = stringResource(R.string.delete),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     } else {
                         IconButton(onClick = { isSelectionMode = true }) {
-                            Icon(Icons.Rounded.Checklist, contentDescription = stringResource(R.string.select_all))
+                            Icon(
+                                Icons.Rounded.Checklist,
+                                contentDescription = stringResource(R.string.select_all)
+                            )
                         }
                         IconButton(onClick = { showClearAllConfirm = true }) {
-                            Icon(Icons.Rounded.DeleteSweep, contentDescription = stringResource(R.string.clear_all), tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                Icons.Rounded.DeleteSweep,
+                                contentDescription = stringResource(R.string.clear_all),
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = com.suseoaa.locationspoofer.ui.theme.AppColors.topBarBackground(isDark),
+                    containerColor = com.suseoaa.locationspoofer.ui.theme.AppColors.topBarBackground(
+                        isDark
+                    ),
                     titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
@@ -140,7 +156,10 @@ fun ManageDataScreen(
             }
         } else if (dataList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.no_data_collected), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    stringResource(R.string.no_data_collected),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         } else {
             Column(
@@ -149,7 +168,9 @@ fun ManageDataScreen(
                     .padding(paddingValues)
             ) {
                 // Top Map
-                Box(modifier = Modifier.fillMaxWidth().weight(0.4f)) {
+                Box(modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.4f)) {
                     AppMapView(
                         mapEngine = uiState.mapEngine,
                         isDomestic = viewModel.isDomesticEnvironment(),
@@ -161,7 +182,7 @@ fun ManageDataScreen(
                         }
                     )
                 }
-                
+
                 // Bottom List
                 LazyColumn(
                     modifier = Modifier
@@ -188,9 +209,25 @@ fun ManageDataScreen(
                                 }
                             },
                             onClick = {
-                                viewModel.updateLatitude(String.format(Locale.US, "%.6f", item.location.lat))
-                                viewModel.updateLongitude(String.format(Locale.US, "%.6f", item.location.lng))
-                                mapController?.animateCamera(item.location.lat, item.location.lng, 17f)
+                                viewModel.updateLatitude(
+                                    String.format(
+                                        Locale.US,
+                                        "%.6f",
+                                        item.location.lat
+                                    )
+                                )
+                                viewModel.updateLongitude(
+                                    String.format(
+                                        Locale.US,
+                                        "%.6f",
+                                        item.location.lng
+                                    )
+                                )
+                                mapController?.animateCamera(
+                                    item.location.lat,
+                                    item.location.lng,
+                                    17f
+                                )
                                 // 可选择关闭屏幕以返回 SpoofingScreen
                             },
                             onDeleteSingle = {
@@ -209,7 +246,7 @@ fun ManageDataScreen(
     if (editingItem != null) {
         var placeName by remember { mutableStateOf(editingItem!!.location.placeName) }
         var remark by remember { mutableStateOf(editingItem!!.location.remark) }
-        
+
         AlertDialog(
             onDismissRequest = { editingItem = null },
             title = { Text(stringResource(R.string.edit_location_data)) },
@@ -285,8 +322,9 @@ private fun DataListItem(
     onEdit: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()) }
-    val timeStr = remember(item.location.timestamp) { dateFormat.format(Date(item.location.timestamp)) }
-    
+    val timeStr =
+        remember(item.location.timestamp) { dateFormat.format(Date(item.location.timestamp)) }
+
     val wifiCount = item.wifis.size
     val cellCount = item.cells.size
     val btCount = item.bluetooths.size
@@ -296,13 +334,15 @@ private fun DataListItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
-                onClick = { 
-                    if (isSelectionMode) onSelect() 
+                onClick = {
+                    if (isSelectionMode) onSelect()
                     else onClick()
                 },
                 onLongClick = onLongClick
             ),
-        color = if (isSelected) com.suseoaa.locationspoofer.ui.theme.AccentBlue.copy(alpha = 0.15f) else com.suseoaa.locationspoofer.ui.theme.AppColors.cardBackground(isDark),
+        color = if (isSelected) com.suseoaa.locationspoofer.ui.theme.AccentBlue.copy(alpha = 0.15f) else com.suseoaa.locationspoofer.ui.theme.AppColors.cardBackground(
+            isDark
+        ),
         tonalElevation = 0.dp
     ) {
         Row(
@@ -316,7 +356,7 @@ private fun DataListItem(
                     modifier = Modifier.padding(end = 16.dp)
                 )
             }
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = timeStr,
@@ -326,7 +366,12 @@ private fun DataListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Lat: ${String.format("%.5f", item.location.lat)}, Lng: ${String.format("%.5f", item.location.lng)}",
+                    text = "Lat: ${
+                        String.format(
+                            "%.5f",
+                            item.location.lat
+                        )
+                    }, Lng: ${String.format("%.5f", item.location.lng)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
@@ -338,7 +383,7 @@ private fun DataListItem(
                     IconTextRow(Icons.Rounded.CellTower, "$cellCount")
                     IconTextRow(Icons.Rounded.Bluetooth, "$btCount")
                 }
-                
+
                 if (item.location.placeName.isNotBlank() || item.location.remark.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))

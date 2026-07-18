@@ -1,4 +1,5 @@
 @file:OptIn(kotlinx.serialization.InternalSerializationApi::class)
+
 package com.suseoaa.locationspoofer.data.db
 
 import androidx.room.Entity

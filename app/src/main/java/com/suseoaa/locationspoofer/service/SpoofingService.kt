@@ -57,6 +57,7 @@ class SpoofingService : Service() {
                 val lng = intent.getDoubleExtra(EXTRA_LNG, 0.0)
                 startSpoofing(lat, lng)
             }
+
             ACTION_STOP -> stopSpoofing()
         }
         return START_STICKY
@@ -67,7 +68,13 @@ class SpoofingService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(com.suseoaa.locationspoofer.R.string.spoofing_service_title))
-            .setContentText(getString(com.suseoaa.locationspoofer.R.string.spoofing_service_content, lat.toString(), lng.toString()))
+            .setContentText(
+                getString(
+                    com.suseoaa.locationspoofer.R.string.spoofing_service_content,
+                    lat.toString(),
+                    lng.toString()
+                )
+            )
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
@@ -124,7 +131,7 @@ class SpoofingService : Service() {
     private fun stopSpoofing() {
         spoofingJob?.cancel()
         isRunning = false
-        
+
         removeTestProvider(LocationManager.GPS_PROVIDER)
         removeTestProvider(LocationManager.NETWORK_PROVIDER)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -173,7 +180,11 @@ class SpoofingService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, getString(com.suseoaa.locationspoofer.R.string.spoofing_service_channel_name), NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                getString(com.suseoaa.locationspoofer.R.string.spoofing_service_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }

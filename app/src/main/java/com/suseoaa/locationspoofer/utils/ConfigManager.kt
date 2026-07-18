@@ -63,7 +63,7 @@ class ConfigManager(private val rootManager: RootManager) {
             put("enable_jitter", enableJitter)
             put("altitude", altitude)
             put("satellite_count", satelliteCount)
-            
+
             val coordSysObj = JSONObject()
             appCoordinateSystems.forEach { (pkg, sys) -> coordSysObj.put(pkg, sys) }
             put("app_coordinate_systems", coordSysObj)

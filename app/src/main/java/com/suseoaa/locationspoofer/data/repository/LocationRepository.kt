@@ -2,12 +2,15 @@ package com.suseoaa.locationspoofer.data.repository
 
 import android.content.Context
 import android.content.Intent
+import com.suseoaa.locationspoofer.data.db.SavedRouteDao
+import com.suseoaa.locationspoofer.data.db.SavedRouteEntity
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.provider.SpooferProvider
 import com.suseoaa.locationspoofer.service.SpoofingService
 import com.suseoaa.locationspoofer.utils.ConfigManager
 import com.suseoaa.locationspoofer.utils.LSPosedManager
 import com.suseoaa.locationspoofer.utils.RootManager
+import com.suseoaa.locationspoofer.utils.SettingsManager
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -15,8 +18,8 @@ class LocationRepository(
     private val configManager: ConfigManager,
     private val rootManager: RootManager,
     private val lsposedManager: LSPosedManager,
-    private val settingsManager: com.suseoaa.locationspoofer.utils.SettingsManager,
-    private val savedRouteDao: com.suseoaa.locationspoofer.data.db.SavedRouteDao
+    private val settingsManager: SettingsManager,
+    private val savedRouteDao: SavedRouteDao
 ) {
     suspend fun checkRootAccess(): Boolean = rootManager.checkRootAccess()
 
@@ -55,7 +58,26 @@ class LocationRepository(
 
         val alt = settingsManager.altitude.toDoubleOrNull() ?: 0.0
         val satCount = settingsManager.satelliteCount.toIntOrNull() ?: 20
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter, alt, satCount)
+        configManager.saveConfig(
+            lat,
+            lng,
+            true,
+            simMode,
+            simBearing,
+            startTime,
+            routePoints,
+            isRouteMode,
+            SpooferProvider.wifiJson,
+            appCoordinateSystems,
+            SpooferProvider.cellJson,
+            SpooferProvider.bluetoothJson,
+            mockWifi,
+            mockCell,
+            mockBluetooth,
+            enableJitter,
+            alt,
+            satCount
+        )
         rootManager.grantMockLocation()
 
         context.startForegroundService(
@@ -111,7 +133,26 @@ class LocationRepository(
         SpooferProvider.enableJitter = enableJitter
         val alt = settingsManager.altitude.toDoubleOrNull() ?: 0.0
         val satCount = settingsManager.satelliteCount.toIntOrNull() ?: 20
-        configManager.saveConfig(lat, lng, true, simMode, simBearing, startTime, routePoints, isRouteMode, SpooferProvider.wifiJson, appCoordinateSystems, SpooferProvider.cellJson, SpooferProvider.bluetoothJson, mockWifi, mockCell, mockBluetooth, enableJitter, alt, satCount)
+        configManager.saveConfig(
+            lat,
+            lng,
+            true,
+            simMode,
+            simBearing,
+            startTime,
+            routePoints,
+            isRouteMode,
+            SpooferProvider.wifiJson,
+            appCoordinateSystems,
+            SpooferProvider.cellJson,
+            SpooferProvider.bluetoothJson,
+            mockWifi,
+            mockCell,
+            mockBluetooth,
+            enableJitter,
+            alt,
+            satCount
+        )
     }
 
     suspend fun updateWifiJson(wifiJson: String, appCoordinateSystems: Map<String, String>) {
@@ -144,21 +185,21 @@ class LocationRepository(
         return arr.toString()
     }
 
-    fun getSavedRoutes(): kotlinx.coroutines.flow.Flow<List<com.suseoaa.locationspoofer.data.db.SavedRouteEntity>> {
+    fun getSavedRoutes(): kotlinx.coroutines.flow.Flow<List<SavedRouteEntity>> {
         return savedRouteDao.getAllSavedRoutes()
     }
 
     suspend fun insertSavedRoute(name: String, points: List<RoutePoint>) {
         val pointsJson = routePointsToJson(points)
         savedRouteDao.insertSavedRoute(
-            com.suseoaa.locationspoofer.data.db.SavedRouteEntity(
+            SavedRouteEntity(
                 name = name,
                 pointsJson = pointsJson
             )
         )
     }
 
-    suspend fun deleteSavedRoute(route: com.suseoaa.locationspoofer.data.db.SavedRouteEntity) {
+    suspend fun deleteSavedRoute(route: SavedRouteEntity) {
         savedRouteDao.deleteSavedRoute(route)
     }
 }

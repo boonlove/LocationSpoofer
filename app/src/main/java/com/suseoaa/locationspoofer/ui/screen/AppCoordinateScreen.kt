@@ -1,5 +1,6 @@
 package com.suseoaa.locationspoofer.ui.screen
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,10 @@ fun AppCoordinateScreen(
     var showSystemApps by remember { mutableStateOf(false) }
     var selectedApp by remember { mutableStateOf<AppInfoItem?>(null) }
 
+    BackHandler {
+        onBack()
+    }
+
     val appsToShow = uiState.hookedApps.filter { app ->
         showSystemApps || !app.isSystem
     }
@@ -56,95 +61,98 @@ fun AppCoordinateScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                title = { 
-                    Text(
-                        text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_algo),
-                        fontSize = 18.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    ) 
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 16.dp)
-                    ) {
+                    title = {
                         Text(
-                            text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.show_system_apps),
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.custom_coordinate_algo),
+                            fontSize = 18.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Switch(
-                            checked = showSystemApps,
-                            onCheckedChange = { showSystemApps = it },
-                            colors = SwitchDefaults.colors(
-                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surface
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 16.dp)
+                        ) {
+                            Text(
+                                text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.show_system_apps),
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
+                            Spacer(Modifier.width(8.dp))
+                            Switch(
+                                checked = showSystemApps,
+                                onCheckedChange = { showSystemApps = it },
+                                colors = SwitchDefaults.colors(
+                                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                if (appsToShow.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.no_hooked_apps),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
-                )
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            if (appsToShow.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.no_hooked_apps), color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(appsToShow, key = { it.packageName }) { app ->
-                        val currentSys = uiState.appCoordinateSystems[app.packageName]
-                        AppItem(
-                            appInfo = app,
-                            currentCoordinateSystem = currentSys,
-                            onClick = { selectedApp = app }
-                        )
-                        Divider(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                            modifier = Modifier.padding(start = 72.dp)
-                        )
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(appsToShow, key = { it.packageName }) { app ->
+                            val currentSys = uiState.appCoordinateSystems[app.packageName]
+                            AppItem(
+                                appInfo = app,
+                                currentCoordinateSystem = currentSys,
+                                onClick = { selectedApp = app }
+                            )
+                            Divider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                modifier = Modifier.padding(start = 72.dp)
+                            )
+                        }
                     }
                 }
             }
-        }
-        
-        // Selection Dialog
-        selectedApp?.let { app ->
-            CoordinateSelectionDialog(
-                appInfo = app,
-                currentSystem = uiState.appCoordinateSystems[app.packageName] ?: "GCJ-02",
-                onDismiss = { selectedApp = null },
-                onSelect = { sys ->
-                    if (sys == "GCJ-02") {
-                        // 如果是默认的 GCJ-02，我们可以直接从 map 中将其移除，以保持配置整洁
-                        viewModel.removeAppCoordinateSystem(app.packageName)
-                    } else {
-                        viewModel.setAppCoordinateSystem(app.packageName, sys)
+
+            // Selection Dialog
+            selectedApp?.let { app ->
+                CoordinateSelectionDialog(
+                    appInfo = app,
+                    currentSystem = uiState.appCoordinateSystems[app.packageName] ?: "GCJ-02",
+                    onDismiss = { selectedApp = null },
+                    onSelect = { sys ->
+                        if (sys == "GCJ-02") {
+                            // 如果是默认的 GCJ-02，我们可以直接从 map 中将其移除，以保持配置整洁
+                            viewModel.removeAppCoordinateSystem(app.packageName)
+                        } else {
+                            viewModel.setAppCoordinateSystem(app.packageName, sys)
+                        }
+                        selectedApp = null
                     }
-                    selectedApp = null
-                }
-            )
+                )
+            }
         }
     }
-}
 }
 
 @Composable
@@ -184,7 +192,7 @@ fun AppItem(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         if (currentCoordinateSystem != null) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -234,7 +242,7 @@ fun CoordinateSelectionDialog(
     val systems = listOf(
         "GCJ-02" to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.gcj02_desc),
         "WGS-84" to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.wgs84_desc),
-        "BD-09"  to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.bd09_desc)
+        "BD-09" to androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.bd09_desc)
     )
 
     val currentContext = androidx.compose.ui.platform.LocalContext.current
@@ -246,11 +254,11 @@ fun CoordinateSelectionDialog(
                 androidx.compose.ui.platform.LocalContext provides currentContext,
                 androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
             ) {
-            Text(
-                text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.set_coordinate_algo),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+                Text(
+                    text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.set_coordinate_algo),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         text = {
@@ -258,52 +266,59 @@ fun CoordinateSelectionDialog(
                 androidx.compose.ui.platform.LocalContext provides currentContext,
                 androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
             ) {
-            Column {
-                Text(
-                    text = androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.select_coord_sys_desc, appInfo.appName),
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                systems.forEach { (sys, desc) ->
-                    val isSelected = sys == currentSystem
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .clickable { onSelect(sys) },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                Column {
+                    Text(
+                        text = androidx.compose.ui.res.stringResource(
+                            com.suseoaa.locationspoofer.R.string.select_coord_sys_desc,
+                            appInfo.appName
+                        ),
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    systems.forEach { (sys, desc) ->
+                        val isSelected = sys == currentSystem
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable { onSelect(sys) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(
+                                alpha = 0.5f
+                            )
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = sys,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = desc,
-                                    fontSize = 12.sp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = sys,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = desc,
+                                        fontSize = 12.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                                            alpha = 0.8f
+                                        ) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
             }
         },
         confirmButton = {
@@ -311,9 +326,9 @@ fun CoordinateSelectionDialog(
                 androidx.compose.ui.platform.LocalContext provides currentContext,
                 androidx.compose.ui.platform.LocalConfiguration provides currentConfiguration
             ) {
-            TextButton(onClick = onDismiss) {
-                Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.cancel))
-            }
+                TextButton(onClick = onDismiss) {
+                    Text(androidx.compose.ui.res.stringResource(com.suseoaa.locationspoofer.R.string.cancel))
+                }
             }
         }
     )

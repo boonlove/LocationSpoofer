@@ -37,27 +37,33 @@ val LANGUAGES = listOf(
 fun LanguageSelectionScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val systemLocale = Locale.getDefault().language
-    
+
     // 如果支持，则默认为系统语言，否则使用 English
     val defaultLang = when {
         systemLocale.startsWith("zh") -> "zh"
         systemLocale.startsWith("ar") -> "ar"
         else -> "en"
     }
-    
+
     var selectedLang by remember { mutableStateOf(defaultLang) }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Box(
-                modifier = Modifier.size(72.dp).clip(CircleShape)
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
                     .background(AccentBlue.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -68,7 +74,7 @@ fun LanguageSelectionScreen(viewModel: MainViewModel) {
                     modifier = Modifier.size(40.dp)
                 )
             }
-            
+
             Text(
                 text = "Select Language / 选择语言 / اختر اللغة",
                 fontSize = 20.sp,
@@ -94,14 +100,20 @@ fun LanguageSelectionScreen(viewModel: MainViewModel) {
             Button(
                 onClick = {
                     viewModel.selectLanguage(selectedLang)
-                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(selectedLang))
+                    AppCompatDelegate.setApplicationLocales(
+                        LocaleListCompat.forLanguageTags(
+                            selectedLang
+                        )
+                    )
                 },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
             ) {
                 Text(
-                    text = when(selectedLang) {
+                    text = when (selectedLang) {
                         "zh" -> "确定"
                         "ar" -> "موافق"
                         else -> "Confirm"
@@ -124,7 +136,10 @@ fun LanguageItem(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, AccentBlue) else null,
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(
+            2.dp,
+            AccentBlue
+        ) else null,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -145,7 +160,11 @@ fun LanguageItem(
                 )
             }
             if (isSelected) {
-                RadioButton(selected = true, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = AccentBlue))
+                RadioButton(
+                    selected = true,
+                    onClick = null,
+                    colors = RadioButtonDefaults.colors(selectedColor = AccentBlue)
+                )
             }
         }
     }

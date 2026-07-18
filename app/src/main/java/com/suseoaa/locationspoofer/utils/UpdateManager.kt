@@ -24,8 +24,10 @@ class UpdateManager(private val context: Context) {
         val query = DownloadManager.Query().setFilterById(downloadId)
         dm.query(query)?.use { cursor ->
             if (cursor.moveToFirst()) {
-                val bytesDownloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                val bytesTotal = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                val bytesDownloaded =
+                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                val bytesTotal =
+                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
                 if (bytesTotal > 0) {
                     return (bytesDownloaded * 100L / bytesTotal).toInt()
                 }

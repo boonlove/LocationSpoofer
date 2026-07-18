@@ -59,7 +59,7 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
                     val body = obj.optString("body", "")
                     val publishedAt = obj.optString("published_at", "")
                     val isPrerelease = obj.optBoolean("prerelease", false)
-                    
+
                     var downloadUrl: String? = null
                     val assets = obj.optJSONArray("assets")
                     if (assets != null) {
@@ -72,7 +72,15 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
                         }
                     }
 
-                    releaseList.add(GithubRelease(tagName, body, downloadUrl, publishedAt, isPrerelease))
+                    releaseList.add(
+                        GithubRelease(
+                            tagName,
+                            body,
+                            downloadUrl,
+                            publishedAt,
+                            isPrerelease
+                        )
+                    )
                 }
 
                 withContext(Dispatchers.Main) {
@@ -89,7 +97,14 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
     fun startDownload(url: String, versionName: String) {
         val fileName = "LocationSpoofer_$versionName.apk"
         val downloadId = updateManager.downloadApk(url, fileName)
-        _uiState.update { it.copy(activeDownloadId = downloadId, activeDownloadUrl = url, downloadProgress = 0, downloadStatus = DownloadManager.STATUS_PENDING) }
+        _uiState.update {
+            it.copy(
+                activeDownloadId = downloadId,
+                activeDownloadUrl = url,
+                downloadProgress = 0,
+                downloadStatus = DownloadManager.STATUS_PENDING
+            )
+        }
         monitorDownload(downloadId)
     }
 
@@ -100,7 +115,12 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
                 val progress = updateManager.getDownloadProgress(downloadId)
 
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(downloadStatus = status, downloadProgress = progress) }
+                    _uiState.update {
+                        it.copy(
+                            downloadStatus = status,
+                            downloadProgress = progress
+                        )
+                    }
                 }
 
                 if (status == DownloadManager.STATUS_SUCCESSFUL || status == DownloadManager.STATUS_FAILED) {
@@ -120,7 +140,14 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
     fun cancelDownload() {
         _uiState.value.activeDownloadId?.let { downloadId ->
             updateManager.cancelDownload(downloadId)
-            _uiState.update { it.copy(activeDownloadId = null, activeDownloadUrl = null, downloadProgress = 0, downloadStatus = DownloadManager.STATUS_PENDING) }
+            _uiState.update {
+                it.copy(
+                    activeDownloadId = null,
+                    activeDownloadUrl = null,
+                    downloadProgress = 0,
+                    downloadStatus = DownloadManager.STATUS_PENDING
+                )
+            }
         }
     }
 }

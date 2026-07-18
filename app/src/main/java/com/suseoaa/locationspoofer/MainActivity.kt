@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
         val prefs = newBase.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
         val isLangSet = prefs.getBoolean("is_language_set", false)
         val lang = if (isLangSet) prefs.getString("language", "") ?: "" else ""
-        
+
         val context = if (lang.isNotEmpty()) {
             LocaleUtils.wrap(newBase, lang)
         } else {
@@ -118,8 +118,16 @@ class MainActivity : ComponentActivity() {
                     LocalDensity provides appDensity
                 ) {
                     MaterialTheme(colorScheme = colorScheme) {
-                        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                            MainScreen(viewModel = viewModel, uiState = uiState, isDark = isDark, isInPipMode = pipModeState)
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            MainScreen(
+                                viewModel = viewModel,
+                                uiState = uiState,
+                                isDark = isDark,
+                                isInPipMode = pipModeState
+                            )
                         }
                     }
                 }
@@ -129,7 +137,10 @@ class MainActivity : ComponentActivity() {
 
     private var pipModeState by mutableStateOf(false)
 
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: android.content.res.Configuration
+    ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         pipModeState = isInPictureInPictureMode
     }
@@ -169,7 +180,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 100) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -209,7 +224,8 @@ fun MainScreen(
 
     val closeMapAndResetRouteIfNeeded = {
         if (uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.SELECTING ||
-            uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.READY) {
+            uiState.routePlanStage == com.suseoaa.locationspoofer.data.model.RoutePlanStage.READY
+        ) {
             viewModel.cancelRoutePlanning()
         }
         isFullScreenMap = false
@@ -228,7 +244,12 @@ fun MainScreen(
     }
 
     AnimatedContent(
-        targetState = MainNavState(isFullScreenMap || isInPipMode, isScannerMap && !isInPipMode, uiState.isManageDataScreen && !isInPipMode, isSettingsScreen && !isInPipMode),
+        targetState = MainNavState(
+            isFullScreenMap || isInPipMode,
+            isScannerMap && !isInPipMode,
+            uiState.isManageDataScreen && !isInPipMode,
+            isSettingsScreen && !isInPipMode
+        ),
         transitionSpec = {
             slideInVertically(tween(400)) { it } togetherWith slideOutVertically(tween(400)) { -it }
         },
@@ -272,12 +293,14 @@ fun MainScreen(
                     message = stringResource(R.string.root_message),
                     isDark = isDark
                 )
+
                 !uiState.isLSPosedActive -> BlockingScreen(
                     icon = Icons.Rounded.Extension,
                     title = stringResource(R.string.lsposed_not_active),
                     message = stringResource(R.string.lsposed_message),
                     isDark = isDark
                 )
+
                 else -> SpoofingScreen(
                     viewModel = viewModel,
                     uiState = uiState,
