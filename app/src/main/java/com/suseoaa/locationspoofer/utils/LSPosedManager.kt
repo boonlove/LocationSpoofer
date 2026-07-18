@@ -11,7 +11,7 @@ class LSPosedManager {
     }
 
     fun getHookedApps(context: Context): List<AppInfoItem> {
-        val scope = com.suseoaa.locationspoofer.LocationApp.mService?.scope ?: emptyList()
+        val scope = LocationApp.mService?.scope ?: emptyList()
         val pm = context.packageManager
         return scope.mapNotNull { pkg ->
             try {
@@ -21,7 +21,7 @@ class LSPosedManager {
                                (info.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
                 AppInfoItem(pkg, label, isSystem)
             } catch (e: Exception) {
-                AppInfoItem(pkg, pkg, false) // fallback
+                AppInfoItem(pkg, pkg, false)
             }
         }.sortedBy { it.appName }
     }

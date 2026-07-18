@@ -19,10 +19,12 @@ import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 
@@ -418,7 +420,7 @@ fun SpoofingScreen(
                     viewModel.setSearchMode(mode)
                     if (mode == com.suseoaa.locationspoofer.data.model.SearchMode.LOCAL) {
                         focusManager.clearFocus()
-                        // Perform local search immediately
+                        // 立即执行本地搜索
                         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             val results = viewModel.performLocalSearch()
                             searchResults = results
@@ -676,11 +678,11 @@ fun SpoofingScreen(
             ) {
                 val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                 
-                // GitHub Button
+                // GitHub 图标
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF181717)) // Official GitHub brand color background
+                        .background(Color(0xFF181717)) // 官方 GitHub 品牌主题色背景
                         .clickable { uriHandler.openUri("https://github.com/boonlove/LocationSpoofer") }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
@@ -703,7 +705,7 @@ fun SpoofingScreen(
                 
                 Spacer(Modifier.width(16.dp))
                 
-                // Telegram Button
+                // Telegram 图标
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -716,7 +718,7 @@ fun SpoofingScreen(
                         Icon(
                             painter = androidx.compose.ui.res.painterResource(R.drawable.ic_telegram),
                             contentDescription = stringResource(R.string.brand_telegram),
-                            tint = Color.Unspecified, // Use natural brand color
+                            tint = Color.Unspecified, // 使用自然的品牌颜色
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(Modifier.width(8.dp))
@@ -1277,7 +1279,7 @@ fun UpdateDialog(
     val context = LocalContext.current
     val currentVersion = BuildConfig.VERSION_NAME
 
-    // Find missed versions (newer than current version)
+    // 查找遗漏的版本（比当前版本更新）
     val missed = remember(uiState.releases) {
         uiState.releases.filter { isNewerVersion(it.versionName, currentVersion) }
     }
@@ -1429,12 +1431,11 @@ fun parseAndCategorizeReleaseNotes(releases: List<GithubRelease>): GroupedReleas
         for (line in lines) {
             val cleanLine = line.trim()
             if (cleanLine.isEmpty()) continue
-            
-            // Check if it is a heading
+
             if (cleanLine.startsWith("#")) {
                 val headingText = cleanLine.replace(Regex("^#+\\s*"), "").lowercase()
                 
-                // Determine section by header keywords
+                // 根据标题关键字确定部分
                 if (featureHeaderKeywords.any { headingText.contains(it) }) {
                     currentSection = "feature"
                 } else if (fixHeaderKeywords.any { headingText.contains(it) }) {
@@ -1445,11 +1446,11 @@ fun parseAndCategorizeReleaseNotes(releases: List<GithubRelease>): GroupedReleas
                 continue
             }
             
-            // Check if it is a list item
+            // 检查它是否为列表项
             val isListItem = cleanLine.startsWith("- ") || cleanLine.startsWith("* ") || cleanLine.startsWith("+ ") || cleanLine.matches(Regex("""^\d+\.\s+.*"""))
             
             if (isListItem) {
-                // Remove list prefix
+                // 移除列表前缀
                 var itemContent = cleanLine
                 if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ") || cleanLine.startsWith("+ ")) {
                     itemContent = cleanLine.substring(2).trim()
@@ -2144,7 +2145,7 @@ fun parseMarkdown(text: String): androidx.compose.ui.text.AnnotatedString {
         lines.forEachIndexed { index, line ->
             val cleanLine = line.trim()
             
-            // Check for code block boundary
+            // 检查代码块边界
             if (cleanLine.startsWith("```")) {
                 isInCodeBlock = !isInCodeBlock
                 return@forEachIndexed

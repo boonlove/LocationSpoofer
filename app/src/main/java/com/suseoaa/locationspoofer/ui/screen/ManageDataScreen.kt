@@ -191,8 +191,7 @@ fun ManageDataScreen(
                                 viewModel.updateLatitude(String.format(Locale.US, "%.6f", item.location.lat))
                                 viewModel.updateLongitude(String.format(Locale.US, "%.6f", item.location.lng))
                                 mapController?.animateCamera(item.location.lat, item.location.lng, 17f)
-                                // Optionally close the screen to return to SpoofingScreen?
-                                // onClose() // Let's keep it open so they can see the map move
+                                // 可选择关闭屏幕以返回 SpoofingScreen
                             },
                             onDeleteSingle = {
                                 viewModel.deleteManageDataSingle(item.location.id)

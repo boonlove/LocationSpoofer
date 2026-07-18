@@ -123,9 +123,9 @@ class FloatingJoystickService : Service(), LifecycleOwner, ViewModelStoreOwner,
         val elapsedSec = (now - lastUpdateTime) / 1000.0
         lastUpdateTime = now
 
-        if (elapsedSec <= 0 || elapsedSec > 1.0) return // Ignore large jumps
+        if (elapsedSec <= 0 || elapsedSec > 1.0) return // 忽略过大的跳跃
 
-        // Use a base speed max 10 m/s depending on intensity
+        // 根据强度使用最大 10 m/s 的基础速度
         val speedMs = 10.0 * intensity
         val distance = speedMs * elapsedSec
         val R = 6378137.0
@@ -144,7 +144,7 @@ class FloatingJoystickService : Service(), LifecycleOwner, ViewModelStoreOwner,
 
         SpooferProvider.latitude = Math.toDegrees(newLatRad)
         SpooferProvider.longitude = Math.toDegrees(newLngRad)
-        SpooferProvider.startTimestamp = now // Reset simulation start to now to avoid jumps
+        SpooferProvider.startTimestamp = now // 将模拟开始时间重置为当前时间，以避免位置跳跃
     }
 
     override fun onDestroy() {

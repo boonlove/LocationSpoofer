@@ -67,7 +67,6 @@ fun SettingsScreen(
             .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
     ) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -237,7 +236,7 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(16.dp))
 
-            // Map Engine Selection
+            // 地图引擎选择
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -277,7 +276,7 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Animated Key Inputs
+            // 动画 Key 输入
             AnimatedVisibility(visible = uiState.mapEngine == MapEngine.AMAP) {
                 PasswordField(
                     value = localAmapApiKey,

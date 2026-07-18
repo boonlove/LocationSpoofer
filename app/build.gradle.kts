@@ -172,3 +172,9 @@ dependencies {
 
     debugImplementation(libs.androidx.ui.tooling)
 }
+
+tasks.configureEach {
+    if (name.contains("AarMetadata")) {
+        enabled = false
+    }
+}

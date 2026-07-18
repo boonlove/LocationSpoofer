@@ -6,10 +6,6 @@ com.sankuai.meituan
 com.baidu.BaiduMap
 com.autonavi.minimap
 com.tencent.map
-com.android.systemui
 com.google.android.gms
 android
 system
-com.android.phone
-com.suseoaa.locationspoofer.fork
-com.android.settings

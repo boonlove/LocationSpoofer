@@ -38,16 +38,16 @@ fun ScannerMapScreen(
         mapController?.setMapType(uiState.mapType)
     }
     
-    // Draw heat map circles when map is ready and records count changes
+    // 当地图准备就绪并且记录数量发生变化时绘制热力图圆圈
     LaunchedEffect(mapController, uiState.environmentRecordCount) {
         val controller = mapController ?: return@LaunchedEffect
         val locations = viewModel.getAllLocations()
         controller.clear()
         
-        // Draw circles for coverage
+        // 绘制覆盖范围圆圈
         com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(controller, locations)
         
-        // Move camera to latest record if exists
+        // 如果存在，则将相机移动到最新记录
         if (locations.isNotEmpty()) {
             val last = locations.last()
             controller.animateCamera(last.lat, last.lng, 17f)
@@ -124,7 +124,7 @@ fun ScannerMapScreen(
             }
         }
         
-        // Floating button on the right side
+        // 右侧悬浮按钮
         Column(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)

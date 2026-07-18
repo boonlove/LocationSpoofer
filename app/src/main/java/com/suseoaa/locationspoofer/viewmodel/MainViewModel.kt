@@ -64,7 +64,7 @@ class MainViewModel(
                 com.suseoaa.locationspoofer.data.model.DarkMode.SYSTEM
             },
             savedLocations = settingsRepository.getSavedLocations(),
-            savedRoutes = emptyList(), // Will be populated by Room Flow
+            savedRoutes = emptyList(), // 将由 Room Flow 填充
             currentLanguage = settingsRepository.getLanguage(),
             isLanguageSet = settingsRepository.isLanguageSet(),
             appCoordinateSystems = settingsRepository.getAppCoordinateSystems(),
@@ -157,8 +157,8 @@ class MainViewModel(
                         }
                     } catch (e: Exception) { e.printStackTrace() }
                     com.suseoaa.locationspoofer.data.model.SavedRoute(entity.name, points).apply {
-                        // attach ID dynamically if needed or just use name for deletion
-                        // Currently MapScreen's showSavedRoutesDialog uses route.name
+                        // 如果需要，动态附加 ID，或者直接使用名称进行删除
+                        // 目前 MapScreen 的 showSavedRoutesDialog 使用 route.name
                     }
                 }
                 _uiState.update { it.copy(savedRoutes = routes) }
@@ -204,7 +204,7 @@ class MainViewModel(
             return emptyList()
         }
 
-        // Simple clustering logic: group by ~150m distance
+        // 简单的聚类逻辑：按大约 150 米的距离进行分组
         val clusters = mutableListOf<ClusterData>()
 
         for (record in allRecords) {
@@ -559,7 +559,7 @@ class MainViewModel(
                 return
             }
 
-            // try last known first
+            // 首先尝试最后已知位置
             val lastLoc = locationManager.getLastKnownLocation(provider)
             if (lastLoc != null) {
                 val res = getNativeConverted(ctx, lastLoc, convertToGcj)
@@ -577,10 +577,10 @@ class MainViewModel(
                 override fun onProviderEnabled(provider: String) {}
                 override fun onProviderDisabled(provider: String) {}
             }
-            // Use main looper for listener
+            // 使用 main looper 处理 listener
             locationManager.requestSingleUpdate(provider, listener, android.os.Looper.getMainLooper())
             
-            // Timeout after 5 seconds to avoid suspending forever
+            // 5 秒后超时，以避免永远挂起
             kotlinx.coroutines.CoroutineScope(Dispatchers.Default).launch {
                 delay(5000)
                 locationManager.removeUpdates(listener)
@@ -662,7 +662,7 @@ class MainViewModel(
                     kotlin.math.sin(dLng / 2).let { it * it }
             val distance = 2 * 6378137.0 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
 
-            if (distance <= 50.0) { // Increased radius to 50m to match visually forgiving areas
+            if (distance <= 50.0) { // 将半径增加到 50m 以匹配视觉上更宽容的区域
                 validRecords.add(record)
             }
         }
@@ -774,7 +774,7 @@ class MainViewModel(
         withContext(Dispatchers.Main) {
             _uiState.update { it.copy(wifiLoadStatus = com.suseoaa.locationspoofer.data.model.WifiLoadStatus.LOADING) }
         }
-        // Align coordinate conversion to WGS-84 standard for WiGLE API
+        // 将坐标转换对齐至 WGS-84 标准以用于 WiGLE API
         val wgs84 = com.suseoaa.locationspoofer.utils.CoordinateUtils.gcj02ToWgs84(lat, lng)
         val wgsLat = wgs84.lat
         val wgsLng = wgs84.lng
@@ -830,7 +830,7 @@ class MainViewModel(
                 
                 withContext(Dispatchers.IO) {
                     saveEnvironmentData(lat, lng, formattedWifiJson, "[]", "[]")
-                    // update metadata to indicate WiGLE source
+                    // 更新 metadata 以指示 WiGLE 来源
                     val newestLocation = environmentDao.getAllLocations().firstOrNull { it.lat == lat && it.lng == lng }
                     if (newestLocation != null) {
                         environmentDao.updateMetadata(newestLocation.id, "WiGLE 导入", "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})")
@@ -1026,7 +1026,7 @@ class MainViewModel(
                 updatedState.enableJitter
             )
             
-            // Wait briefly to ensure root shell syncs to disk fully
+            // 稍作等待，确保 root shell 完全同步到磁盘
             kotlinx.coroutines.delay(200)
 
             _uiState.update {
@@ -1146,8 +1146,8 @@ class MainViewModel(
     
     fun deleteSavedRoute(route: com.suseoaa.locationspoofer.data.model.SavedRoute) {
         viewModelScope.launch(Dispatchers.IO) {
-            // we delete by finding the entity with matching name
-            // (a bit hacky but works for now, or we can add delete by name in DAO)
+            // 我们通过寻找匹配名称的实体进行删除
+            // （有点取巧，但目前有效，或者我们可以在 DAO 中添加按名称删除的功能）
             val routes = locationRepository.getSavedRoutes().first()
             val entity = routes.find { it.name == route.name }
             if (entity != null) {
@@ -1643,7 +1643,7 @@ class MainViewModel(
         SpooferProvider.simBearing = bearing
         SpooferProvider.startTimestamp = System.currentTimeMillis()
         
-        // Check if we need to query the database (e.g. moved more than 20 meters since last query)
+        // 检查是否需要查询数据库（例如：自上次查询以来移动了超过 20 米）
         val dLat = Math.toRadians(lat - lastDbQueryLat)
         val dLng = Math.toRadians(lng - lastDbQueryLng)
         val a = kotlin.math.sin(dLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lastDbQueryLat)) * kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.sin(dLng / 2).let { it * it }
@@ -1656,7 +1656,7 @@ class MainViewModel(
                 val records = environmentDao.getNearestLocations(lat, lng, 3)
                 if (records.isNotEmpty()) {
                     val record = records[0]
-                    // Check if the closest record is actually within ~50 meters
+                    // 检查最近的记录是否实际上在大约 50 米内
                     val rLat = Math.toRadians(record.location.lat - lat)
                     val rLng = Math.toRadians(record.location.lng - lng)
                     val rA = kotlin.math.sin(rLat / 2).let { it * it } + kotlin.math.cos(Math.toRadians(lat)) * kotlin.math.cos(Math.toRadians(record.location.lat)) * kotlin.math.sin(rLng / 2).let { it * it }
@@ -1665,7 +1665,7 @@ class MainViewModel(
                     if (rDist <= 50.0) {
                         val jsons = locationToJson(records, lat, lng)
                         SpooferProvider.cellJson = jsons.second
-                        // Save config file with new cell_json and wifi_json and bluetoothJson
+                        // 保存配置文件，写入新的 cell_json、wifi_json 和 bluetoothJson
                         locationRepository.updateConfig(
                             lat = lat,
                             lng = lng,
@@ -1680,7 +1680,7 @@ class MainViewModel(
                             bluetoothJson = jsons.third
                         )
                     } else {
-                        // Fallback to random cell generation
+                        // 回退到随机基站生成
                         SpooferProvider.cellJson = "[]"
                         locationRepository.updateConfig(
                             lat = lat,
@@ -1824,7 +1824,7 @@ class MainViewModel(
                         _uiState.update { it.copy(environmentRecordCount = count) }
                     }
                     
-                    // Delay 10 seconds between scans
+                    // 扫描之间延迟 10 秒
                     delay(10000)
                 }
             }
@@ -1957,7 +1957,7 @@ class MainViewModel(
         settingsRepository.setAppCoordinateSystems(currentMap)
         _uiState.update { it.copy(appCoordinateSystems = currentMap) }
         
-        // If spoofing is active, update config
+        // 如果模拟处于开启状态，则更新配置
         if (_uiState.value.isSpoofingActive) {
             viewModelScope.launch {
                 locationRepository.updateConfig(
@@ -2144,7 +2144,7 @@ class MainViewModel(
             1.0 / (safeDist * safeDist)
         }
 
-        // 1. Reconstruct connected Wi-Fi using the closest record's connectedWi-Fi
+        // 1. 使用最近记录的 connectedWi-Fi 重构已连接的 Wi-Fi
         val closestRecord = records.firstOrNull()
         val hasConnected = closestRecord?.connectedWifi != null
         val connectedObj = if (hasConnected) {
@@ -2166,7 +2166,7 @@ class MainViewModel(
             null
         }
 
-        // 2. Interpolate nearby Wi-Fis
+        // 2. 插值附近的 Wi-Fi
         val wifiMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithWifi>()
         val wifiLevels = mutableMapOf<String, Double>()
         val wifiWeights = mutableMapOf<String, Double>()
@@ -2201,7 +2201,7 @@ class MainViewModel(
             put("connectedWifi", connectedObj ?: org.json.JSONObject.NULL)
             put("nearbyWifi", nearbyArr)
         }
-        val wifiArr = wifiResultObj // Just assign it to match the rest of the method variables if needed, or we return wifiResultObj.toString()
+        val wifiArr = wifiResultObj // 根据需要赋值以匹配其余的方法变量，或者直接返回 wifiResultObj.toString()
 
         
         val cellMap = mutableMapOf<String, com.suseoaa.locationspoofer.data.db.LocationWithCell>()

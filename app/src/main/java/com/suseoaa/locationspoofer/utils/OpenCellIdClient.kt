@@ -26,8 +26,8 @@ class OpenCellIdClient {
                 val body = response.body?.string() ?: return@withContext false
                 val json = JSONObject(body)
                 if (json.has("error")) {
-                    // code 1 means "No cells found", which actually validates that the key exists and works.
-                    // code 2 means "API Key not known" or other codes indicate invalid key.
+                    // code 1 表示“未找到基站”，这实际上验证了密钥存在并且有效。
+                    // code 2 表示“API Key not known”或其他代码指示密钥无效。
                     json.optInt("code") == 1
                 } else {
                     true
@@ -74,7 +74,7 @@ class OpenCellIdClient {
                         }
                         return@withContext normalizedCells.toString()
                     } else {
-                        // Request unsuccessful, try next radius
+                        // 请求未成功，尝试下一个半径
                     }
                 }
                 return@withContext "[]"

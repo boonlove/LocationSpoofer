@@ -134,7 +134,7 @@ fun AppCoordinateScreen(
                 onDismiss = { selectedApp = null },
                 onSelect = { sys ->
                     if (sys == "GCJ-02") {
-                        // If it's default GCJ-02, we can just remove it from the map to keep config clean
+                        // 如果是默认的 GCJ-02，我们可以直接从 map 中将其移除，以保持配置整洁
                         viewModel.removeAppCoordinateSystem(app.packageName)
                     } else {
                         viewModel.setAppCoordinateSystem(app.packageName, sys)

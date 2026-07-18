@@ -248,21 +248,20 @@ class EnvironmentScanner(private val context: Context) {
                         }
                     }
                     override fun onScanFailed(errorCode: Int) {
-                        // ignore
                     }
                 }
 
-                // Start scan
+                // 开始扫描
                 scanner.startScan(callback)
 
-                // Stop scan after 2 seconds
+                // 2 秒后停止扫描
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     delay(2000)
                     try {
                         scanner.stopScan(callback)
                     } catch (e: Exception) {}
                     
-                    // Deduplicate and convert to JSON
+                    // 去重并转换为 JSON
                     val deduped = resultsList.distinctBy { it.device.address }
                     deduped.forEach { res ->
                         val obj = JSONObject()
@@ -270,7 +269,7 @@ class EnvironmentScanner(private val context: Context) {
                         obj.put("name", res.device.name ?: "")
                         obj.put("rssi", res.rssi)
                         
-                        // Parse scan record bytes if available
+                        // 如果可用，解析扫描记录的字节
                         val recordBytes = res.scanRecord?.bytes
                         if (recordBytes != null) {
                             val hexString = recordBytes.joinToString("") { "%02X".format(it) }

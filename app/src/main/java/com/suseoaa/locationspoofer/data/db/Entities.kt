@@ -208,6 +208,6 @@ data class SavedRouteEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
-    val pointsJson: String, // Store List<RoutePoint> as JSON
+    val pointsJson: String, // 将 List<RoutePoint> 存储为 JSON
     val timestamp: Long = System.currentTimeMillis()
 )
