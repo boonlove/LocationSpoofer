@@ -6,7 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write # 允许 GITHUB_TOKEN 创建 Release 和 Tag
+  contents: write
 
 jobs:
   build:
@@ -25,12 +25,35 @@ jobs:
         with:
           fetch-depth: 0 # 需要完整的提交历史来获取 tag 和并生成 changelog
 
+      - name: 检查是否为 Pre-release
+        id: check_prerelease
+        run: |
+          if echo "${{ github.ref }}" | grep -q "beta"; then
+            echo "Pre-release version"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release version"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 清理 Pre-Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --repo "${{ github.repository }}" --json tagName,isPrerelease --jq '.[] | select(.isPrerelease == true) | .tagName' |
+          while read tag; do
+            if [ -n "$tag" ]; then
+              echo "Deleting pre-release: $tag"
+              gh release delete "$tag" --repo "${{ github.repository }}" --yes
+            fi
+          done
+
       - name: 生成更新日志
         id: changelog
         run: |
-          # 获取上一个 tag 的名字
-          PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' 2>/dev/null || echo "")
+          # 获取 tag
           CURR_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${CURR_TAG}$" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || echo "")
 
           if [ -z "$CURR_TAG" ]; then
             CURR_TAG="HEAD"
@@ -74,15 +97,15 @@ jobs:
             if [ -z "$FEATS" ] && [ -z "$FIXES" ] && [ -z "$REFACTOR" ]; then
               echo "常规更新与优化"
             fi
-          } > changelog.txt
+          } > changelog.md
 
-          cat changelog.txt
+          cat changelog.md
 
       - name: 下载 APK
         uses: actions/download-artifact@v8
         with:
           pattern: "*.apk"
-          path: app/release
+          path: artifact
           merge-multiple: true
           skip-decompress: true
 
@@ -92,7 +115,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          body_path: changelog.txt
-          files: app/release/*.apk
+          body_path: changelog.md
+          files: artifact/*.apk
           generate_release_notes: false
-          prerelease: false
+          prerelease: ${{ steps.check_prerelease.outputs.prerelease }}
