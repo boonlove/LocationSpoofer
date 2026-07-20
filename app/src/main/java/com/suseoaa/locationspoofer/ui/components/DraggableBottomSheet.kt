@@ -362,8 +362,11 @@ private fun BottomSheetState.preUpPostDownNestedScrollConnection(
             val delta = available.y
             val o = offset
             if (o.isNaN()) return Offset.Zero
-            // COLLAPSED 态：阻断向下滚动，防止 collapsedContent 滚出视野
-            if (currentValue == BottomSheetValue.COLLAPSED && delta > 0f) {
+            // 已到达 COLLAPSED 锚点：阻断向下滚动，防止 collapsedContent 滚出视野
+            // 用 offset 而非 currentValue 判断——currentValue 在跨越锚点中点时即更新，
+            // 若此时阻断会让 sheet 卡在 HALF~COLLAPSED 之间无法继续下滑
+            val collapsedOffset = anchorOffsets[BottomSheetValue.COLLAPSED]
+            if (collapsedOffset != null && o >= collapsedOffset && delta > 0f) {
                 return Offset(0f, delta)
             }
             // 上推且未到 EXPANDED：先展开 Sheet，再交内容滚动
