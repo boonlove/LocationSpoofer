@@ -287,7 +287,7 @@ class LocationHooker : XposedModule() {
             return
         }
 
-        val isSystemServer = (pkg == "android")
+        val isSystemServer = (pkg == "android") || (android.os.Process.myUid() < 10000)
 
         // 系统进程：允许执行所有的环境数据Hook，实现系统原生界面的完美覆盖
         // if (SYSTEM_PACKAGES.contains(pkg)) {
