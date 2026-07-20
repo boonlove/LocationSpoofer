@@ -97,12 +97,14 @@ class BottomSheetState internal constructor(
      * 按运动方向吸附到锚点。
      * 快速 fling（|velocity| > velocityThreshold）取运动方向上的下一个锚点；
      * 否则取最近锚点。统一用 animateTo + 承接手势动量的 spring 实现，避免 decay 动画在中速时缓慢移动。
+     *
+     * @return 是否实际产生了吸附动画（true 表示 sheet 已/正在跨锚点移动，调用方可据此丢弃余量）。
      */
-    internal suspend fun snapToAnchor(velocity: Float, velocityThreshold: Float) {
+    internal suspend fun snapToAnchor(velocity: Float, velocityThreshold: Float): Boolean {
         val o = requireOffset()
-        if (o.isNaN()) return
+        if (o.isNaN()) return false
         val target = computeFlingTarget(velocity, velocityThreshold) ?: findNearestAnchor(o)
-        animateTo(target, velocity)
+        return animateTo(target, velocity)
     }
 
     /**
@@ -151,11 +153,12 @@ class BottomSheetState internal constructor(
      * @param initialVelocity 手势速度（px/s），传递给 spring 使动画承接手势动量，
      *   实现"动量连续"——快速 fling 时动画起步快，慢速拖拽时柔和到位。
      *   NoBouncy + StiffnessMedium 保证平滑无回弹、~80-130ms 收敛，既不生硬也不拖沓。
+     * @return 是否实际产生了动画（target 与 start 相同或 anchors 缺失时返回 false）。
      */
-    internal suspend fun animateTo(target: BottomSheetValue, initialVelocity: Float = 0f) {
-        val targetOffset = anchorOffsets[target] ?: return
+    internal suspend fun animateTo(target: BottomSheetValue, initialVelocity: Float = 0f): Boolean {
+        val targetOffset = anchorOffsets[target] ?: return false
         val startOffset = requireOffset()
-        if (startOffset.isNaN() || startOffset == targetOffset) return
+        if (startOffset.isNaN() || startOffset == targetOffset) return false
         val animatable = Animatable(startOffset)
         animatable.animateTo(
             targetValue = targetOffset,
@@ -169,6 +172,7 @@ class BottomSheetState internal constructor(
             val delta = value - current
             if (delta != 0f) dispatchRawDelta(delta)
         }
+        return true
     }
 }
 
@@ -397,8 +401,10 @@ private fun BottomSheetState.preUpPostDownNestedScrollConnection(
             }
             // 快速 fling 跨越锚点，或 sheet 已偏移需吸附
             if (computeFlingTarget(v, velocityThreshold) != null || o > 0f) {
-                snapToAnchor(v, velocityThreshold)
-                return Velocity(0f, v)
+                val snapped = snapToAnchor(v, velocityThreshold)
+                // 吸附成功（如 EXPANDED -> HALF）：丢弃余量，避免内容继续 fling
+                // 未吸附（sheet 已在锚点上）：余量交给原组件消费
+                return if (snapped) Velocity(0f, v) else Velocity.Zero
             }
             return Velocity.Zero
         }
@@ -407,15 +413,18 @@ private fun BottomSheetState.preUpPostDownNestedScrollConnection(
             val v = available.y
             val o = offset
             if (o.isNaN()) return Velocity.Zero
-            // EXPANDED 态：fling 余量丢弃；若 sheet 在 Drag 阶段被移动了则吸附锚点
+            // EXPANDED 态：若 sheet 在 Drag 阶段被移动了则吸附锚点
             if (currentValue == BottomSheetValue.EXPANDED) {
-                if (o > 0f) snapToAnchor(v, velocityThreshold)
-                return Velocity(0f, v)
+                if (o > 0f) {
+                    val snapped = snapToAnchor(v, velocityThreshold)
+                    return if (snapped) Velocity(0f, v) else Velocity.Zero
+                }
+                return Velocity.Zero
             }
             // 非 EXPANDED：offset 已跨越阈值（committed）时按运动方向吸附
             if (o > 0f && currentValue != targetValue) {
-                snapToAnchor(v, velocityThreshold)
-                return Velocity(0f, v)
+                val snapped = snapToAnchor(v, velocityThreshold)
+                return if (snapped) Velocity(0f, v) else Velocity.Zero
             }
             return Velocity.Zero
         }
