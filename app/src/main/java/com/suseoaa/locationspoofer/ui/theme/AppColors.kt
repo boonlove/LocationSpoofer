@@ -1,7 +1,11 @@
 package com.suseoaa.locationspoofer.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // 深色调色板
@@ -61,6 +65,12 @@ object AppColors {
     fun textSecondary(isDark: Boolean) = if (isDark) TextSecondaryDark else TextSecondaryLight
     fun surface(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceLight
     fun cardBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardLight
-    fun topBarBackground(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceCardCustomLight
+    fun topBarBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardLight
     fun background(isDark: Boolean) = if (isDark) DarkBg else LightBg
+    @Composable
+    fun switchColors(isDark: Boolean): SwitchColors = SwitchDefaults.colors(
+        uncheckedThumbColor = if (isDark) darkColorScheme().outline else lightColorScheme().outline,
+        uncheckedTrackColor = MaterialTheme.colorScheme.surface,
+        uncheckedBorderColor = if (isDark) darkColorScheme().outline else lightColorScheme().outline
+    )
 }

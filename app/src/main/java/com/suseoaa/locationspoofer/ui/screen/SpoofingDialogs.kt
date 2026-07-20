@@ -645,7 +645,10 @@ fun StartSpoofingDialog(
                             fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Switch(checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() })
+                        Switch(
+                            checked = uiState.mockWifi, onCheckedChange = { onToggleWifi() },
+                            colors = AppColors.switchColors(isDark)
+                        )
                     }
                 }
 
@@ -669,7 +672,10 @@ fun StartSpoofingDialog(
                             fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onBackground
                         )
-                        Switch(checked = uiState.mockCell, onCheckedChange = { onToggleCell() })
+                        Switch(
+                            checked = uiState.mockCell, onCheckedChange = { onToggleCell() },
+                            colors = AppColors.switchColors(isDark)
+                        )
                     }
                 }
 
@@ -695,7 +701,8 @@ fun StartSpoofingDialog(
                         )
                         Switch(
                             checked = uiState.mockBluetooth,
-                            onCheckedChange = { onToggleBluetooth() })
+                            onCheckedChange = { onToggleBluetooth() },
+                            colors = AppColors.switchColors(isDark))
                     }
                 }
                 Row(
@@ -717,7 +724,11 @@ fun StartSpoofingDialog(
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Switch(checked = uiState.enableJitter, onCheckedChange = { onToggleJitter() })
+                    Switch(
+                        checked = uiState.enableJitter,
+                        onCheckedChange = { onToggleJitter() },
+                        colors = AppColors.switchColors(isDark)
+                    )
                 }
 
                 Spacer(Modifier.height(8.dp))

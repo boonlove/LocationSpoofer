@@ -40,6 +40,7 @@ import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.extensions.isEnable
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
+import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.viewmodel.SettingsViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -48,6 +49,7 @@ import org.koin.androidx.compose.koinViewModel
 fun SettingsScreen(
     viewModel: MainViewModel,
     uiState: AppState,
+    isDark: Boolean,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -65,11 +67,12 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(AppColors.topBarBackground(isDark))
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -89,7 +92,7 @@ fun SettingsScreen(
             )
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
+        // HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
 
         // Content
         Column(

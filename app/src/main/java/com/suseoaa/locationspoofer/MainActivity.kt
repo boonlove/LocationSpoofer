@@ -281,6 +281,7 @@ fun MainScreen(
             com.suseoaa.locationspoofer.ui.screen.SettingsScreen(
                 viewModel = viewModel,
                 uiState = uiState,
+                isDark = isDark,
                 onClose = { isSettingsScreen = false }
             )
         } else {

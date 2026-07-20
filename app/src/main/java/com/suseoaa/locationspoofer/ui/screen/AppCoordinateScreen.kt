@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.suseoaa.locationspoofer.data.model.AppInfoItem
 import com.suseoaa.locationspoofer.data.model.AppState
+import com.suseoaa.locationspoofer.ui.extensions.isDark
+import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +34,8 @@ fun AppCoordinateScreen(
     uiState: AppState,
     onBack: () -> Unit
 ) {
+    val isDark = uiState.darkMode.isDark()
+
     var showSystemApps by remember { mutableStateOf(false) }
     var selectedApp by remember { mutableStateOf<AppInfoItem?>(null) }
 
@@ -88,10 +92,7 @@ fun AppCoordinateScreen(
                             Switch(
                                 checked = showSystemApps,
                                 onCheckedChange = { showSystemApps = it },
-                                colors = SwitchDefaults.colors(
-                                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                                    uncheckedTrackColor = MaterialTheme.colorScheme.surface
-                                )
+                                colors = AppColors.switchColors(isDark)
                             )
                         }
                     },
