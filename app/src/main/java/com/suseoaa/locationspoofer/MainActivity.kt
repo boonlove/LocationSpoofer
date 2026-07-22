@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.unit.Density
 import com.suseoaa.locationspoofer.ui.components.BottomSheetValue
 import com.suseoaa.locationspoofer.ui.extensions.isDark
@@ -118,6 +120,13 @@ class MainActivity : ComponentActivity() {
                     LocalDensity provides appDensity
                 ) {
                     MaterialTheme(colorScheme = colorScheme) {
+                        // 根据当前主题切换状态栏图标颜色
+                        val view = LocalView.current
+                        SideEffect {
+                            val window = (view.context as android.app.Activity).window
+                            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark
+                        }
+
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background
