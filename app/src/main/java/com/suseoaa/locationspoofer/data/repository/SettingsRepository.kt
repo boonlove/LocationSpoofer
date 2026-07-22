@@ -148,4 +148,10 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         set(value) {
             settingsManager.satelliteCount = value
         }
+
+    var spoofingScreenMapFullscreen: Boolean
+        get() = settingsManager.spoofingScreenMapFullscreen
+        set(value) {
+            settingsManager.spoofingScreenMapFullscreen = value
+        }
 }

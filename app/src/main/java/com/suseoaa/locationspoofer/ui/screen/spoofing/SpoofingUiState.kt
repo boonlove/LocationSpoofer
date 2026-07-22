@@ -27,6 +27,9 @@ data class SpoofingUiState(
     val searchResults: List<AppPoiItem> = emptyList(),
     val showSearchResults: Boolean = false,
 
+    // Map Display Mode
+    val isMapFullscreen: Boolean = false,
+
     // Notifications / Error
     val toastMessage: String? = null
 )

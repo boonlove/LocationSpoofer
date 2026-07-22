@@ -53,6 +53,7 @@ import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import com.suseoaa.locationspoofer.BuildConfig
@@ -266,6 +267,8 @@ fun SpoofingScreen(
     val expandedHeightPx = with(density) { expandedHeightDp.toPx() }
     val halfHeightPx = with(density) { halfHeightDp.toPx() }
 
+    var topBarHeightPx by remember { mutableFloatStateOf(0f) }
+
     val initialAnchors = remember(expandedHeightPx, halfHeightPx) {
         DraggableAnchors {
             BottomSheetValue.EXPANDED at 0f
@@ -293,47 +296,69 @@ fun SpoofingScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // 全屏地图
-        AppMapView(
-            mapEngine = uiState.mapEngine,
-            isDomestic = viewModel.isDomesticEnvironment(),
-            isDark = isDark,
-            modifier = Modifier.fillMaxSize()
-        ) { map ->
-            smallMapRef = map
-            map.disableUiControls()
-            val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
-            val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
-            map.moveCamera(initLat, initLng, 15f)
-
-            map.setOnCameraChangeListener { lat, lng ->
-                fromMapGesture = true
-                onIntent(SpoofingIntent.ConfirmMapPoint(lat, lng))
-            }
-        }
-
-        // 十字准星
-        Icon(
-            Icons.Rounded.AddLocationAlt, null,
-            tint = AccentBlue.copy(alpha = 0.8f),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(32.dp)
-                .padding(bottom = 16.dp)
-        )
-
-        // 浮动按钮组（全屏/图层/定位），竖向排列，避让 Sheet 可见高度
-        // EXPANDED 时隐藏（Sheet 占半屏，按钮区域被遮挡）
+        // 地图（可跟随底部Sheet自适应）、搜索栏及搜索结果、浮动按钮
         Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset {
-                    val o = sheetState.offset
-                    val visible = if (o.isNaN()) expandedHeightPx else (expandedHeightPx - o)
-                    IntOffset(0, -visible.roundToInt())
+                .fillMaxWidth()
+                .height(
+                    if (spoofingUiState.isMapFullscreen) {
+                        screenHeightDp
+                    } else {
+                         with(density) { (screenHeightDp.toPx() - topBarHeightPx - (expandedHeightPx - sheetState.offset)).toDp() }
+                    }
+                )
+                .offset{
+                    if (!spoofingUiState.isMapFullscreen) {
+                        IntOffset(0, topBarHeightPx.roundToInt())
+                    } else {
+                        IntOffset(0, 0)
+                    }
                 }
         ) {
-            AnimatedVisibility(visible = !sheetState.isExpanded) {
+            AppMapView(
+                mapEngine = uiState.mapEngine,
+                isDomestic = viewModel.isDomesticEnvironment(),
+                isDark = isDark,
+                modifier = Modifier.fillMaxSize()
+            ) { map ->
+                smallMapRef = map
+                map.disableUiControls()
+                val initLat = uiState.latitudeInput.toDoubleOrNull() ?: 39.9042
+                val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
+                map.moveCamera(initLat, initLng, 15f)
+
+                map.setOnCameraChangeListener { lat, lng ->
+                    fromMapGesture = true
+                    onIntent(SpoofingIntent.ConfirmMapPoint(lat, lng))
+                }
+            }
+
+            // 十字准星
+            Icon(
+                Icons.Rounded.AddLocationAlt, null,
+                tint = AccentBlue.copy(alpha = 0.8f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(32.dp)
+                    .padding(bottom = 16.dp)
+            )
+
+            // 浮动按钮组（全屏/图层/定位），竖向排列，避让 Sheet 可见高度
+            // EXPANDED 时隐藏（Sheet 占半屏，按钮区域被遮挡）
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !sheetState.isExpanded,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset {
+                        if (spoofingUiState.isMapFullscreen) {
+                            val o = sheetState.offset
+                            val visible = if (o.isNaN()) expandedHeightPx else (expandedHeightPx - o)
+                            IntOffset(0, -visible.roundToInt())
+                        } else {
+                            IntOffset(0,0)
+                        }
+                    }
+            ) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
@@ -392,13 +417,173 @@ fun SpoofingScreen(
                     }
                 }
             }
+
+            // Floating Search Bar & Results Overlay
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .offset{
+                        if (spoofingUiState.isMapFullscreen) {
+                            IntOffset(0, topBarHeightPx.roundToInt())
+                        } else {
+                            IntOffset(0, 0)
+                        }
+                    }
+            ) {
+                Box(modifier = Modifier.clickable {
+                    if (!spoofingUiState.isSearchActive) onIntent(
+                        SpoofingIntent.SetSearchActive(true)
+                    )
+                }) {
+                    HomeSearchBar(
+                        query = spoofingUiState.searchQuery,
+                        searchMode = uiState.searchMode,
+                        onSearchModeChange = { mode -> viewModel.setSearchMode(mode) },
+                        onSearch = {
+                            focusManager.clearFocus()
+                            if (uiState.searchMode == SearchMode.LOCAL) {
+                                GlobalScope.launch(Dispatchers.Main) {
+                                    val results = viewModel.performLocalSearch()
+                                    onIntent(
+                                        SpoofingIntent.SetSearchResults(
+                                            results,
+                                            true
+                                        )
+                                    )
+                                }
+                            }else if (
+                                (activeEngine == MapEngine.AMAP && uiState.amapApiKey.isBlank()) ||
+                                (activeEngine == MapEngine.BAIDU && uiState.baiduApiKey.isBlank())
+                            ) {
+                                onIntent(
+                                    SpoofingIntent.SetApiKeyWarningVisible(
+                                        true
+                                    )
+                                )
+                            } else if (spoofingUiState.searchQuery.isNotBlank()) {
+                                performPoiSearch(
+                                    context,
+                                    uiState.mapEngine,
+                                    spoofingUiState.searchQuery,
+                                    viewModel.isDomesticEnvironment()
+                                ) { results ->
+                                    onIntent(
+                                        SpoofingIntent.SetSearchResults(
+                                            results,
+                                            true
+                                        )
+                                    )
+                                }
+                            }
+                        },
+                        onQueryChange = { onIntent(SpoofingIntent.UpdateSearchQuery(it)) }
+                    )
+                }
+
+                // 搜索结果
+                AnimatedVisibility(visible = spoofingUiState.showSearchResults && spoofingUiState.searchResults.isNotEmpty()) {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                            items(spoofingUiState.searchResults.take(15)) { poi ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.updateLatitude(
+                                                String.format(
+                                                    "%.6f",
+                                                    poi.lat
+                                                )
+                                            )
+                                            viewModel.updateLongitude(
+                                                String.format(
+                                                    "%.6f",
+                                                    poi.lng
+                                                )
+                                            )
+                                            smallMapRef?.animateCamera(
+                                                poi.lat,
+                                                poi.lng,
+                                                16f
+                                            )
+                                            onIntent(
+                                                SpoofingIntent.ClearSearchResults(
+                                                    false
+                                                )
+                                            )
+                                            onIntent(
+                                                SpoofingIntent.SetSearchActive(
+                                                    false
+                                                )
+                                            )
+                                            onIntent(
+                                                SpoofingIntent.UpdateSearchQuery(
+                                                    poi.title
+                                                )
+                                            )
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Place,
+                                        null,
+                                        tint = AccentBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            poi.title,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            poi.snippet,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 地图底部渐变遮罩
+            if (!spoofingUiState.isMapFullscreen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Transparent,
+                                    MaterialTheme.colorScheme.background.copy(0.8f)
+                                )
+                            )
+                        ))
+            }
         }
 
-        // 顶部UI
+        // 顶部栏
         Column {
             Row (
                 modifier = Modifier
-                    .background(AppColors.topBarBackground(isDark).copy(alpha = 0.5f))
+                    .onGloballyPositioned { coordinates ->
+                        topBarHeightPx = coordinates.size.height.toFloat()
+                    }
+                    .background(if (spoofingUiState.isMapFullscreen) AppColors.topBarBackground(isDark).copy(alpha = 0.5f) else AppColors.topBarBackground(isDark))
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -444,151 +629,14 @@ fun SpoofingScreen(
                     )
                 }
             }
-
-            // Floating Search Bar & Results Overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 5.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Transparent)
-                ) {
-                    Box(modifier = Modifier.clickable {
-                        if (!spoofingUiState.isSearchActive) onIntent(
-                            SpoofingIntent.SetSearchActive(true)
-                        )
-                    }) {
-                        HomeSearchBar(
-                            query = spoofingUiState.searchQuery,
-                            searchMode = uiState.searchMode,
-                            onSearchModeChange = { mode -> viewModel.setSearchMode(mode) },
-                            onSearch = {
-                                focusManager.clearFocus()
-                                if (uiState.searchMode == SearchMode.LOCAL) {
-                                    GlobalScope.launch(Dispatchers.Main) {
-                                        val results = viewModel.performLocalSearch()
-                                        onIntent(
-                                            SpoofingIntent.SetSearchResults(
-                                                results,
-                                                true
-                                            )
-                                        )
-                                    }
-                                }else if (
-                                    (activeEngine == MapEngine.AMAP && uiState.amapApiKey.isBlank()) ||
-                                    (activeEngine == MapEngine.BAIDU && uiState.baiduApiKey.isBlank())
-                                ) {
-                                    onIntent(
-                                        SpoofingIntent.SetApiKeyWarningVisible(
-                                            true
-                                        )
-                                    )
-                                } else if (spoofingUiState.searchQuery.isNotBlank()) {
-                                    performPoiSearch(
-                                        context,
-                                        uiState.mapEngine,
-                                        spoofingUiState.searchQuery,
-                                        viewModel.isDomesticEnvironment()
-                                    ) { results ->
-                                        onIntent(
-                                            SpoofingIntent.SetSearchResults(
-                                                results,
-                                                true
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-                            onQueryChange = { onIntent(SpoofingIntent.UpdateSearchQuery(it)) }
-                        )
-                    }
-
-                    AnimatedVisibility(visible = spoofingUiState.showSearchResults && spoofingUiState.searchResults.isNotEmpty()) {
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                        ) {
-                            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                                items(spoofingUiState.searchResults.take(15)) { poi ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.updateLatitude(
-                                                    String.format(
-                                                        "%.6f",
-                                                        poi.lat
-                                                    )
-                                                )
-                                                viewModel.updateLongitude(
-                                                    String.format(
-                                                        "%.6f",
-                                                        poi.lng
-                                                    )
-                                                )
-                                                smallMapRef?.animateCamera(
-                                                    poi.lat,
-                                                    poi.lng,
-                                                    16f
-                                                )
-                                                onIntent(
-                                                    SpoofingIntent.ClearSearchResults(
-                                                        false
-                                                    )
-                                                )
-                                                onIntent(
-                                                    SpoofingIntent.SetSearchActive(
-                                                        false
-                                                    )
-                                                )
-                                                onIntent(
-                                                    SpoofingIntent.UpdateSearchQuery(
-                                                        poi.title
-                                                    )
-                                                )
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Place,
-                                            null,
-                                            tint = AccentBlue,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Column {
-                                            Text(
-                                                poi.title,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                            Text(
-                                                poi.snippet,
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         // Bottom Sheet
         DraggableBottomSheet(
             sheetState = sheetState,
             modifier = Modifier.fillMaxSize(),
-            scrimColor = MaterialTheme.colorScheme.background.copy(0.8f),
+            sheetShape = if (spoofingUiState.isMapFullscreen) RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp) else RectangleShape,
+            scrimColor = if (spoofingUiState.isMapFullscreen) MaterialTheme.colorScheme.background.copy(0.8f) else MaterialTheme.colorScheme.background,
             expandedFraction = expandedFraction,
             halfFraction = halfFraction,
             scrollState = scrollState,

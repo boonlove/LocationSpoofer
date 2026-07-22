@@ -30,6 +30,9 @@ sealed class SpoofingIntent {
         val show: Boolean
     ) : SpoofingIntent()
 
+    // Map Display Mode
+    data class SetMapFullscreen(val isFullScreen: Boolean) : SpoofingIntent()
+
     // Map Actions
     data class ConfirmMapPoint(val lat: Double, val lng: Double) : SpoofingIntent()
     data object RequestCurrentLocation : SpoofingIntent()

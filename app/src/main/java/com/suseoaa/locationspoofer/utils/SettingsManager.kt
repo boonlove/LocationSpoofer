@@ -96,6 +96,10 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("satellite_count", "10") ?: "10"
         set(value) = prefs.edit().putString("satellite_count", value).apply()
 
+    var spoofingScreenMapFullscreen: Boolean
+        get() = prefs.getBoolean("spoofing_screen_map_fullscreen", true)
+        set(value) = prefs.edit().putBoolean("spoofing_screen_map_fullscreen", value).apply()
+
     fun getSavedLocations(): List<SavedLocation> {
         val jsonString = prefs.getString("saved_locations", "[]") ?: "[]"
         val list = mutableListOf<SavedLocation>()

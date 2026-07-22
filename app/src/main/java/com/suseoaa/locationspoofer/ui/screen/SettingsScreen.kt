@@ -40,6 +40,7 @@ import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.extensions.isEnable
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
+import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.viewmodel.SettingsViewModel
@@ -62,6 +63,7 @@ fun SettingsScreen(
     var localOpencellidToken by remember(uiState.opencellidToken) { mutableStateOf(uiState.opencellidToken) }
     var localBaiduStyleId by remember { mutableStateOf(settingsViewModel.getBaiduStyleId()) }
     val clipboardManager = LocalClipboardManager.current
+    val spoofingUiState by viewModel.spoofingUiState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -182,6 +184,38 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // 首页地图模式
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable { viewModel.handleSpoofingIntent(SpoofingIntent.SetMapFullscreen(!spoofingUiState.isMapFullscreen)) }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "首页地图全屏",
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (spoofingUiState.isMapFullscreen) "首页地图覆盖全屏显示" else "首页地图跟随底部面板自适应",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Switch(
+                    checked = spoofingUiState.isMapFullscreen,
+                    onCheckedChange = null,
+                    colors = AppColors.switchColors(isDark)
+                )
             }
             Spacer(Modifier.height(24.dp))
 

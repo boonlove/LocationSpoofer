@@ -81,7 +81,9 @@ class MainViewModel(
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
 
     private val _spoofingUiState =
-        MutableStateFlow(com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState())
+        MutableStateFlow(com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState(
+            isMapFullscreen = settingsRepository.spoofingScreenMapFullscreen
+        ))
     val spoofingUiState: StateFlow<com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState> =
         _spoofingUiState.asStateFlow()
 
@@ -2648,6 +2650,15 @@ class MainViewModel(
                     searchResults = intent.results,
                     showSearchResults = intent.show
                 )
+            }
+
+            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetMapFullscreen -> {
+                settingsRepository.spoofingScreenMapFullscreen = intent.isFullScreen
+                _spoofingUiState.update {
+                    it.copy(
+                        isMapFullscreen = intent.isFullScreen
+                    )
+                }
             }
 
             is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.ConfirmMapPoint -> confirmMapPoint(
