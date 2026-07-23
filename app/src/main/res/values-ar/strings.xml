@@ -113,6 +113,8 @@
     <string name="check_updates_desc">احصل على أحدث إصدار من GitHub</string>
     <string name="update_dialog_title">تحديثات الإصدار</string>
     <string name="download">تحميل</string>
+    <string name="download_via_browser">تحميل عبر المتصفح</string>
+    <string name="no_browser_available">لا يوجد متصفح متاح</string>
     <string name="install">تثبيت</string>
     <string name="downloading">جاري التحميل: %1$d%%</string>
     <string name="version">الإصدار: %1$s</string>

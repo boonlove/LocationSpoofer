@@ -292,16 +292,43 @@ fun UpdateDialog(
                                             }
                                         }
                                     } else if (uiState.activeDownloadId == null) {
-                                        Button(
-                                            onClick = {
-                                                onDownload(
-                                                    release.downloadUrl,
-                                                    release.versionName
-                                                )
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(stringResource(R.string.download))
+                                            Button(
+                                                onClick = {
+                                                    onDownload(
+                                                        release.downloadUrl,
+                                                        release.versionName
+                                                    )
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                            ) {
+                                                Text(stringResource(R.string.download))
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    val intent = android.content.Intent(
+                                                        android.content.Intent.ACTION_VIEW,
+                                                        android.net.Uri.parse(release.downloadUrl)
+                                                    ).apply {
+                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    }
+                                                    try {
+                                                        context.startActivity(intent)
+                                                    } catch (_: android.content.ActivityNotFoundException) {
+                                                        Toast.makeText(
+                                                            context,
+                                                            context.getString(R.string.no_browser_available),
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                            ) {
+                                                Text(stringResource(R.string.download_via_browser))
+                                            }
                                         }
                                     }
                                 }

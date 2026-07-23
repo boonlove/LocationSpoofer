@@ -96,6 +96,8 @@
     <string name="check_updates_desc">Get latest version from GitHub</string>
     <string name="update_dialog_title">Version Updates</string>
     <string name="download">Download</string>
+    <string name="download_via_browser">Browser Download</string>
+    <string name="no_browser_available">No browser app available</string>
     <string name="install">Install</string>
     <string name="downloading">Downloading: %1$d%%</string>
     <string name="version">Version: %1$s</string>

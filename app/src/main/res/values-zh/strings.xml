@@ -101,6 +101,8 @@
     <string name="check_updates_desc">从 GitHub 获取最新版本</string>
     <string name="update_dialog_title">版本更新</string>
     <string name="download">下载</string>
+    <string name="download_via_browser">浏览器下载</string>
+    <string name="no_browser_available">未找到可用的浏览器</string>
     <string name="install">安装</string>
     <string name="downloading">下载中: %1$d%%</string>
     <string name="version">版本: %1$s</string>
