@@ -20,6 +20,7 @@ places = "3.4.0"
 room = "2.6.1"
 ksp = "2.0.21-1.0.27"
 kotlinxSerializationJson = "1.6.3"
+materialKolor = "2.1.1"
 
 [libraries]
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
@@ -52,6 +53,7 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+material-kolor = { group = "com.materialkolor", name = "material-kolor", version.ref = "materialKolor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

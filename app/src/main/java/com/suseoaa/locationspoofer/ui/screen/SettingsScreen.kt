@@ -2,14 +2,17 @@ package com.suseoaa.locationspoofer.ui.screen
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.rounded.AutoMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.AnimatedVisibility
@@ -25,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -40,6 +44,7 @@ import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.suseoaa.locationspoofer.ui.extensions.isEnable
 import com.suseoaa.locationspoofer.ui.theme.AccentBlue
+import com.suseoaa.locationspoofer.ui.theme.keyColorOptions
 import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
@@ -145,7 +150,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surface)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
                         .clickable { darkModeExpanded = true }
                         .padding(horizontal = 16.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -159,7 +164,7 @@ fun SettingsScreen(
                 DropdownMenu(
                     expanded = darkModeExpanded,
                     onDismissRequest = { darkModeExpanded = false},
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                 ) {
                     darkModeOptions.forEach { (darkMode, label) ->
                         DropdownMenuItem(
@@ -187,12 +192,53 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(8.dp))
 
+            // 主题颜色（种子色调色板，由 MaterialKolor 派生全套 M3 调色板）
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                Text("主题颜色", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (uiState.keyColor == 0) "跟随系统壁纸动态色" else "自定义种子色生成调色板",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 跟随系统动态色（keyColor == 0）
+                    KeyColorSwatch(
+                        swatchColor = null,
+                        isSelected = uiState.keyColor == 0,
+                        onClick = { viewModel.setKeyColor(0) }
+                    )
+                    // 15 色预设种子色
+                    keyColorOptions.forEach { colorArgb ->
+                        KeyColorSwatch(
+                            swatchColor = Color(colorArgb),
+                            isSelected = uiState.keyColor == colorArgb,
+                            onClick = { viewModel.setKeyColor(colorArgb) }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
             // 首页地图模式
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
                     .clickable { viewModel.handleSpoofingIntent(SpoofingIntent.SetMapFullscreen(!spoofingUiState.isMapFullscreen)) }
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -545,4 +591,52 @@ fun PasswordField(
         singleLine = singleLine,
         colors = colors
     )
+}
+
+/**
+ * 主题种子色色块。
+ * - [swatchColor] == null 表示「跟随系统动态色」，显示 AutoMode 图标
+ * - [swatchColor] != null 为自定义种子色，选中时显示白色对勾
+ */
+@Composable
+private fun KeyColorSwatch(
+    swatchColor: Color?,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(swatchColor ?: MaterialTheme.colorScheme.surface)
+            .border(
+                width = if (isSelected) 3.dp else if (swatchColor == null) 1.dp else 0.dp,
+                color = when {
+                    isSelected -> MaterialTheme.colorScheme.primary
+                    swatchColor == null -> MaterialTheme.colorScheme.outline
+                    else -> Color.Transparent
+                },
+                shape = CircleShape
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (swatchColor == null) {
+            // 跟随系统：显示自动模式图标
+            Icon(
+                Icons.Rounded.AutoMode,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        } else if (isSelected) {
+            // 自定义色选中：白色对勾
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
 }

@@ -471,7 +471,7 @@ fun CustomCoordinateDialog(
 
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surface,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
         title = {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalContext provides currentContext,

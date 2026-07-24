@@ -3,74 +3,72 @@ package com.suseoaa.locationspoofer.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// 深色调色板
-val DarkBg = Color(0xFF0D1117)
-val SurfaceDark = Color(0xFF161B22)
-val SurfaceCardDark = Color(0xFF1C2333)
-val surfaceContainerHighDark = SurfaceCardDark
-val DividerColorDark = Color(0xFF30363D)
-val TextPrimaryDark = Color(0xFFE6EDF3)
-val TextSecondaryDark = Color(0xFF8B949E)
+/**
+ * 动态颜色兼容层。
+ *
+ * 原本项目中的硬编码颜色常量（AccentBlue=0xFF388BFD 等）已迁移为基于 MaterialKolor 种子色
+ * 动态生成的 [ColorScheme]。为最小化对调用方的改动并保证不遗漏，这里将原符号重新定义为
+ * **@Composable getter**，其值实时取自 [MaterialTheme.colorScheme]，使所有历史调用点自动获得动态颜色。
+ *
+ * 真正的颜色生成逻辑见 [LocationSpooferTheme] / [rememberLocationSpooferColorScheme]。
+ */
 
-// 浅色调色板
-val LightBg = Color(0xFFF6F8FA)
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceCardLight = Color(0xFFFFFFFF)
-val SurfaceCardCustomLight = Color(0xFFF3F6F9) // Custom color overriding MD3 default
-val surfaceContainerHighLight = SurfaceLight
-val DividerColorLight = Color(0xFFD0D7DE)
-val TextPrimaryLight = Color(0xFF24292F)
-val TextSecondaryLight = Color(0xFF57606A)
+// 强调色：跟随当前 colorScheme 主色/次色/三色/错误色
+val AccentBlue: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
+val OnAccentBlue: Color
+    @Composable get() = MaterialTheme.colorScheme.onPrimary
+val AccentGreen: Color
+    @Composable get() = MaterialTheme.colorScheme.secondary
+val OnAccentGreen: Color
+    @Composable get() = MaterialTheme.colorScheme.onSecondary
+val AccentOrange: Color
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+val OnAccentOrange: Color
+    @Composable get() = MaterialTheme.colorScheme.onTertiary
+val ErrorRed: Color
+    @Composable get() = MaterialTheme.colorScheme.error
+val OnErrorRed: Color
+    @Composable get() = MaterialTheme.colorScheme.onError
 
-// 强调色
-val AccentBlue = Color(0xFF388BFD)
-val AccentGreen = Color(0xFF2EA043)
-val AccentOrange = Color(0xFFD29922)
-val ErrorRed = Color(0xFFF85149)
-
-val AppColorSchemeDark = darkColorScheme(
-    primary = AccentBlue,
-    onPrimary = Color.White,
-    secondary = AccentGreen,
-    onSecondary = Color.White,
-    background = DarkBg,
-    surface = SurfaceCardDark,
-    onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark,
-    surfaceContainerHigh = surfaceContainerHighDark,
-    outline = DividerColorDark,
-    error = ErrorRed
-)
-
-val AppColorSchemeLight = lightColorScheme(
-    primary = AccentBlue,
-    onPrimary = Color.White,
-    secondary = AccentGreen,
-    onSecondary = Color.White,
-    background = LightBg,
-    surface = SurfaceCardLight,
-    onBackground = TextPrimaryLight,
-    onSurface = TextPrimaryLight,
-    surfaceContainerHigh = surfaceContainerHighLight,
-    outline = DividerColorLight,
-    error = Color(0xFFCF222E)
-)
-
+// 默认强调色（固定）
+val DefaultAccentBlue = Color(0xFF388BFD)
+val DefaultAccentGreen = Color(0xFF2EA043)
+val DefaultAccentOrange = Color(0xFFD29922)
+val DefaultErrorRed = Color(0xFFF85149)
+/**
+ * 主题辅助方法。保留 `isDark` 参数以兼容历史调用签名，但内部不再依赖它——
+ * 所有颜色均来自当前 [MaterialTheme.colorScheme]，由 [LocationSpooferTheme] 统一解析。
+ */
 object AppColors {
-    fun textSecondary(isDark: Boolean) = if (isDark) TextSecondaryDark else TextSecondaryLight
-    fun surface(isDark: Boolean) = if (isDark) SurfaceDark else SurfaceLight
-    fun cardBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardLight
-    fun topBarBackground(isDark: Boolean) = if (isDark) SurfaceCardDark else SurfaceCardLight
-    fun background(isDark: Boolean) = if (isDark) DarkBg else LightBg
     @Composable
-    fun switchColors(isDark: Boolean): SwitchColors = SwitchDefaults.colors(
-        uncheckedThumbColor = if (isDark) darkColorScheme().outline else lightColorScheme().outline,
-        uncheckedTrackColor = MaterialTheme.colorScheme.surface,
-        uncheckedBorderColor = if (isDark) darkColorScheme().outline else lightColorScheme().outline
-    )
+    fun textSecondary(@Suppress("UNUSED_PARAMETER") isDark: Boolean): Color =
+        MaterialTheme.colorScheme.onSurfaceVariant
+
+    @Composable
+    fun surface(@Suppress("UNUSED_PARAMETER") isDark: Boolean): Color =
+        MaterialTheme.colorScheme.surface
+
+    @Composable
+    fun cardBackground(@Suppress("UNUSED_PARAMETER") isDark: Boolean): Color =
+        MaterialTheme.colorScheme.surfaceContainer
+
+    @Composable
+    fun topBarBackground(@Suppress("UNUSED_PARAMETER") isDark: Boolean): Color =
+        MaterialTheme.colorScheme.surfaceContainer
+
+    @Composable
+    fun background(@Suppress("UNUSED_PARAMETER") isDark: Boolean): Color =
+        MaterialTheme.colorScheme.background
+
+    @Composable
+    fun switchColors(@Suppress("UNUSED_PARAMETER") isDark: Boolean): SwitchColors =
+        SwitchDefaults.colors(
+            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainer,
+            uncheckedBorderColor = MaterialTheme.colorScheme.outline
+        )
 }

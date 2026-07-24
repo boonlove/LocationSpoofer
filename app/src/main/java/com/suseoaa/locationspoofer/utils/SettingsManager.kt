@@ -16,6 +16,15 @@ class SettingsManager(context: Context) {
         get() = prefs.getString("dark_mode", "SYSTEM") ?: "SYSTEM"
         set(value) = prefs.edit().putString("dark_mode", value).apply()
 
+    /**
+     * 主题种子色。
+     * - 0 表示「跟随系统动态色」（取系统壁纸动态色 primary）
+     * - 非 0 表示用户选定种子色（ARGB），由 MaterialKolor 派生全套 M3 调色板
+     */
+    var keyColor: Int
+        get() = prefs.getInt("key_color", com.suseoaa.locationspoofer.ui.theme.keyColorOptions[0])
+        set(value) = prefs.edit().putInt("key_color", value).apply()
+
     var language: String
         get() = prefs.getString("language", "") ?: ""
         set(value) = prefs.edit().putString("language", value).apply()

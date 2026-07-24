@@ -36,6 +36,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.darkMode = value
     }
 
+    fun getKeyColor(): Int = settingsManager.keyColor
+
+    fun setKeyColor(value: Int) {
+        settingsManager.keyColor = value
+    }
+
     fun getAmapApiKey(): String = settingsManager.amapApiKey
 
     fun setAmapApiKey(value: String) {

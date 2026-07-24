@@ -21,6 +21,10 @@
 -keep class vi.com.gdi.bgl.android.** { *; }
 -dontwarn com.baidu.**
 
+# MaterialKolor (动态主题种子色生成)
+-keep class com.materialkolor.** { *; }
+-dontwarn com.materialkolor.**
+
 # Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}

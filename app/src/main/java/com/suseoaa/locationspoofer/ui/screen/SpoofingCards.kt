@@ -150,7 +150,7 @@ fun CoordinateInputCard(
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -330,7 +330,7 @@ fun UpdateCheckCard(isDark: Boolean, onCheckClick: () -> Unit) {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.clickable { onCheckClick() }
     ) {
@@ -402,7 +402,7 @@ fun SavedLocationsCard(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column {
@@ -799,7 +799,9 @@ fun SearchModeCard(
 
             val isNetwork = searchMode == com.suseoaa.locationspoofer.data.model.SearchMode.NETWORK
             val activeColor = AccentBlue
+            val onActiveColor = OnAccentBlue
             val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
+            val onInactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
 
             Row(modifier = Modifier.weight(1.5f), horizontalArrangement = Arrangement.End) {
                 Button(
@@ -814,7 +816,7 @@ fun SearchModeCard(
                     Text(
                         "网络检索",
                         fontSize = 11.sp,
-                        color = if (isNetwork) Color.White else MaterialTheme.colorScheme.onSurface
+                        color = if (isNetwork) onActiveColor else onInactiveColor
                     )
                 }
                 Button(
@@ -829,7 +831,7 @@ fun SearchModeCard(
                     Text(
                         "本地采集",
                         fontSize = 11.sp,
-                        color = if (!isNetwork) Color.White else MaterialTheme.colorScheme.onSurface
+                        color = if (!isNetwork) onActiveColor else onInactiveColor
                     )
                 }
             }

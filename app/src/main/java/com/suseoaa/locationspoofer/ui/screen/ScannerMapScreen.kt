@@ -19,6 +19,7 @@ import com.suseoaa.locationspoofer.ui.components.AppMapController
 import com.suseoaa.locationspoofer.ui.components.AppMapView
 import com.suseoaa.locationspoofer.data.model.AppMapType
 import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
+import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.ui.theme.AccentGreen
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
@@ -126,8 +127,8 @@ fun ScannerMapScreen(
         ) {
             FloatingActionButton(
                 onClick = { viewModel.toggleContinuousScanning() },
-                containerColor = if (uiState.isContinuousScanning) MaterialTheme.colorScheme.surface else AccentGreen,
-                contentColor = if (uiState.isContinuousScanning) AccentGreen else Color.White
+                containerColor = if (uiState.isContinuousScanning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                contentColor = if (uiState.isContinuousScanning) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
             ) {
                 Icon(Icons.Rounded.Radar, null)
             }
@@ -147,7 +148,7 @@ fun ScannerMapScreen(
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
                     .size(44.dp)
             ) {
-                Icon(Icons.Rounded.Layers, "Map Type", tint = AccentGreen)
+                Icon(Icons.Rounded.Layers, "Map Type", tint = AccentBlue)
             }
         }
     }

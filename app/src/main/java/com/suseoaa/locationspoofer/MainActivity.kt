@@ -27,9 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.unit.Density
 import com.suseoaa.locationspoofer.ui.components.BottomSheetValue
 import com.suseoaa.locationspoofer.ui.extensions.isDark
@@ -38,8 +36,7 @@ import com.suseoaa.locationspoofer.ui.screen.FullScreenMapPage
 import com.suseoaa.locationspoofer.ui.screen.InitializingScreen
 import com.suseoaa.locationspoofer.ui.screen.SpoofingScreen
 import com.suseoaa.locationspoofer.ui.screen.LanguageSelectionScreen
-import com.suseoaa.locationspoofer.ui.theme.AppColorSchemeDark
-import com.suseoaa.locationspoofer.ui.theme.AppColorSchemeLight
+import com.suseoaa.locationspoofer.ui.theme.LocationSpooferTheme
 import com.suseoaa.locationspoofer.utils.LocaleUtils
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
@@ -96,7 +93,6 @@ class MainActivity : ComponentActivity() {
             ) {
                 val uiState by viewModel.uiState.collectAsState()
                 val isDark = uiState.darkMode.isDark()
-                val colorScheme = if (isDark) AppColorSchemeDark else AppColorSchemeLight
                 val baseDensity = LocalDensity.current
                 val appDensity = remember(baseDensity.density, baseDensity.fontScale) {
                     Density(baseDensity.density, baseDensity.fontScale.coerceAtMost(1.15f))
@@ -119,14 +115,10 @@ class MainActivity : ComponentActivity() {
                     LocalConfiguration provides configuration,
                     LocalDensity provides appDensity
                 ) {
-                    MaterialTheme(colorScheme = colorScheme) {
-                        // 根据当前主题切换状态栏图标颜色
-                        val view = LocalView.current
-                        SideEffect {
-                            val window = (view.context as android.app.Activity).window
-                            WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark
-                        }
-
+                    LocationSpooferTheme(
+                        darkMode = uiState.darkMode,
+                        keyColor = uiState.keyColor
+                    ) {
                         Surface(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background

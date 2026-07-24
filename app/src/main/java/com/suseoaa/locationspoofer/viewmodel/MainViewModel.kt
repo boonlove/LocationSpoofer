@@ -63,6 +63,7 @@ class MainViewModel(
             } catch (e: Exception) {
                 com.suseoaa.locationspoofer.data.model.DarkMode.SYSTEM
             },
+            keyColor = settingsRepository.getKeyColor(),
             savedLocations = settingsRepository.getSavedLocations(),
             savedRoutes = emptyList(), // 将由 Room Flow 填充
             currentLanguage = settingsRepository.getLanguage(),
@@ -183,6 +184,11 @@ class MainViewModel(
     fun setDarkMode(mode: com.suseoaa.locationspoofer.data.model.DarkMode) {
         settingsRepository.setDarkMode(mode.name)
         _uiState.update { it.copy(darkMode = mode) }
+    }
+
+    fun setKeyColor(color: Int) {
+        settingsRepository.setKeyColor(color)
+        _uiState.update { it.copy(keyColor = color) }
     }
 
     fun setMapType(type: AppMapType) {

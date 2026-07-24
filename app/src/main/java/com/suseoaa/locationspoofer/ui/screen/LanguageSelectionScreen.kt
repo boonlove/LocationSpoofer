@@ -135,7 +135,7 @@ fun LanguageItem(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
+        color = if (isSelected) AccentBlue.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceContainer,
         border = if (isSelected) androidx.compose.foundation.BorderStroke(
             2.dp,
             AccentBlue

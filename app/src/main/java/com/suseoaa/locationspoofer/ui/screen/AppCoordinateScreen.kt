@@ -25,6 +25,7 @@ import com.suseoaa.locationspoofer.data.model.AppInfoItem
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.ui.extensions.isDark
 import com.suseoaa.locationspoofer.ui.theme.AppColors
+import com.suseoaa.locationspoofer.ui.theme.LocationSpooferTheme
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,21 +48,10 @@ fun AppCoordinateScreen(
         showSystemApps || !app.isSystem
     }
 
-    val milkyWhiteColorScheme = lightColorScheme(
-        background = MaterialTheme.colorScheme.background,
-        surface = MaterialTheme.colorScheme.surface,
-        onBackground = MaterialTheme.colorScheme.onBackground,
-        onSurface = MaterialTheme.colorScheme.onSurface,
-        surfaceVariant = MaterialTheme.colorScheme.surfaceVariant,
-        onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant,
-        surfaceContainerHigh = MaterialTheme.colorScheme.surfaceContainerHigh,
-        primary = MaterialTheme.colorScheme.primary,
-        onPrimary = MaterialTheme.colorScheme.onPrimary,
-        primaryContainer = MaterialTheme.colorScheme.primaryContainer,
-        onPrimaryContainer = MaterialTheme.colorScheme.onPrimaryContainer
-    )
-
-    MaterialTheme(colorScheme = milkyWhiteColorScheme) {
+    LocationSpooferTheme(
+        darkMode = uiState.darkMode,
+        keyColor = uiState.keyColor
+    ) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -97,7 +87,7 @@ fun AppCoordinateScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                         titleContentColor = MaterialTheme.colorScheme.onSurface,
                         navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                     )
