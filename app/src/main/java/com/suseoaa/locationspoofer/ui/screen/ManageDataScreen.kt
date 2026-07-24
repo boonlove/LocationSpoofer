@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -32,6 +33,8 @@ import java.util.Date
 import java.util.Locale
 import com.suseoaa.locationspoofer.ui.components.AppMapView
 import com.suseoaa.locationspoofer.ui.components.AppMapController
+import com.suseoaa.locationspoofer.ui.components.MapTypeDialog
+import com.suseoaa.locationspoofer.ui.theme.AccentBlue
 import com.suseoaa.locationspoofer.utils.MapCoverageHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +45,7 @@ fun ManageDataScreen(
     isDark: Boolean,
     onClose: () -> Unit
 ) {
+    var showMapTypeDialog by remember { mutableStateOf(false) }
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Long>() }
     var showClearAllConfirm by remember { mutableStateOf(false) }
@@ -181,6 +185,30 @@ fun ManageDataScreen(
                             controller.disableUiControls()
                         }
                     )
+
+                    // 右侧悬浮按钮
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 12.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                                .clickable { showMapTypeDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Layers,
+                                contentDescription = null,
+                                tint = AccentBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Bottom List
@@ -241,6 +269,16 @@ fun ManageDataScreen(
                 }
             }
         }
+    }
+
+    if (showMapTypeDialog) {
+        MapTypeDialog(
+            currentMapType = uiState.mapType,
+            onMapTypeSelected = { viewModel.setMapType(it) },
+            currentMapEngine = uiState.mapEngine,
+            onMapEngineSelected = { viewModel.setMapEngine(it) },
+            onDismiss = { showMapTypeDialog = false }
+        )
     }
 
     if (editingItem != null) {
