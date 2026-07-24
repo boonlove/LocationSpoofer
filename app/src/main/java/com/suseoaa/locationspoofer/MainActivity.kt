@@ -93,9 +93,12 @@ class MainActivity : ComponentActivity() {
             ) {
                 val uiState by viewModel.uiState.collectAsState()
                 val isDark = uiState.darkMode.isDark()
+
+                // 设置屏幕密度
                 val baseDensity = LocalDensity.current
-                val appDensity = remember(baseDensity.density, baseDensity.fontScale) {
-                    Density(baseDensity.density, baseDensity.fontScale.coerceAtMost(1.15f))
+                val appDensity = remember(baseDensity.density, baseDensity.fontScale, uiState.screenDensity) {
+                    val scale = uiState.screenDensity / 100f
+                    Density(baseDensity.density * scale, baseDensity.fontScale.coerceAtMost(1.15f))
                 }
 
                 // 核心：在 Compose 层级内部通过 CompositionLocalProvider 动态刷新

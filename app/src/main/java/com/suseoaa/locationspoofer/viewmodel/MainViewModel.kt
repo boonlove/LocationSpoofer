@@ -64,6 +64,7 @@ class MainViewModel(
                 com.suseoaa.locationspoofer.data.model.DarkMode.SYSTEM
             },
             keyColor = settingsRepository.getKeyColor(),
+            screenDensity = settingsRepository.getScreenDensity(),
             savedLocations = settingsRepository.getSavedLocations(),
             savedRoutes = emptyList(), // 将由 Room Flow 填充
             currentLanguage = settingsRepository.getLanguage(),
@@ -189,6 +190,11 @@ class MainViewModel(
     fun setKeyColor(color: Int) {
         settingsRepository.setKeyColor(color)
         _uiState.update { it.copy(keyColor = color) }
+    }
+
+    fun setScreenDensity(density: Int) {
+        settingsRepository.setScreenDensity(density)
+        _uiState.update { it.copy(screenDensity = density) }
     }
 
     fun setMapType(type: AppMapType) {

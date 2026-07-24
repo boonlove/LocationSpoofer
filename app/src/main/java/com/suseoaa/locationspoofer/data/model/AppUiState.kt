@@ -60,6 +60,8 @@ data class AppState(
     val mapEngine: MapEngine = MapEngine.AUTO,
     val darkMode: DarkMode = DarkMode.SYSTEM,
     val keyColor: Int = com.suseoaa.locationspoofer.ui.theme.keyColorOptions[0],
+    /** 屏幕密度百分比（80~110，100=系统默认）*/
+    val screenDensity: Int = 100,
     val isInitializing: Boolean = true,
     val isLanguageSet: Boolean = true, // 默认为 true，以避免在不需要时发生闪烁
     val currentLanguage: String = "",

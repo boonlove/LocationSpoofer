@@ -233,6 +233,56 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(8.dp))
 
+            // 屏幕密度（本应用 UI 缩放，80%~110%）
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                // 本地拖动值：拖动时只更新预览，松手(onValueChangeFinished)才落库
+                var sliderValue by remember(uiState.screenDensity) {
+                    mutableStateOf(uiState.screenDensity.toFloat())
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "界面缩放",
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "调整全局显示比例",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "${sliderValue.toInt()}%",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    onValueChangeFinished = {
+                        viewModel.setScreenDensity(sliderValue.toInt())
+                    },
+                    valueRange = 80f..110f,
+                    steps = 29
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+
             // 首页地图模式
             Row(
                 modifier = Modifier

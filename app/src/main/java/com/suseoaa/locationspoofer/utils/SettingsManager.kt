@@ -25,6 +25,11 @@ class SettingsManager(context: Context) {
         get() = prefs.getInt("key_color", com.suseoaa.locationspoofer.ui.theme.keyColorOptions[0])
         set(value) = prefs.edit().putInt("key_color", value).apply()
 
+    // 自定义屏幕密度百分比（80~110，100=系统默认）。
+    var screenDensity: Int
+        get() = prefs.getInt("screen_density", 100).coerceIn(80, 110)
+        set(value) = prefs.edit().putInt("screen_density", value.coerceIn(80, 110)).apply()
+
     var language: String
         get() = prefs.getString("language", "") ?: ""
         set(value) = prefs.edit().putString("language", value).apply()

@@ -42,6 +42,12 @@ class SettingsRepository(private val settingsManager: SettingsManager) {
         settingsManager.keyColor = value
     }
 
+    fun getScreenDensity(): Int = settingsManager.screenDensity
+
+    fun setScreenDensity(value: Int) {
+        settingsManager.screenDensity = value
+    }
+
     fun getAmapApiKey(): String = settingsManager.amapApiKey
 
     fun setAmapApiKey(value: String) {
