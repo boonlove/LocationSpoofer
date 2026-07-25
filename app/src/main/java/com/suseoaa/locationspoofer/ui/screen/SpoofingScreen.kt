@@ -258,14 +258,14 @@ fun SpoofingScreen(
     */
 
     val density = LocalDensity.current
-    val screenHeightDp = configuration.screenHeightDp.dp
+    // configuration.screenHeightDp 为系统原始 dp（不受界面缩放影响）：先用系统 density 转物理 px，
+    // 再用当前(缩放后) density 转回 dp —— 得到"缩放视觉 dp"，使 Modifier.height 渲染出正确物理高度
+    val screenHeightPx = configuration.screenHeightDp.dp.value * LocalContext.current.resources.displayMetrics.density
+    val screenHeightDp = with(density) { screenHeightPx.toDp() }
     val expandedFraction = 0.75f
     val halfFraction = 0.375f
-    val expandedHeightDp = screenHeightDp * expandedFraction
-    val halfHeightDp = screenHeightDp * halfFraction
-    // AnchoredDraggableState 的 anchors/offset 基于 px，需在此转换
-    val expandedHeightPx = with(density) { expandedHeightDp.toPx() }
-    val halfHeightPx = with(density) { halfHeightDp.toPx() }
+    val expandedHeightPx = screenHeightPx * expandedFraction
+    val halfHeightPx = screenHeightPx * halfFraction
 
     var topBarHeightPx by remember { mutableFloatStateOf(0f) }
 
@@ -304,7 +304,7 @@ fun SpoofingScreen(
                     if (spoofingUiState.isMapFullscreen) {
                         screenHeightDp
                     } else {
-                         with(density) { (screenHeightDp.toPx() - topBarHeightPx - (expandedHeightPx - sheetState.offset)).toDp() }
+                         with(density) { (screenHeightPx - topBarHeightPx - (expandedHeightPx - sheetState.offset)).toDp() }
                     }
                 )
                 .offset{
