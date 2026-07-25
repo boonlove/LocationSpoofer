@@ -177,7 +177,7 @@ fun HomeSearchBar(
             Icon(
                 Icons.Rounded.Search,
                 stringResource(R.string.search),
-                tint = Color.White,
+                tint = OnAccentBlue,
                 modifier = Modifier.size(20.dp)
             )
         }

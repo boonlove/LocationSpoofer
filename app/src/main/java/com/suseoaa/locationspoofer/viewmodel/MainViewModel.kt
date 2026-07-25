@@ -1968,10 +1968,10 @@ class MainViewModel(
 
 
     fun toggleContinuousScanning() {
-        if (_uiState.value.isSpoofingActive) {
+        if (!isLocationEnabled(context)) {
             android.widget.Toast.makeText(
                 context,
-                context.getString(com.suseoaa.locationspoofer.R.string.disable_continuous_scan_route_first),
+                context.getString(com.suseoaa.locationspoofer.R.string.turn_on_location_services_first),
                 android.widget.Toast.LENGTH_SHORT
             ).show()
             return
