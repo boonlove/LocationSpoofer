@@ -287,7 +287,17 @@ class LocationHooker : XposedModule() {
             return
         }
 
-        val isSystemServer = (pkg == "android") || (android.os.Process.myUid() < 10000)
+        val processName = try {
+            File("/proc/self/cmdline").readText().trim('\u0000', ' ', '\n')
+        } catch (e: Exception) {
+            pkg
+        }
+        val isSystemServer = (pkg == "android") || (processName == "android") || (processName == "system_server")
+        
+        // 可选：过滤掉容易引发安全模式的几个核心进程，但不影响设置或网络定位进程
+        val isCoreSystemProcess = isSystemServer || 
+                                  processName == "com.android.phone" || 
+                                  processName == "com.android.systemui"
 
         // 系统进程：允许执行所有的环境数据Hook，实现系统原生界面的完美覆盖
         // if (SYSTEM_PACKAGES.contains(pkg)) {
@@ -299,13 +309,13 @@ class LocationHooker : XposedModule() {
         XposedBridge.log("[LocationSpoofer] Hooking package: $pkg")
         XposedBridge.logOpenCellId("handleLoadPackage pkg=$pkg classLoader=$classLoader")
 
-        // ★ 反检测: 必须在其他Hook之前安装,隐藏Xposed环境
+        // 反检测: 必须在其他Hook之前安装,隐藏Xposed环境
         hookAntiDetection(classLoader)
 
         hookLocationAPIs(classLoader, pkg)
         hookGnssStatus(classLoader)
 
-        if (!isSystemServer) {
+        if (!isCoreSystemProcess) {
             hookWifiEnvironment(classLoader)
             hookCellEnvironment(classLoader)
             hookConnectivityLayer(classLoader)
