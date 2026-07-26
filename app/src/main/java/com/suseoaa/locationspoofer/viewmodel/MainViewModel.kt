@@ -2033,18 +2033,25 @@ class MainViewModel(
     fun loadManageData() {
         _uiState.update { it.copy(manageDataIsLoading = true) }
         viewModelScope.launch(Dispatchers.IO) {
-            val list = environmentDao.getAllCompleteLocations()
-            withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(manageDataList = list, manageDataIsLoading = false) }
-                evaluateMockCapabilities()
-            }
+            refreshManageDataInternal()
+        }
+    }
+
+    /**
+     * 静默刷新 manageDataList，不触发 loading 状态。用于删除/编辑/清空等写操作后的数据同步
+     */
+    private suspend fun refreshManageDataInternal() {
+        val list = environmentDao.getAllCompleteLocations()
+        withContext(Dispatchers.Main) {
+            _uiState.update { it.copy(manageDataList = list, manageDataIsLoading = false) }
+            evaluateMockCapabilities()
         }
     }
 
     fun deleteManageData(ids: List<Long>) {
         viewModelScope.launch(Dispatchers.IO) {
             environmentDao.deleteLocations(ids)
-            loadManageData()
+            refreshManageDataInternal()
             refreshRecordCount()
         }
     }
@@ -2052,7 +2059,7 @@ class MainViewModel(
     fun deleteManageDataSingle(id: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             environmentDao.deleteLocation(id)
-            loadManageData()
+            refreshManageDataInternal()
             refreshRecordCount()
         }
     }
@@ -2060,14 +2067,14 @@ class MainViewModel(
     fun updateManageDataMetadata(id: Long, placeName: String, remark: String) {
         viewModelScope.launch(Dispatchers.IO) {
             environmentDao.updateMetadata(id, placeName, remark)
-            loadManageData()
+            refreshManageDataInternal()
         }
     }
 
     fun clearAllManageData() {
         viewModelScope.launch(Dispatchers.IO) {
             environmentDao.clearAll()
-            loadManageData()
+            refreshManageDataInternal()
             refreshRecordCount()
         }
     }
