@@ -111,7 +111,7 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putString("satellite_count", value).apply()
 
     var spoofingScreenMapFullscreen: Boolean
-        get() = prefs.getBoolean("spoofing_screen_map_fullscreen", true)
+        get() = prefs.getBoolean("spoofing_screen_map_fullscreen", false)
         set(value) = prefs.edit().putBoolean("spoofing_screen_map_fullscreen", value).apply()
 
     fun getSavedLocations(): List<SavedLocation> {
