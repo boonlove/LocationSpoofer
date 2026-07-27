@@ -79,7 +79,15 @@ class SpoofingService : Service() {
             .setOngoing(true)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            // Ignore, continue running without foreground status
+        }
         isRunning = true
 
         setupTestProvider(LocationManager.GPS_PROVIDER)
@@ -172,6 +180,9 @@ class SpoofingService : Service() {
                 bearing = loc.bearing
                 time = System.currentTimeMillis()
                 elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
+                extras = android.os.Bundle().apply {
+                    putBoolean("suseoaa_mock", true)
+                }
             }
             locationManager.setTestProviderLocation(provider, location)
         } catch (e: Exception) {

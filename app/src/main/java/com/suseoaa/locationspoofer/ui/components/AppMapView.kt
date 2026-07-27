@@ -1,5 +1,6 @@
 package com.suseoaa.locationspoofer.ui.components
 
+import android.content.Context
 import android.os.Bundle
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -12,6 +13,10 @@ import com.amap.api.maps.AMap
 import com.amap.api.maps.CameraUpdateFactory
 import com.amap.api.maps.TextureMapView
 import com.amap.api.maps.model.BitmapDescriptorFactory
+import com.amap.api.maps.model.CameraPosition
+import com.baidu.mapapi.map.BaiduMap
+import com.baidu.mapapi.map.Stroke
+import com.baidu.mapapi.model.LatLng
 import com.amap.api.maps.model.LatLng as AMapLatLng
 import com.amap.api.maps.model.MarkerOptions as AMapMarkerOptions
 import com.amap.api.maps.model.PolylineOptions as AMapPolylineOptions
@@ -20,6 +25,10 @@ import com.suseoaa.locationspoofer.data.model.AppMapType
 import com.google.android.gms.maps.CameraUpdateFactory as GCameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.suseoaa.locationspoofer.ui.extensions.activeEngine
+import com.google.android.gms.maps.model.CircleOptions
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle
+import com.suseoaa.locationspoofer.data.model.MapEngine
 import com.google.android.gms.maps.MapView as GMapView
 import com.google.android.gms.maps.model.BitmapDescriptorFactory as GBitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng as GLatLng
@@ -52,6 +61,7 @@ interface AppMapController {
     val cameraTargetLat: Double?
     val cameraTargetLng: Double?
     fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit)
+    fun setOnCameraMoveListener(onMove: (lat: Double, lng: Double) -> Unit)
     fun disableUiControls()
     fun setMapType(type: AppMapType)
     fun setDarkMode(isDark: Boolean, context: android.content.Context)
@@ -157,13 +167,26 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
     override val cameraTargetLat: Double? get() = map.cameraPosition?.target?.latitude
     override val cameraTargetLng: Double? get() = map.cameraPosition?.target?.longitude
 
-    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+    private var cameraFinishListener: ((Double, Double) -> Unit)? = null
+    private var cameraMoveListener: ((Double, Double) -> Unit)? = null
+
+    init {
         map.setOnCameraChangeListener(object : AMap.OnCameraChangeListener {
-            override fun onCameraChange(p0: com.amap.api.maps.model.CameraPosition?) {}
-            override fun onCameraChangeFinish(p0: com.amap.api.maps.model.CameraPosition?) {
-                p0?.target?.let { onFinish(it.latitude, it.longitude) }
+            override fun onCameraChange(p0: CameraPosition?) {
+                p0?.target?.let { cameraMoveListener?.invoke(it.latitude, it.longitude) }
+            }
+            override fun onCameraChangeFinish(p0: CameraPosition?) {
+                p0?.target?.let { cameraFinishListener?.invoke(it.latitude, it.longitude) }
             }
         })
+    }
+
+    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+        cameraFinishListener = onFinish
+    }
+
+    override fun setOnCameraMoveListener(onMove: (lat: Double, lng: Double) -> Unit) {
+        cameraMoveListener = onMove
     }
 
     override fun disableUiControls() {
@@ -179,7 +202,7 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
             AppMapType.NORMAL -> {
                 map.mapType = if (isDarkMode) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
                 val cameraPosition = map.cameraPosition ?: return
-                val newCam = com.amap.api.maps.model.CameraPosition(
+                val newCam = CameraPosition(
                     cameraPosition.target,
                     cameraPosition.zoom,
                     0f,
@@ -191,7 +214,7 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
             AppMapType.SATELLITE -> {
                 map.mapType = AMap.MAP_TYPE_SATELLITE
                 val cameraPosition = map.cameraPosition ?: return
-                val newCam = com.amap.api.maps.model.CameraPosition(
+                val newCam = CameraPosition(
                     cameraPosition.target,
                     cameraPosition.zoom,
                     0f,
@@ -203,7 +226,7 @@ class AMapControllerImpl(private val map: AMap) : AppMapController {
             AppMapType.MAP_3D -> {
                 map.mapType = if (isDarkMode) AMap.MAP_TYPE_NIGHT else AMap.MAP_TYPE_NORMAL
                 val cameraPosition = map.cameraPosition ?: return
-                val newCam = com.amap.api.maps.model.CameraPosition(
+                val newCam = CameraPosition(
                     cameraPosition.target,
                     cameraPosition.zoom,
                     45f,
@@ -219,12 +242,12 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
     private var isDarkMode: Boolean = false
     private var currentMapType: AppMapType = AppMapType.NORMAL
 
-    override fun setDarkMode(isDark: Boolean, context: android.content.Context) {
+    override fun setDarkMode(isDark: Boolean, context: Context) {
         isDarkMode = isDark
         try {
             if (isDark) {
                 map.setMapStyle(
-                    com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle(
+                    loadRawResourceStyle(
                         context,
                         com.suseoaa.locationspoofer.R.raw.map_style_dark
                     )
@@ -261,7 +284,7 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
         strokeWidth: Float
     ) {
         map.addCircle(
-            com.google.android.gms.maps.model.CircleOptions()
+            CircleOptions()
                 .center(GLatLng(lat, lng))
                 .radius(radius)
                 .fillColor(fillColorInt)
@@ -307,7 +330,7 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
 
     override fun fitBounds(points: List<Pair<Double, Double>>, padding: Int) {
         if (points.isEmpty()) return
-        val builder = com.google.android.gms.maps.model.LatLngBounds.Builder()
+        val builder = LatLngBounds.Builder()
         points.forEach { builder.include(GLatLng(it.first, it.second)) }
         try {
             map.animateCamera(GCameraUpdateFactory.newLatLngBounds(builder.build(), padding))
@@ -329,13 +352,30 @@ class GMapControllerImpl(private val map: GoogleMap) : AppMapController {
     override val cameraTargetLat: Double? get() = map.cameraPosition?.target?.latitude
     override val cameraTargetLng: Double? get() = map.cameraPosition?.target?.longitude
 
-    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+    private var cameraFinishListener: ((Double, Double) -> Unit)? = null
+    private var cameraMoveListener: ((Double, Double) -> Unit)? = null
+
+    init {
+        map.setOnCameraMoveListener {
+            val target = map.cameraPosition?.target
+            if (target != null) {
+                cameraMoveListener?.invoke(target.latitude, target.longitude)
+            }
+        }
         map.setOnCameraIdleListener {
             val target = map.cameraPosition?.target
             if (target != null) {
-                onFinish(target.latitude, target.longitude)
+                cameraFinishListener?.invoke(target.latitude, target.longitude)
             }
         }
+    }
+
+    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+        cameraFinishListener = onFinish
+    }
+
+    override fun setOnCameraMoveListener(onMove: (lat: Double, lng: Double) -> Unit) {
+        cameraMoveListener = onMove
     }
 
     override fun disableUiControls() {
@@ -452,7 +492,7 @@ class BaiduMapControllerImpl(
     ) {
         map.addOverlay(
             com.baidu.mapapi.map.CircleOptions()
-                .center(com.baidu.mapapi.model.LatLng(lat, lng))
+                .center(LatLng(lat, lng))
                 .radius(radius.toInt())
                 .fillColor(fillColorInt)
                 .stroke(com.baidu.mapapi.map.Stroke(strokeWidth, strokeColorInt))
@@ -477,13 +517,13 @@ class BaiduMapControllerImpl(
         }
         val marker = map.addOverlay(
             com.baidu.mapapi.map.MarkerOptions()
-                .position(com.baidu.mapapi.model.LatLng(lat, lng))
+                .position(LatLng(lat, lng))
                 .title(title)
                 .icon(icon)
         ) as? com.baidu.mapapi.map.Marker
         return object : AppMapMarker {
             override fun setPosition(lat: Double, lng: Double) {
-                marker?.position = com.baidu.mapapi.model.LatLng(lat, lng)
+                marker?.position = LatLng(lat, lng)
             }
         }
     }
@@ -502,13 +542,13 @@ class BaiduMapControllerImpl(
 
     override fun animateCamera(lat: Double, lng: Double, zoom: Float?) {
         val update = if (zoom != null) com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(
-            com.baidu.mapapi.model.LatLng(
+            LatLng(
                 lat,
                 lng
             ), zoom
         )
         else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(
-            com.baidu.mapapi.model.LatLng(
+            LatLng(
                 lat,
                 lng
             )
@@ -560,7 +600,7 @@ class BaiduMapControllerImpl(
             }
 
             val update = com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(
-                com.baidu.mapapi.model.LatLng(centerLat, centerLng), zoom
+                LatLng(centerLat, centerLng), zoom
             )
             map.animateMapStatus(update)
         } catch (e: Exception) {
@@ -570,13 +610,13 @@ class BaiduMapControllerImpl(
 
     override fun moveCamera(lat: Double, lng: Double, zoom: Float?) {
         val update = if (zoom != null) com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLngZoom(
-            com.baidu.mapapi.model.LatLng(
+            LatLng(
                 lat,
                 lng
             ), zoom
         )
         else com.baidu.mapapi.map.MapStatusUpdateFactory.newLatLng(
-            com.baidu.mapapi.model.LatLng(
+            LatLng(
                 lat,
                 lng
             )
@@ -587,22 +627,37 @@ class BaiduMapControllerImpl(
     override val cameraTargetLat: Double? get() = map.mapStatus?.target?.latitude
     override val cameraTargetLng: Double? get() = map.mapStatus?.target?.longitude
 
-    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+    private var cameraFinishListener: ((Double, Double) -> Unit)? = null
+    private var cameraMoveListener: ((Double, Double) -> Unit)? = null
+
+    init {
         map.setOnMapStatusChangeListener(object :
-            com.baidu.mapapi.map.BaiduMap.OnMapStatusChangeListener {
+            BaiduMap.OnMapStatusChangeListener {
             private var lastReason: Int = 0
             override fun onMapStatusChangeStart(p0: com.baidu.mapapi.map.MapStatus?) {}
             override fun onMapStatusChangeStart(p0: com.baidu.mapapi.map.MapStatus?, p1: Int) {
                 lastReason = p1
             }
 
-            override fun onMapStatusChange(p0: com.baidu.mapapi.map.MapStatus?) {}
+            override fun onMapStatusChange(p0: com.baidu.mapapi.map.MapStatus?) {
+                if (lastReason == BaiduMap.OnMapStatusChangeListener.REASON_GESTURE) {
+                    p0?.target?.let { cameraMoveListener?.invoke(it.latitude, it.longitude) }
+                }
+            }
             override fun onMapStatusChangeFinish(p0: com.baidu.mapapi.map.MapStatus?) {
-                if (lastReason == com.baidu.mapapi.map.BaiduMap.OnMapStatusChangeListener.REASON_GESTURE) {
-                    p0?.target?.let { onFinish(it.latitude, it.longitude) }
+                if (lastReason == BaiduMap.OnMapStatusChangeListener.REASON_GESTURE) {
+                    p0?.target?.let { cameraFinishListener?.invoke(it.latitude, it.longitude) }
                 }
             }
         })
+    }
+
+    override fun setOnCameraChangeListener(onFinish: (lat: Double, lng: Double) -> Unit) {
+        cameraFinishListener = onFinish
+    }
+
+    override fun setOnCameraMoveListener(onMove: (lat: Double, lng: Double) -> Unit) {
+        cameraMoveListener = onMove
     }
 
     override fun disableUiControls() {
@@ -616,15 +671,15 @@ class BaiduMapControllerImpl(
         currentMapType = type
         when (type) {
             AppMapType.NORMAL -> {
-                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_NORMAL
+                map.mapType = BaiduMap.MAP_TYPE_NORMAL
             }
 
             AppMapType.SATELLITE -> {
-                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_SATELLITE
+                map.mapType = BaiduMap.MAP_TYPE_SATELLITE
             }
 
             AppMapType.MAP_3D -> {
-                map.mapType = com.baidu.mapapi.map.BaiduMap.MAP_TYPE_NORMAL
+                map.mapType = BaiduMap.MAP_TYPE_NORMAL
             }
         }
     }
@@ -632,7 +687,7 @@ class BaiduMapControllerImpl(
 
 @Composable
 fun AppMapView(
-    mapEngine: com.suseoaa.locationspoofer.data.model.MapEngine,
+    mapEngine: MapEngine,
     isDomestic: Boolean,
     isDark: Boolean,
     modifier: Modifier = Modifier,
@@ -648,7 +703,7 @@ fun AppMapView(
 
     val activeEngine = mapEngine.activeEngine(isDomestic)
 
-    if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.AMAP) {
+    if (activeEngine == MapEngine.AMAP) {
         val amapView = remember {
             val view = TextureMapView(context)
             view.onCreate(Bundle())
@@ -658,8 +713,8 @@ fun AppMapView(
             var isDestroyed = false
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_RESUME  -> amapView.onResume()
-                    Lifecycle.Event.ON_PAUSE   -> amapView.onPause()
+                    Lifecycle.Event.ON_RESUME -> amapView.onResume()
+                    Lifecycle.Event.ON_PAUSE -> amapView.onPause()
                     Lifecycle.Event.ON_DESTROY -> {
                         if (!isDestroyed) {
                             isDestroyed = true
@@ -694,8 +749,8 @@ fun AppMapView(
             },
             modifier = modifier
         )
-    } else if (activeEngine == com.suseoaa.locationspoofer.data.model.MapEngine.BAIDU) {
-        val baiduMapView = remember { 
+    } else if (activeEngine == MapEngine.BAIDU) {
+        val baiduMapView = remember {
             val view = com.baidu.mapapi.map.TextureMapView(context).apply {
                 showZoomControls(false)
             }
@@ -705,8 +760,8 @@ fun AppMapView(
             var isDestroyed = false  //  // 防止 Back 键导致 onDestroy 被双次调用，Activity 重建后新 BMapView 无法正确初始化
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_RESUME  -> baiduMapView.onResume()
-                    Lifecycle.Event.ON_PAUSE   -> baiduMapView.onPause()
+                    Lifecycle.Event.ON_RESUME -> baiduMapView.onResume()
+                    Lifecycle.Event.ON_PAUSE -> baiduMapView.onPause()
                     Lifecycle.Event.ON_DESTROY -> {
                         if (!isDestroyed) {
                             isDestroyed = true
@@ -755,8 +810,8 @@ fun AppMapView(
             var isDestroyed = false
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_RESUME  -> gmapView.onResume()
-                    Lifecycle.Event.ON_PAUSE   -> gmapView.onPause()
+                    Lifecycle.Event.ON_RESUME -> gmapView.onResume()
+                    Lifecycle.Event.ON_PAUSE -> gmapView.onPause()
                     Lifecycle.Event.ON_DESTROY -> {
                         if (!isDestroyed) {
                             isDestroyed = true

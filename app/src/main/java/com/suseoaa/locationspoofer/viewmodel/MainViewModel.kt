@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.amap.api.location.AMapLocationClient
 import com.amap.api.location.AMapLocationClientOption
 import com.google.android.gms.location.LocationServices
+import com.suseoaa.locationspoofer.LocationApp
+import com.suseoaa.locationspoofer.data.db.EnvironmentDao
+import com.suseoaa.locationspoofer.data.db.LocationRecord
 import com.suseoaa.locationspoofer.data.model.AppState
 import com.suseoaa.locationspoofer.data.model.RoutePoint
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
@@ -14,11 +17,19 @@ import com.suseoaa.locationspoofer.data.model.SavedLocation
 import com.suseoaa.locationspoofer.data.model.SimMode
 import com.suseoaa.locationspoofer.data.model.AppMapType
 import com.suseoaa.locationspoofer.data.model.MapEngine
+import com.suseoaa.locationspoofer.data.model.SearchMode
 import com.suseoaa.locationspoofer.data.repository.LocationRepository
 import com.suseoaa.locationspoofer.data.repository.SettingsRepository
+import com.suseoaa.locationspoofer.data.repository.WifiRepository
 import com.suseoaa.locationspoofer.provider.SpooferProvider
 import com.suseoaa.locationspoofer.service.SpoofingService
 import com.suseoaa.locationspoofer.ui.extensions.activeEngine
+import com.suseoaa.locationspoofer.ui.screen.AppPoiItem
+import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent
+import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState
+import com.suseoaa.locationspoofer.utils.EnvironmentScanner
+import com.suseoaa.locationspoofer.utils.LSPosedManager
+import com.suseoaa.locationspoofer.utils.OpenCellIdClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,13 +49,15 @@ import kotlin.coroutines.suspendCoroutine
 class MainViewModel(
     private val locationRepository: LocationRepository,
     private val settingsRepository: SettingsRepository,
-    private val lsposedManager: com.suseoaa.locationspoofer.utils.LSPosedManager,
-    private val environmentScanner: com.suseoaa.locationspoofer.utils.EnvironmentScanner,
-    private val environmentDao: com.suseoaa.locationspoofer.data.db.EnvironmentDao,
-    private val wifiRepository: com.suseoaa.locationspoofer.data.repository.WifiRepository,
-    private val opencellidClient: com.suseoaa.locationspoofer.utils.OpenCellIdClient,
+    private val lsposedManager: LSPosedManager,
+    private val environmentScanner: EnvironmentScanner,
+    private val environmentDao: EnvironmentDao,
+    private val wifiRepository: WifiRepository,
+    private val opencellidClient: OpenCellIdClient,
     private val context: Context
 ) : ViewModel() {
+    private var lastMapMoveTime = 0L
+    private var mapMoveJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         AppState(
@@ -54,9 +67,9 @@ class MainViewModel(
                 AppMapType.NORMAL
             },
             mapEngine = try {
-                com.suseoaa.locationspoofer.data.model.MapEngine.valueOf(settingsRepository.getMapEngine())
+                MapEngine.valueOf(settingsRepository.getMapEngine())
             } catch (e: Exception) {
-                com.suseoaa.locationspoofer.data.model.MapEngine.AUTO
+                MapEngine.AUTO
             },
             darkMode = try {
                 com.suseoaa.locationspoofer.data.model.DarkMode.valueOf(settingsRepository.getDarkMode())
@@ -83,10 +96,10 @@ class MainViewModel(
     val uiState: StateFlow<AppState> = _uiState.asStateFlow()
 
     private val _spoofingUiState =
-        MutableStateFlow(com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState(
+        MutableStateFlow(SpoofingUiState(
             isMapFullscreen = settingsRepository.spoofingScreenMapFullscreen
         ))
-    val spoofingUiState: StateFlow<com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState> =
+    val spoofingUiState: StateFlow<SpoofingUiState> =
         _spoofingUiState.asStateFlow()
 
     private var locationSyncJob: Job? = null
@@ -144,7 +157,7 @@ class MainViewModel(
         }
 
         viewModelScope.launch {
-            com.suseoaa.locationspoofer.LocationApp.isModuleActive.collect { active ->
+            LocationApp.isModuleActive.collect { active ->
                 _uiState.update {
                     it.copy(
                         isLSPosedActive = active,
@@ -202,24 +215,24 @@ class MainViewModel(
         _uiState.update { it.copy(mapType = type) }
     }
 
-    fun setMapEngine(engine: com.suseoaa.locationspoofer.data.model.MapEngine) {
+    fun setMapEngine(engine: MapEngine) {
         settingsRepository.setMapEngine(engine.name)
         _uiState.update { it.copy(mapEngine = engine) }
     }
 
-    fun setSearchMode(mode: com.suseoaa.locationspoofer.data.model.SearchMode) {
+    fun setSearchMode(mode: SearchMode) {
         _uiState.update { it.copy(searchMode = mode) }
     }
 
     data class ClusterData(
-        val center: com.suseoaa.locationspoofer.data.db.LocationRecord,
+        val center: LocationRecord,
         var count: Int,
         var hasWifi: Boolean,
         var hasBluetooth: Boolean,
         var hasCell: Boolean
     )
 
-    suspend fun performLocalSearch(): List<com.suseoaa.locationspoofer.ui.screen.AppPoiItem> {
+    suspend fun performLocalSearch(): List<AppPoiItem> {
         val allRecords = environmentDao.getAllCompleteLocations()
         if (allRecords.isEmpty()) {
             return emptyList()
@@ -530,82 +543,83 @@ class MainViewModel(
         }
     }
 
-    private suspend fun fetchRealLocationSilent(ctx: Context): Pair<Double, Double>? = suspendCoroutine { cont ->
-        if (!isLocationEnabled(ctx)) {
-            // 定位服务不可用
-            cont.resume(null)
-            return@suspendCoroutine
-        }
-        if (activeEngine == MapEngine.AMAP) {
-            if (uiState.value.amapApiKey.isBlank()) {
-                // 未配置 Api Key 时直接使用原生定位
-                fallbackToNativeLocationSilent(ctx, true, cont)
-                return@suspendCoroutine
-            }
-            val client = try {
-                com.amap.api.location.AMapLocationClient(ctx.applicationContext)
-            } catch (e: Exception) {
+    private suspend fun fetchRealLocationSilent(ctx: Context): Pair<Double, Double>? =
+        suspendCoroutine { cont ->
+            if (!isLocationEnabled(ctx)) {
+                // 定位服务不可用
                 cont.resume(null)
                 return@suspendCoroutine
             }
-            client.setLocationOption(com.amap.api.location.AMapLocationClientOption().apply {
-                locationMode =
-                    com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
-                isOnceLocation = true
-                isNeedAddress = false
-            })
-            client.setLocationListener { loc ->
-                if (loc != null && loc.errorCode == 0) {
-                    cont.resume(Pair(loc.latitude, loc.longitude))
-                } else {
+            if (activeEngine == MapEngine.AMAP) {
+                if (uiState.value.amapApiKey.isBlank()) {
+                    // 未配置 Api Key 时直接使用原生定位
                     fallbackToNativeLocationSilent(ctx, true, cont)
+                    return@suspendCoroutine
                 }
-                client.stopLocation()
-                client.onDestroy()
-            }
-            client.startLocation()
-        } else if (activeEngine == MapEngine.BAIDU) {
-            if (uiState.value.baiduApiKey.isBlank()) {
-                // 未配置 Api Key 时直接使用原生定位
-                fallbackToNativeLocationSilent(ctx, true, cont)
-                return@suspendCoroutine
-            }
-            val client = try {
-                com.baidu.location.LocationClient(ctx.applicationContext)
-            } catch (e: Exception) {
-                cont.resume(null)
-                return@suspendCoroutine
-            }
-            client.setLocOption(com.baidu.location.LocationClientOption().apply {
-                openGps = true
-                coorType = "gcj02"
-                setOnceLocation(true)
-                setIsNeedAddress(false)
-                scanSpan = 0
-                locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
-            })
-            val listener = object : com.baidu.location.BDAbstractLocationListener() {
-                override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
-                    if (location != null &&
-                        location.locType != com.baidu.location.BDLocation.TypeNone &&
-                        location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
-                        (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
-                    ) {
-                        cont.resume(Pair(location.latitude, location.longitude))
+                val client = try {
+                    com.amap.api.location.AMapLocationClient(ctx.applicationContext)
+                } catch (e: Exception) {
+                    cont.resume(null)
+                    return@suspendCoroutine
+                }
+                client.setLocationOption(com.amap.api.location.AMapLocationClientOption().apply {
+                    locationMode =
+                        com.amap.api.location.AMapLocationClientOption.AMapLocationMode.Hight_Accuracy
+                    isOnceLocation = true
+                    isNeedAddress = false
+                })
+                client.setLocationListener { loc ->
+                    if (loc != null && loc.errorCode == 0) {
+                        cont.resume(Pair(loc.latitude, loc.longitude))
                     } else {
-                        // 百度定位失败，回退到原生定位
                         fallbackToNativeLocationSilent(ctx, true, cont)
                     }
-                    client.unRegisterLocationListener(this)
-                    client.stop()
+                    client.stopLocation()
+                    client.onDestroy()
                 }
+                client.startLocation()
+            } else if (activeEngine == MapEngine.BAIDU) {
+                if (uiState.value.baiduApiKey.isBlank()) {
+                    // 未配置 Api Key 时直接使用原生定位
+                    fallbackToNativeLocationSilent(ctx, true, cont)
+                    return@suspendCoroutine
+                }
+                val client = try {
+                    com.baidu.location.LocationClient(ctx.applicationContext)
+                } catch (e: Exception) {
+                    cont.resume(null)
+                    return@suspendCoroutine
+                }
+                client.setLocOption(com.baidu.location.LocationClientOption().apply {
+                    openGps = true
+                    coorType = "gcj02"
+                    setOnceLocation(true)
+                    setIsNeedAddress(false)
+                    scanSpan = 0
+                    locationMode = com.baidu.location.LocationClientOption.LocationMode.Hight_Accuracy
+                })
+                val listener = object : com.baidu.location.BDAbstractLocationListener() {
+                    override fun onReceiveLocation(location: com.baidu.location.BDLocation?) {
+                        if (location != null &&
+                            location.locType != com.baidu.location.BDLocation.TypeNone &&
+                            location.locType != com.baidu.location.BDLocation.TypeCriteriaException &&
+                            (kotlin.math.abs(location.latitude) > 0.001 || kotlin.math.abs(location.longitude) > 0.001)
+                        ) {
+                            cont.resume(Pair(location.latitude, location.longitude))
+                        } else {
+                            // 百度定位失败，回退到原生定位
+                            fallbackToNativeLocationSilent(ctx, true, cont)
+                        }
+                        client.unRegisterLocationListener(this)
+                        client.stop()
+                    }
+                }
+                client.registerLocationListener(listener)
+                client.start()
+            } else {
+                fallbackToNativeLocationSilent(ctx, false, cont)
             }
-            client.registerLocationListener(listener)
-            client.start()
-        } else {
-            fallbackToNativeLocationSilent(ctx, false, cont)
         }
-    }
 
     @android.annotation.SuppressLint("MissingPermission")
     private fun fallbackToNativeLocationSilent(
@@ -1312,7 +1326,7 @@ class MainViewModel(
     }
 
     /** 首页地图确认选点 */
-    fun confirmMapPoint(lat: Double, lng: Double) {
+    fun confirmMapPoint(lat: Double, lng: Double, isDragging: Boolean = false) {
         _uiState.update {
             it.copy(
                 latitudeInput = String.format("%.6f", lat),
@@ -1322,6 +1336,38 @@ class MainViewModel(
             )
         }
         evaluateMockCapabilities()
+        val state = _uiState.value
+        if (state.isSpoofingActive) {
+            settingsRepository.lastSpoofedLat = lat.toString()
+            settingsRepository.lastSpoofedLng = lng.toString()
+            viewModelScope.launch {
+                if (state.mockWifi && !hasLocalWifiWithin50m(lat, lng) && !isDragging) {
+                    fetchWifiFromWigleSync(lat, lng)
+                }
+                if (state.mockCell && !hasLocalCellsWithin50m(lat, lng) && !isDragging) {
+                    fetchCellFromOpenCellIdSync(lat, lng)
+                }
+                evaluateMockCapabilitiesSuspend(lat, lng)
+                val updatedState = _uiState.value
+                locationRepository.updateConfig(
+                    lat = lat,
+                    lng = lng,
+                    simMode = "STILL",
+                    simBearing = 0f,
+                    startTime = SpooferProvider.startTimestamp,
+                    routePoints = emptyList(),
+                    isRouteMode = false,
+                    appCoordinateSystems = updatedState.appCoordinateSystems,
+                    wifiJson = updatedState.collectedWifiJson,
+                    cellJson = updatedState.collectedCellJson,
+                    bluetoothJson = updatedState.collectedBluetoothJson,
+                    mockWifi = updatedState.mockWifi && updatedState.canMockWifi,
+                    mockCell = updatedState.mockCell,
+                    mockBluetooth = updatedState.mockBluetooth && updatedState.canMockBluetooth,
+                    enableJitter = updatedState.enableJitter
+                )
+            }
+        }
     }
 
     /** 清除地图选点状态 */
@@ -2573,105 +2619,105 @@ class MainViewModel(
         settingsRepository.setIgnoredVersion(version)
     }
 
-    fun handleSpoofingIntent(intent: com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent) {
+    fun handleSpoofingIntent(intent: SpoofingIntent) {
         when (intent) {
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetApiKeyWarningVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetApiKeyWarningVisible -> _spoofingUiState.update {
                 it.copy(
                     showApiKeyWarningDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSaveDialogVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetSaveDialogVisible -> _spoofingUiState.update {
                 it.copy(
                     showSaveDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSavedLocationsVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetSavedLocationsVisible -> _spoofingUiState.update {
                 it.copy(
                     showSavedLocationsDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetUpdateDialogVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetUpdateDialogVisible -> _spoofingUiState.update {
                 it.copy(
                     showUpdateDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetMapTypeDialogVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetMapTypeDialogVisible -> _spoofingUiState.update {
                 it.copy(
                     showMapTypeDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetCustomCoordDialogVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetCustomCoordDialogVisible -> _spoofingUiState.update {
                 it.copy(
                     showCustomCoordDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetStartSpoofingDialogVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetStartSpoofingDialogVisible -> _spoofingUiState.update {
                 it.copy(
                     showStartSpoofingDialog = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetAppCoordinateScreenVisible -> _spoofingUiState.update {
+            is SpoofingIntent.SetAppCoordinateScreenVisible -> _spoofingUiState.update {
                 it.copy(
                     showAppCoordinateScreen = intent.visible
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSheetState -> _spoofingUiState.update {
+            is SpoofingIntent.SetSheetState -> _spoofingUiState.update {
                 it.copy(
                     sheetState = intent.sheetValue
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetScrollOffset -> _spoofingUiState.update {
+            is SpoofingIntent.SetScrollOffset -> _spoofingUiState.update {
                 it.copy(
                     scrollOffset = intent.scrollValue
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSheetExpanded -> _spoofingUiState.update {
+            is SpoofingIntent.SetSheetExpanded -> _spoofingUiState.update {
                 it.copy(
                     isSheetExpanded = intent.expanded
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSearchActive -> _spoofingUiState.update {
+            is SpoofingIntent.SetSearchActive -> _spoofingUiState.update {
                 it.copy(
                     isSearchActive = intent.active
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.UpdateSearchQuery -> _spoofingUiState.update {
+            is SpoofingIntent.UpdateSearchQuery -> _spoofingUiState.update {
                 it.copy(
                     searchQuery = intent.query
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.PerformSearch -> {
+            is SpoofingIntent.PerformSearch -> {
                 // Implement search logic later via another intent or directly here if preferred
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.ClearSearchResults -> _spoofingUiState.update {
+            is SpoofingIntent.ClearSearchResults -> _spoofingUiState.update {
                 it.copy(
                     searchResults = emptyList(),
                     showSearchResults = false
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetSearchResults -> _spoofingUiState.update {
+            is SpoofingIntent.SetSearchResults -> _spoofingUiState.update {
                 it.copy(
                     searchResults = intent.results,
                     showSearchResults = intent.show
                 )
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.SetMapFullscreen -> {
+            is SpoofingIntent.SetMapFullscreen -> {
                 settingsRepository.spoofingScreenMapFullscreen = intent.isFullScreen
                 _spoofingUiState.update {
                     it.copy(
@@ -2680,12 +2726,27 @@ class MainViewModel(
                 }
             }
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.ConfirmMapPoint -> confirmMapPoint(
+            is SpoofingIntent.ConfirmMapPoint -> confirmMapPoint(
                 intent.lat,
                 intent.lng
             )
 
-            is com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent.RequestCurrentLocation -> {} // Typically requires Context, will pass to a callback instead
+            is SpoofingIntent.MapPointMoved -> {
+                val now = System.currentTimeMillis()
+                if (now - lastMapMoveTime > 500) {
+                    lastMapMoveTime = now
+                    confirmMapPoint(intent.lat, intent.lng, isDragging = true)
+                } else {
+                    mapMoveJob?.cancel()
+                    mapMoveJob = viewModelScope.launch {
+                        kotlinx.coroutines.delay(500 - (now - lastMapMoveTime))
+                        lastMapMoveTime = System.currentTimeMillis()
+                        confirmMapPoint(intent.lat, intent.lng, isDragging = true)
+                    }
+                }
+            }
+
+            is SpoofingIntent.RequestCurrentLocation -> {} // Typically requires Context, will pass to a callback instead
         }
     }
 }

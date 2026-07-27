@@ -327,11 +327,15 @@ fun SpoofingScreen(
                 val initLng = uiState.longitudeInput.toDoubleOrNull() ?: 116.4074
                 map.moveCamera(initLat, initLng, 15f)
 
-                map.setOnCameraChangeListener { lat, lng ->
-                    fromMapGesture = true
-                    onIntent(SpoofingIntent.ConfirmMapPoint(lat, lng))
-                }
-            }
+                        map.setOnCameraChangeListener { lat, lng ->
+                            fromMapGesture = true
+                            onIntent(SpoofingIntent.ConfirmMapPoint(lat, lng))
+                        }
+                        map.setOnCameraMoveListener { lat, lng ->
+                            fromMapGesture = true
+                            onIntent(SpoofingIntent.MapPointMoved(lat, lng))
+                        }
+                    }
 
             // 十字准星
             Icon(
