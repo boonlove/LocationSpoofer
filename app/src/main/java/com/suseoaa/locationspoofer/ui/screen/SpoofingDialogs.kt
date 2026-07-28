@@ -248,8 +248,11 @@ fun UpdateDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                if (release.downloadUrl != null) {
-                                    if (uiState.activeDownloadId != null && uiState.activeDownloadUrl == release.downloadUrl) {
+                                if (release.downloadUrl != null || release.downloadUrl32Bit != null) {
+                                    val isDownloadingThis = uiState.activeDownloadId != null &&
+                                        (uiState.activeDownloadUrl == release.downloadUrl || uiState.activeDownloadUrl == release.downloadUrl32Bit)
+
+                                    if (isDownloadingThis) {
                                         if (uiState.downloadStatus == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                                             Button(
                                                 onClick = onInstall,
@@ -273,7 +276,7 @@ fun UpdateDialog(
                                                     )
                                                     Spacer(Modifier.height(4.dp))
                                                     LinearProgressIndicator(
-                                                        progress = uiState.downloadProgress / 100f,
+                                                        progress = { uiState.downloadProgress / 100f },
                                                         modifier = Modifier.fillMaxWidth(),
                                                         color = AccentBlue
                                                     )
@@ -292,42 +295,96 @@ fun UpdateDialog(
                                             }
                                         }
                                     } else if (uiState.activeDownloadId == null) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Button(
-                                                onClick = {
-                                                    onDownload(
-                                                        release.downloadUrl,
-                                                        release.versionName
-                                                    )
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                                            ) {
-                                                Text(stringResource(R.string.download))
+                                        Column {
+                                            if (release.downloadUrl != null) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Button(
+                                                        onClick = {
+                                                            onDownload(
+                                                                release.downloadUrl,
+                                                                release.versionName
+                                                            )
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                                    ) {
+                                                        Text(
+                                                            if (release.downloadUrl32Bit != null)
+                                                                stringResource(R.string.download) + " (64位/默认)"
+                                                            else
+                                                                stringResource(R.string.download)
+                                                        )
+                                                    }
+                                                    TextButton(
+                                                        onClick = {
+                                                            val intent = android.content.Intent(
+                                                                android.content.Intent.ACTION_VIEW,
+                                                                android.net.Uri.parse(release.downloadUrl)
+                                                            ).apply {
+                                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                            }
+                                                            try {
+                                                                context.startActivity(intent)
+                                                            } catch (_: android.content.ActivityNotFoundException) {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    context.getString(R.string.no_browser_available),
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+                                                        }
+                                                    ) {
+                                                        Text(
+                                                            if (release.downloadUrl32Bit != null)
+                                                                stringResource(R.string.download_via_browser) + " (64位)"
+                                                            else
+                                                                stringResource(R.string.download_via_browser)
+                                                        )
+                                                    }
+                                                }
                                             }
-                                            Button(
-                                                onClick = {
-                                                    val intent = android.content.Intent(
-                                                        android.content.Intent.ACTION_VIEW,
-                                                        android.net.Uri.parse(release.downloadUrl)
-                                                    ).apply {
-                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            if (release.downloadUrl32Bit != null) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Button(
+                                                        onClick = {
+                                                            onDownload(
+                                                                release.downloadUrl32Bit,
+                                                                release.versionName + "_32bit"
+                                                            )
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                                                    ) {
+                                                        Text("下载 (32位)")
                                                     }
-                                                    try {
-                                                        context.startActivity(intent)
-                                                    } catch (_: android.content.ActivityNotFoundException) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(R.string.no_browser_available),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
+                                                    TextButton(
+                                                        onClick = {
+                                                            val intent = android.content.Intent(
+                                                                android.content.Intent.ACTION_VIEW,
+                                                                android.net.Uri.parse(release.downloadUrl32Bit)
+                                                            ).apply {
+                                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                            }
+                                                            try {
+                                                                context.startActivity(intent)
+                                                            } catch (_: android.content.ActivityNotFoundException) {
+                                                                Toast.makeText(
+                                                                    context,
+                                                                    context.getString(R.string.no_browser_available),
+                                                                    Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+                                                        }
+                                                    ) {
+                                                        Text(
+                                                            stringResource(R.string.download_via_browser) + " (32位)"
+                                                        )
                                                     }
-                                                },
-                                                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
-                                            ) {
-                                                Text(stringResource(R.string.download_via_browser))
+                                                }
                                             }
                                         }
                                     }
