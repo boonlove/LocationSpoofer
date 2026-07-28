@@ -1018,7 +1018,8 @@ class MainViewModel(
                         environmentDao.updateMetadata(
                             newestLocation.id,
                             "WiGLE 导入",
-                            "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})"
+                            "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})",
+                            null, null, null
                         )
                     }
                 }
@@ -1082,7 +1083,8 @@ class MainViewModel(
                         environmentDao.updateMetadata(
                             newestLocation.id,
                             "OpenCellID 导入",
-                            "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})"
+                            "经纬度: (${String.format("%.6f", lat)}, ${String.format("%.6f", lng)})",
+                            null, null, null
                         )
                     }
                 }
@@ -2168,9 +2170,23 @@ class MainViewModel(
         }
     }
 
-    fun updateManageDataMetadata(id: Long, placeName: String, remark: String) {
+    fun updateManageDataMetadata(
+        id: Long,
+        placeName: String,
+        remark: String,
+        selectedWifiBssid: String?,
+        selectedBluetoothAddress: String?,
+        selectedCellKey: String?
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            environmentDao.updateMetadata(id, placeName, remark)
+            environmentDao.updateMetadata(
+                id,
+                placeName,
+                remark,
+                selectedWifiBssid,
+                selectedBluetoothAddress,
+                selectedCellKey
+            )
             refreshManageDataInternal()
         }
     }
@@ -2491,11 +2507,26 @@ class MainViewModel(
             1.0 / (safeDist * safeDist)
         }
 
-        // 1. 使用最近记录的 connectedWi-Fi 重构已连接的 Wi-Fi
         val closestRecord = records.firstOrNull()
-        val hasConnected = closestRecord?.connectedWifi != null
-        val connectedObj = if (hasConnected) {
-            val cw = closestRecord!!.connectedWifi!!
+        val explicitWifiBssid = closestRecord?.location?.selectedWifiBssid
+        val explicitWifi = if (explicitWifiBssid != null) closestRecord.wifis.find { it.device.bssid == explicitWifiBssid } else null
+
+        val connectedObj = if (explicitWifi != null) {
+            org.json.JSONObject().apply {
+                put("ssid", explicitWifi.device.ssid)
+                put("bssid", explicitWifi.device.bssid)
+                put("vendor", explicitWifi.device.vendor)
+                put("macAddress", explicitWifi.device.bssid)
+                put("frequency", explicitWifi.device.frequency)
+                put("channel", com.suseoaa.locationspoofer.utils.MacVendorHelper.frequencyToChannel(explicitWifi.device.frequency))
+                put("linkSpeed", 65)
+                put("level", explicitWifi.locationWifi.level)
+                put("capabilities", explicitWifi.device.capabilities)
+                put("networkId", 1)
+                put("wifiStandard", 6)
+            }
+        } else if (closestRecord?.connectedWifi != null) {
+            val cw = closestRecord.connectedWifi!!
             org.json.JSONObject().apply {
                 put("ssid", cw.ssid)
                 put("bssid", cw.bssid)
@@ -2549,6 +2580,7 @@ class MainViewModel(
             nearbyArr.put(obj)
         }
 
+        val hasConnected = connectedObj != null
         val wifiResultObj = org.json.JSONObject().apply {
             put("isConnected", hasConnected)
             put("connectedWifi", connectedObj ?: org.json.JSONObject.NULL)
@@ -2570,6 +2602,7 @@ class MainViewModel(
             }
         }
 
+        val explicitCellKey = closestRecord?.location?.selectedCellKey
         val cellArr = org.json.JSONArray()
         cellMap.forEach { (cellKey, rc) ->
             val w = cellWeights[cellKey]!!
@@ -2589,7 +2622,8 @@ class MainViewModel(
             obj.put("systemId", rc.device.systemId)
             obj.put("basestationId", rc.device.basestationId)
             obj.put("dbm", interpolatedDbm)
-            obj.put("isRegistered", rc.locationCell.isRegistered)
+            val isReg = if (explicitCellKey != null) cellKey == explicitCellKey else rc.locationCell.isRegistered
+            obj.put("isRegistered", isReg)
             cellArr.put(obj)
         }
 
@@ -2608,6 +2642,7 @@ class MainViewModel(
             }
         }
 
+        val explicitBtAddress = closestRecord?.location?.selectedBluetoothAddress
         val btArr = org.json.JSONArray()
         btMap.forEach { (address, rb) ->
             val w = btWeights[address]!!
@@ -2617,6 +2652,9 @@ class MainViewModel(
             obj.put("name", rb.device.name)
             obj.put("scanRecordHex", rb.device.scanRecordHex)
             obj.put("rssi", interpolatedRssi)
+            if (explicitBtAddress != null && explicitBtAddress == address) {
+                obj.put("isConnected", true)
+            }
             btArr.put(obj)
         }
 

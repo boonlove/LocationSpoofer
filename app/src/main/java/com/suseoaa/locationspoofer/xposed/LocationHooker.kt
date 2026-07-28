@@ -3742,7 +3742,24 @@ class LocationHooker : XposedModule() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         val config = readConfig() ?: return
                         if (!config.optBoolean("active", false)) return
-                        param.result = java.util.HashSet<Any>()
+                        val bondedSet = java.util.HashSet<Any>()
+                        try {
+                            val bluetoothArray = config.optJSONArray("bluetooth_json")
+                            if (bluetoothArray != null && bluetoothArray.length() > 0) {
+                                val bluetoothDeviceClass = XposedHelpers.findClass("android.bluetooth.BluetoothDevice", classLoader)
+                                for (i in 0 until bluetoothArray.length()) {
+                                    val obj = bluetoothArray.getJSONObject(i)
+                                    if (obj.optBoolean("isConnected", false)) {
+                                        val address = obj.optString("address", "00:00:00:00:00:00")
+                                        val device = XposedHelpers.newInstance(bluetoothDeviceClass, address)
+                                        bondedSet.add(device)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        param.result = bondedSet
                     }
                 }
             )
