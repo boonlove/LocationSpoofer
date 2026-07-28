@@ -98,7 +98,10 @@ class SpoofingService : Service() {
                 val currentLoc = computeCurrentLocation()
                 pushLocation(LocationManager.GPS_PROVIDER, currentLoc)
                 pushLocation(LocationManager.NETWORK_PROVIDER, currentLoc)
-                delay(1000)
+                
+                // 在路线模拟模式下使用更高的刷新率以实现平滑移动
+                val updateInterval = if (SpooferProvider.isRouteMode) 100L else 500L
+                delay(updateInterval)
             }
         }
     }
