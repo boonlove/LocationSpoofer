@@ -1137,6 +1137,8 @@ class LocationHooker : XposedModule() {
                 // AMap SDK 专属 Hook（含抖动，与原生Location保持同步）
                 val amapHook = object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
+                        // 宿主 App 使用 AMapLocationClient 获取真实位置，不拦截
+                        if (currentPkg.substringBefore(":") == BuildConfig.APPLICATION_ID) return
                         val config = readConfig()
                         if (config != null && config.optBoolean("active", false)) {
                             val baseLat = config.optDouble("lat", 0.0)
