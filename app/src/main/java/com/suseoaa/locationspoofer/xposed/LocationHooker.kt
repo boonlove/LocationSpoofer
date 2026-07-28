@@ -705,6 +705,8 @@ class LocationHooker : XposedModule() {
             // 这正是之前微信和学习通出现定位偏移的根本原因。
             val getLatHook = object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
+                    // 宿主 App 需要从真实 Location 读取坐标（如"定位到当前位置"），不拦截
+                    if (currentPkg.substringBefore(":") == BuildConfig.APPLICATION_ID) return
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
@@ -733,6 +735,7 @@ class LocationHooker : XposedModule() {
 
             val getLngHook = object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
+                    if (currentPkg.substringBefore(":") == BuildConfig.APPLICATION_ID) return
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
                         val appSystems = config.optJSONObject("app_coordinate_systems")
@@ -760,6 +763,7 @@ class LocationHooker : XposedModule() {
 
             val getAccHook = object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
+                    if (currentPkg.substringBefore(":") == BuildConfig.APPLICATION_ID) return
                     val config = readConfig()
                     if (config != null && config.optBoolean("active", false)) {
                         param.result = getJitteredAccuracy()
@@ -1062,6 +1066,60 @@ class LocationHooker : XposedModule() {
                 )
             } catch (e: Throwable) {
                 XposedBridge.log("[LocationSpoofer] Failed to hook requestLocationUpdates: $e")
+            }
+
+            // getLastKnownLocation: immediately return spoofed location, fixing "needs multiple attempts"
+            try {
+                val locationManagerClazz2 =
+                    XposedHelpers.findClass("android.location.LocationManager", classLoader)
+                XposedBridge.hookAllMethods(
+                    locationManagerClazz2,
+                    "getLastKnownLocation",
+                    object : XC_MethodHook() {
+                        override fun afterHookedMethod(param: MethodHookParam) {
+                            // 宿主 App 自身需要获取真实位置（"定位到当前位置"功能）
+                            // 不拦截宿主 App 的 getLastKnownLocation，只拦截目标 App 的
+                            val hostPkg = currentPkg.substringBefore(":")
+                            if (hostPkg == BuildConfig.APPLICATION_ID) return
+
+                            val config = readConfig()
+                            if (config == null || !config.optBoolean("active", false)) return
+                            val appSystems = config.optJSONObject("app_coordinate_systems")
+                            val basePkg = currentPkg.substringBefore(":")
+                            val targetSys = if (appSystems?.has(basePkg) == true)
+                                appSystems.optString(basePkg, "GCJ-02") else "GCJ-02"
+                            val lat = when (targetSys) {
+                                "WGS-84" -> config.optDouble("wgs84_lat", 0.0)
+                                "BD-09"  -> config.optDouble("bd09_lat", 0.0)
+                                else     -> config.optDouble("lat", 0.0)
+                            }
+                            val lng = when (targetSys) {
+                                "WGS-84" -> config.optDouble("wgs84_lng", 0.0)
+                                "BD-09"  -> config.optDouble("bd09_lng", 0.0)
+                                else     -> config.optDouble("lng", 0.0)
+                            }
+                            if (lat == 0.0 && lng == 0.0) return
+                            try {
+                                val locClass = Class.forName("android.location.Location", false, classLoader)
+                                val fakeLoc = locClass.getConstructor(String::class.java)
+                                    .newInstance(android.location.LocationManager.GPS_PROVIDER)
+                                XposedHelpers.callMethod(fakeLoc, "setLatitude", lat)
+                                XposedHelpers.callMethod(fakeLoc, "setLongitude", lng)
+                                XposedHelpers.callMethod(fakeLoc, "setAccuracy", 20.0f)
+                                XposedHelpers.callMethod(fakeLoc, "setTime", System.currentTimeMillis())
+                                XposedHelpers.callMethod(fakeLoc, "setElapsedRealtimeNanos",
+                                    android.os.SystemClock.elapsedRealtimeNanos())
+                                try { XposedHelpers.callMethod(fakeLoc, "setIsFromMockProvider", false) } catch (_: Throwable) {}
+                                param.result = fakeLoc
+                            } catch (e2: Throwable) {
+                                XposedBridge.log("[LocationSpoofer] getLastKnownLocation build error: $e2")
+                            }
+                        }
+                    }
+
+                )
+            } catch (e: Throwable) {
+                XposedBridge.log("[LocationSpoofer] Failed to hook getLastKnownLocation: $e")
             }
 
             // ── 高德SDK专属Hook(含抖动,与原生Location保持同步) ──
@@ -5254,25 +5312,22 @@ class LocationHooker : XposedModule() {
 
     private fun normalizeConfig(config: JSONObject): JSONObject {
         if (!config.has("wifi_json")) config.put("wifi_json", org.json.JSONArray())
-        // The UI (Baidu Map) saves coordinates in BD-09.
-        val bd09Lat = config.optDouble("lat", 0.0)
-        val bd09Lng = config.optDouble("lng", 0.0)
-        
-        config.put("bd09_lat", bd09Lat)
-        config.put("bd09_lng", bd09Lng)
-        
-        val gcj02 = bd09ToGcj02(bd09Lat, bd09Lng)
-        val gcj02Lat = gcj02.first
-        val gcj02Lng = gcj02.second
-        
-        // Overwrite lat and lng in config to GCJ-02 so that later logic uses GCJ-02 as base
-        config.put("lat", gcj02Lat)
-        config.put("lng", gcj02Lng)
+        // UI 使用高德地图(AMapSDK)，cameraPosition.target 返回的是 GCJ-02 坐标系。
+        // 因此 config["lat"/"lng"] 已经是 GCJ-02，不需要再做 BD-09 → GCJ-02 转换。
+        val gcj02Lat = config.optDouble("lat", 0.0)
+        val gcj02Lng = config.optDouble("lng", 0.0)
 
+        // 派生出 BD-09（百度定位 SDK 需要）
+        val bd09 = gcj02ToBd09(gcj02Lat, gcj02Lng)
+        config.put("bd09_lat", bd09.first)
+        config.put("bd09_lng", bd09.second)
+
+        // 派生出 WGS-84（标准 Android Location 对象的理论坐标系）
         val wgs84 = gcj02ToWgs84(gcj02Lat, gcj02Lng)
         config.put("wgs84_lat", wgs84.first)
         config.put("wgs84_lng", wgs84.second)
-        
+
+        // lat/lng 保持 GCJ-02 不变，作为默认坐标（高德、腾讯等直接使用）
         return config
     }
 
@@ -5356,33 +5411,49 @@ class LocationHooker : XposedModule() {
                                 val tCount = capturedTencentListeners.size
                                 android.util.Log.e("LocationSpoofer", "[POLLER] pkg=$currentPackageName lat=$currentLat lng=$currentLng native=$nCount amap=$aCount baidu=$bCount tencent=$tCount")
 
-                                val wgs84Lat = newConfig.optDouble("wgs84_lat", currentLat)
-                                val wgs84Lng = newConfig.optDouble("wgs84_lng", currentLng)
                                 val timeNow = System.currentTimeMillis()
                                 val elapsedNanos = android.os.SystemClock.elapsedRealtimeNanos()
 
-                                // 1. Android Native LocationListener (直接从后台线程调用，无需 Handler)
+                                // 1. Android Native LocationListener
+                                // 坐标系修复：推送坐标必须与 getLatitude() hook 返回值一致。
+                                // getLatitude() hook 默认返回 GCJ-02（config["lat"]）。
+                                // 同时尊重每个 App 的坐标系配置（app_coordinate_systems）。
                                 if (nCount > 0 && cl != null) {
+                                    val appSystems = newConfig.optJSONObject("app_coordinate_systems")
+                                    val basePkg = currentPackageName.substringBefore(":")
+                                    val targetSys = if (appSystems?.has(basePkg) == true)
+                                        appSystems.optString(basePkg, "GCJ-02") else "GCJ-02"
+                                    val pushLat = when (targetSys) {
+                                        "WGS-84" -> newConfig.optDouble("wgs84_lat", currentLat)
+                                        "BD-09"  -> newConfig.optDouble("bd09_lat", currentLat)
+                                        else     -> currentLat  // GCJ-02（默认，与 hook 一致）
+                                    }
+                                    val pushLng = when (targetSys) {
+                                        "WGS-84" -> newConfig.optDouble("wgs84_lng", currentLng)
+                                        "BD-09"  -> newConfig.optDouble("bd09_lng", currentLng)
+                                        else     -> currentLng
+                                    }
                                     val listenersToNotify = capturedLocationListeners.toList()
                                     for (listener in listenersToNotify) {
                                         try {
                                             val listenerCl = listener.javaClass.classLoader ?: cl
                                             val locationClass = Class.forName("android.location.Location", false, listenerCl)
                                             val mockLoc = locationClass.getConstructor(String::class.java).newInstance(android.location.LocationManager.GPS_PROVIDER)
-                                            XposedHelpers.callMethod(mockLoc, "setLatitude", wgs84Lat)
-                                            XposedHelpers.callMethod(mockLoc, "setLongitude", wgs84Lng)
+                                            XposedHelpers.callMethod(mockLoc, "setLatitude", pushLat)
+                                            XposedHelpers.callMethod(mockLoc, "setLongitude", pushLng)
                                             XposedHelpers.callMethod(mockLoc, "setAccuracy", 20.0f)
                                             XposedHelpers.callMethod(mockLoc, "setSpeed", 0.0f)
                                             XposedHelpers.callMethod(mockLoc, "setTime", timeNow)
                                             XposedHelpers.callMethod(mockLoc, "setElapsedRealtimeNanos", elapsedNanos)
                                             try { XposedHelpers.callMethod(mockLoc, "setIsFromMockProvider", false) } catch (e: Throwable) {}
                                             XposedHelpers.callMethod(listener, "onLocationChanged", mockLoc)
-                                            android.util.Log.e("LocationSpoofer", "[PUSH] Native listener pushed OK: ${listener.javaClass.name}")
+                                            android.util.Log.e("LocationSpoofer", "[PUSH] Native($targetSys lat=$pushLat lng=$pushLng): ${listener.javaClass.name}")
                                         } catch (e: Throwable) {
                                             android.util.Log.e("LocationSpoofer", "[PUSH-ERR] Native listener error: $e")
                                         }
                                     }
                                 }
+
 
                                 // 2. AMapLocationListener
                                 if (aCount > 0 && cl != null) {
