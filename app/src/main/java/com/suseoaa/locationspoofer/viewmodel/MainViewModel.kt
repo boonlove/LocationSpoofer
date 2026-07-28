@@ -2085,6 +2085,7 @@ class MainViewModel(
 
         if (!currentState) {
             // Start scanning
+            _uiState.update { it.copy(scannedWifiCount = 0, scannedCellCount = 0, scannedBluetoothCount = 0) }
             continuousScanJob = viewModelScope.launch(Dispatchers.IO) {
                 while (isActive) {
                     val realLoc = fetchRealLocationSilent(context)
@@ -2096,10 +2097,19 @@ class MainViewModel(
                         val cellJson = environmentScanner.scanCell()
                         val bluetoothJson = environmentScanner.scanBluetooth()
 
+                        val wCount = try { org.json.JSONArray(wifiJson).length() } catch (e: Exception) { 0 }
+                        val cCount = try { org.json.JSONArray(cellJson).length() } catch (e: Exception) { 0 }
+                        val bCount = try { org.json.JSONArray(bluetoothJson).length() } catch (e: Exception) { 0 }
+
                         saveEnvironmentData(lat, lng, wifiJson, cellJson, bluetoothJson)
 
                         val count = environmentDao.getRecordCount()
-                        _uiState.update { it.copy(environmentRecordCount = count) }
+                        _uiState.update { it.copy(
+                            environmentRecordCount = count,
+                            scannedWifiCount = it.scannedWifiCount + wCount,
+                            scannedCellCount = it.scannedCellCount + cCount,
+                            scannedBluetoothCount = it.scannedBluetoothCount + bCount
+                        ) }
                     }
 
                     // 扫描之间延迟 10 秒
