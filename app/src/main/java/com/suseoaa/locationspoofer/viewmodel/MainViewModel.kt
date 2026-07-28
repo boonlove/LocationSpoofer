@@ -324,9 +324,15 @@ class MainViewModel(
             if (cluster.hasCell) tags.add("基站")
 
             val tagStr = if (tags.isNotEmpty()) " [${tags.joinToString(", ")}]" else ""
+            
+            val baseTitle = when {
+                cluster.center.remark.isNotEmpty() -> cluster.center.remark
+                cluster.center.placeName.isNotEmpty() -> cluster.center.placeName
+                else -> "本地采集热点"
+            }
 
             com.suseoaa.locationspoofer.ui.screen.AppPoiItem(
-                title = "本地采集热点$tagStr",
+                title = "$baseTitle$tagStr",
                 snippet = "包含 ${cluster.count} 条记录 (${
                     String.format(
                         "%.4f",
