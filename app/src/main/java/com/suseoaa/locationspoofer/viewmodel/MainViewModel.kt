@@ -114,6 +114,7 @@ class MainViewModel(
 
     private fun initialize() {
         viewModelScope.launch(Dispatchers.IO) {
+            mergeLegacyRecords()
             val root = locationRepository.checkRootAccess()
 
             if (settingsRepository.isSpoofingActive) {
@@ -186,6 +187,47 @@ class MainViewModel(
                     }
                 }
                 _uiState.update { it.copy(savedRoutes = routes) }
+            }
+        }
+    }
+
+    private suspend fun mergeLegacyRecords() {
+        val allComplete = environmentDao.getAllCompleteLocations()
+        if (allComplete.isEmpty()) return
+        
+        // Group by approx coordinate (round to 4 decimals, about 11m)
+        val grouped = allComplete.groupBy { 
+            Pair(
+                String.format(java.util.Locale.US, "%.4f", it.location.lat),
+                String.format(java.util.Locale.US, "%.4f", it.location.lng)
+            )
+        }.filter { it.value.size > 1 }
+        
+        for ((_, group) in grouped) {
+            // Choose the one with the latest timestamp as primary
+            val primary = group.maxByOrNull { it.location.timestamp } ?: continue
+            val others = group.filter { it.location.id != primary.location.id }
+            
+            for (other in others) {
+                // Move connected wifi
+                other.connectedWifi?.let {
+                    environmentDao.insertConnectedWifi(it.copy(locationId = primary.location.id))
+                }
+                // Move wifis
+                other.wifis.forEach { lw ->
+                    environmentDao.insertLocationWifi(lw.locationWifi.copy(locationId = primary.location.id))
+                }
+                // Move bluetooths
+                other.bluetooths.forEach { lb ->
+                    environmentDao.insertLocationBluetooth(lb.locationBluetooth.copy(locationId = primary.location.id))
+                }
+                // Move cells
+                other.cells.forEach { lc ->
+                    environmentDao.insertLocationCell(lc.locationCell.copy(locationId = primary.location.id))
+                }
+                
+                // Delete the old separate record
+                environmentDao.deleteLocation(other.location.id)
             }
         }
     }
@@ -2252,12 +2294,19 @@ class MainViewModel(
         cellJson: String,
         bluetoothJson: String
     ) {
-        val locId = environmentDao.insertLocation(
-            com.suseoaa.locationspoofer.data.db.LocationRecord(
-                lat = lat,
-                lng = lng
+        val existingLocation = environmentDao.findLocationByCoordinates(lat, lng)
+        val locId = if (existingLocation != null) {
+            val updated = existingLocation.copy(timestamp = System.currentTimeMillis())
+            environmentDao.insertLocation(updated)
+            updated.id
+        } else {
+            environmentDao.insertLocation(
+                com.suseoaa.locationspoofer.data.db.LocationRecord(
+                    lat = lat,
+                    lng = lng
+                )
             )
-        )
+        }
 
         try {
             val wifiObj = org.json.JSONObject(wifiJson)
