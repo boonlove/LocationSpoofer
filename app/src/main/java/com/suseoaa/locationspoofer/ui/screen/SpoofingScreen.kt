@@ -148,34 +148,17 @@ fun SpoofingScreen(
         onIntent(SpoofingIntent.ClearSearchResults(false))
     }
 
-    LaunchedEffect(Unit) {
-        if (ContextCompat.checkSelfPermission(
-                context, Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            viewModel.fetchCurrentLocation(context)
-        }
-        viewModel.loadManageData()
-    }
-
     var smallMapRef by remember { mutableStateOf<AppMapController?>(null) }
     val lat = uiState.latitudeInput.toDoubleOrNull()
     val lng = uiState.longitudeInput.toDoubleOrNull()
-    // 标记坐标更新是否来自地图手势(拖拽/滑动)，若是则不触发 animateCamera 避免打断惯性动画
-    var fromMapGesture by remember { mutableStateOf(false) }
 
-    LaunchedEffect(lat, lng, smallMapRef) {
-        if (lat != null && lng != null) {
-            if (fromMapGesture) {
-                fromMapGesture = false // 手势引发的坐标更新，不做 animateCamera 以免打断惯性
-            } else {
-                smallMapRef?.animateCamera(lat, lng)
-            }
-        }
-    }
-
+    // 同步地图类型，地图引擎为高德地图时，需要额外并延迟设置一次地图中心点，否则地图中心点会定位在北京
     LaunchedEffect(smallMapRef, uiState.mapType) {
         smallMapRef?.setMapType(uiState.mapType)
+        if (activeEngine == MapEngine.AMAP && lat != null && lng != null) {
+            kotlinx.coroutines.delay(200)
+            smallMapRef?.moveCamera(lat, lng)
+        }
     }
 
     LaunchedEffect(smallMapRef, uiState.manageDataList) {
@@ -183,6 +166,18 @@ fun SpoofingScreen(
         map.clear()
         val locations = uiState.manageDataList.map { it.location }
         com.suseoaa.locationspoofer.utils.MapCoverageHelper.drawCoverage(map, locations)
+    }
+
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.fetchCurrentLocation(context) {lat, lng ->
+                smallMapRef?.moveCamera(lat, lng)
+            }
+        }
+        viewModel.loadManageData()
     }
 
     // Bottom Sheet
@@ -328,11 +323,9 @@ fun SpoofingScreen(
                 map.moveCamera(initLat, initLng, 15f)
 
                         map.setOnCameraChangeListener { lat, lng ->
-                            fromMapGesture = true
                             onIntent(SpoofingIntent.ConfirmMapPoint(lat, lng))
                         }
                         map.setOnCameraMoveListener { lat, lng ->
-                            fromMapGesture = true
                             onIntent(SpoofingIntent.MapPointMoved(lat, lng))
                         }
                     }
@@ -409,7 +402,11 @@ fun SpoofingScreen(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
-                            .clickable { viewModel.fetchCurrentLocation(context) { _, _ -> } },
+                            .clickable {
+                                viewModel.fetchCurrentLocation(context) { lat, lng ->
+                                    smallMapRef?.animateCamera(lat, lng)
+                                }
+                                       },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -500,6 +497,7 @@ fun SpoofingScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
+                                            /**
                                             viewModel.updateLatitude(
                                                 String.format(
                                                     "%.6f",
@@ -512,10 +510,17 @@ fun SpoofingScreen(
                                                     poi.lng
                                                 )
                                             )
+                                            */
                                             smallMapRef?.animateCamera(
                                                 poi.lat,
                                                 poi.lng,
                                                 16f
+                                            )
+                                            onIntent(
+                                                SpoofingIntent.ConfirmMapPoint(
+                                                    poi.lat,
+                                                    poi.lng
+                                                )
                                             )
                                             onIntent(
                                                 SpoofingIntent.ClearSearchResults(
@@ -709,7 +714,11 @@ fun SpoofingScreen(
                 Spacer(Modifier.height(8.dp))
                 SavedLocationsCard(
                     savedLocations = uiState.savedLocations,
-                    onSelect = { loc -> viewModel.loadSavedLocation(loc) },
+                    onSelect = { loc ->
+                        // viewModel.loadSavedLocation(loc)
+                        smallMapRef?.animateCamera(loc.lat, loc.lng)
+                        onIntent(SpoofingIntent.ConfirmMapPoint(loc.lat, loc.lng))
+                               },
                     onDelete = { loc -> viewModel.removeSavedLocation(loc) }
                 )
                 Spacer(Modifier.height(16.dp))
@@ -785,7 +794,9 @@ fun SpoofingScreen(
             savedLocations = uiState.savedLocations,
             onDismiss = { onIntent(SpoofingIntent.SetSavedLocationsVisible(false)) },
             onSelect = { loc ->
-                viewModel.loadSavedLocation(loc)
+                // viewModel.loadSavedLocation(loc)
+                smallMapRef?.animateCamera(loc.lat, loc.lng)
+                onIntent(SpoofingIntent.ConfirmMapPoint(loc.lat, loc.lng))
                 onIntent(SpoofingIntent.SetSavedLocationsVisible(false))
             },
             onDelete = { loc -> viewModel.removeSavedLocation(loc) }
@@ -831,8 +842,16 @@ fun SpoofingScreen(
             isDark = isDark,
             onDismiss = { onIntent(SpoofingIntent.SetCustomCoordDialogVisible(false)) },
             onConfirm = { lat, lng ->
+                /**
                 viewModel.updateLatitude(lat)
                 viewModel.updateLongitude(lng)
+                */
+                val Lat = lat.toDoubleOrNull()
+                val Lng = lng.toDoubleOrNull()
+                if (Lat != null && Lng != null) {
+                    smallMapRef?.animateCamera(Lat, Lng)
+                    onIntent(SpoofingIntent.ConfirmMapPoint(Lat, Lng))
+                }
                 onIntent(SpoofingIntent.SetCustomCoordDialogVisible(false))
             }
         )

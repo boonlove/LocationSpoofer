@@ -150,9 +150,11 @@ class MainViewModel(
                     appSha1 = getAppSignatureSHA1()
                 )
             }
+            /**
             if (!settingsRepository.isSpoofingActive) {
                 fetchCurrentLocation(context)
             }
+            */
             refreshRecordCount()
             loadManageData()
         }
@@ -383,6 +385,15 @@ class MainViewModel(
 
     fun fetchCurrentLocation(ctx: Context, forceCallback: ((Double, Double) -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.Main) {
+            if (settingsRepository.isSpoofingActive) {
+                // 模拟定位中
+                val lastLat = settingsRepository.lastSpoofedLat.toDoubleOrNull() ?: 0.0
+                val lastLng = settingsRepository.lastSpoofedLng.toDoubleOrNull() ?: 0.0
+                if (lastLat != 0.0 && lastLng != 0.0) {
+                    forceCallback?.invoke(lastLat, lastLng)
+                }
+                return@launch
+            }
             if (!isLocationEnabled(ctx)) {
                 // 定位服务不可用
                 if (forceCallback != null) {
@@ -593,6 +604,15 @@ class MainViewModel(
 
     private suspend fun fetchRealLocationSilent(ctx: Context): Pair<Double, Double>? =
         suspendCoroutine { cont ->
+            if (settingsRepository.isSpoofingActive) {
+                // 模拟定位中
+                val lastLat = settingsRepository.lastSpoofedLat.toDoubleOrNull() ?: 0.0
+                val lastLng = settingsRepository.lastSpoofedLng.toDoubleOrNull() ?: 0.0
+                if (lastLat != 0.0 && lastLng != 0.0) {
+                    cont.resume(Pair(lastLat, lastLng))
+                }
+                return@suspendCoroutine
+            }
             if (!isLocationEnabled(ctx)) {
                 // 定位服务不可用
                 cont.resume(null)

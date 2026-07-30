@@ -195,7 +195,7 @@ fun FullScreenMapPage(
     LaunchedEffect(mapRef, uiState.mapType) {
         mapRef?.setMapType(uiState.mapType)
         if (activeEngine == MapEngine.AMAP && lat != null && lng != null) {
-            kotlinx.coroutines.delay(100)
+            kotlinx.coroutines.delay(200)
             mapRef?.moveCamera(lat, lng, 18f)
         }
     }
@@ -203,7 +203,7 @@ fun FullScreenMapPage(
     // 地图引擎为高德地图时，需要额外并延迟设置一次地图中心点，否则地图中心点会定位在北京
     LaunchedEffect(Unit) {
         if (activeEngine == MapEngine.AMAP && lat != null && lng != null) {
-            kotlinx.coroutines.delay(100)
+            kotlinx.coroutines.delay(200)
             mapRef?.moveCamera(lat, lng, 18f)
         }
     }
