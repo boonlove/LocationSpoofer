@@ -22,7 +22,7 @@ class SettingsManager(context: Context) {
      * - 非 0 表示用户选定种子色（ARGB），由 MaterialKolor 派生全套 M3 调色板
      */
     var keyColor: Int
-        get() = prefs.getInt("key_color", com.suseoaa.locationspoofer.ui.theme.keyColorOptions[0])
+        get() = prefs.getInt("key_color", com.suseoaa.locationspoofer.ui.theme.defaultKeyColor)
         set(value) = prefs.edit().putInt("key_color", value).apply()
 
     // 自定义屏幕密度百分比（80~110，100=系统默认）。

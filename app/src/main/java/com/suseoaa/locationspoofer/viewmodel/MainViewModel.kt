@@ -76,7 +76,10 @@ class MainViewModel(
             } catch (e: Exception) {
                 com.suseoaa.locationspoofer.data.model.DarkMode.SYSTEM
             },
-            keyColor = settingsRepository.getKeyColor(),
+            keyColor = settingsRepository.getKeyColor().let { saved ->
+                if (saved != 0 && saved !in com.suseoaa.locationspoofer.ui.theme.keyColorOptions)
+                    com.suseoaa.locationspoofer.ui.theme.defaultKeyColor else saved
+            },
             screenDensity = settingsRepository.getScreenDensity(),
             savedLocations = settingsRepository.getSavedLocations(),
             savedRoutes = emptyList(), // 将由 Room Flow 填充

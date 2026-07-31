@@ -20,18 +20,20 @@ import com.materialkolor.rememberDynamicColorScheme
 import com.suseoaa.locationspoofer.data.model.DarkMode
 import com.suseoaa.locationspoofer.ui.extensions.isDark
 
+/** 默认种子色（Material 蓝） */
+val defaultKeyColor: Int = 0xFF2196F3.toInt()
+
 /**
  * 预设主题种子色调色板。
  * keyColor == 0 表示「跟随系统动态色」；非 0 即用户选定种子色。
  */
 val keyColorOptions: List<Int> = listOf(
-    0xFF388BFD.toInt(), // 默认蓝
     0xFFF44336.toInt(),
     0xFFE91E63.toInt(),
     0xFF9C27B0.toInt(),
     0xFF673AB7.toInt(),
     0xFF3F51B5.toInt(),
-    0xFF2196F3.toInt(),
+    defaultKeyColor,
     0xFF00BCD4.toInt(),
     0xFF009688.toInt(),
     0xFF4FAF50.toInt(),

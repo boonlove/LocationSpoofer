@@ -59,7 +59,7 @@ data class AppState(
     val mapType: AppMapType = AppMapType.NORMAL,
     val mapEngine: MapEngine = MapEngine.AUTO,
     val darkMode: DarkMode = DarkMode.SYSTEM,
-    val keyColor: Int = com.suseoaa.locationspoofer.ui.theme.keyColorOptions[0],
+    val keyColor: Int = com.suseoaa.locationspoofer.ui.theme.defaultKeyColor,
     /** 屏幕密度百分比（80~110，100=系统默认）*/
     val screenDensity: Int = 100,
     val isInitializing: Boolean = true,
