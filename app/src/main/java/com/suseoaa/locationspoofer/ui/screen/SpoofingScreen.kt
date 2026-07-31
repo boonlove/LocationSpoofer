@@ -769,6 +769,10 @@ fun SpoofingScreen(
             Spacer(Modifier.height(16.dp))
 
             FooterLinks(isDark)
+            Spacer(Modifier.height(8.dp))
+
+            AppInfoCard(isDark)
+            Spacer(Modifier.height(16.dp))
         }
     }
 

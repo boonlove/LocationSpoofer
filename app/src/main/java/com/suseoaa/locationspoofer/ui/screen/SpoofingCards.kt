@@ -2,6 +2,7 @@ package com.suseoaa.locationspoofer.ui.screen
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -694,8 +696,7 @@ fun ImportExportDataCard(isDark: Boolean, onImportClick: () -> Unit, onExportCli
 fun FooterLinks(isDark: Boolean) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 16.dp),
+            .fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -753,6 +754,27 @@ fun FooterLinks(isDark: Boolean) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun AppInfoCard(isDark: Boolean) {
+    // 软件信息：名称 版本名 (版本号) abi
+    val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+    val info = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) $abi"
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Text(
+            text = info,
+            color = AppColors.textSecondary(isDark),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+        )
     }
 }
 
