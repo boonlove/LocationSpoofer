@@ -9,7 +9,25 @@ import java.io.InputStreamReader
 class RootManager {
 
     suspend fun checkRootAccess(): Boolean = withContext(Dispatchers.IO) {
-        executeCommand("id").contains("uid=0(root)")
+        executeCommand("id").contains("uid=0(root)") || checkRootAccessInteractive()
+    }
+
+    // 备用方案：启动交互式 su shell，写入 stdin 并读取 stdout
+    private suspend fun checkRootAccessInteractive(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val process = ProcessBuilder("su")
+                .redirectErrorStream(true)
+                .start()
+            process.outputStream.bufferedWriter().use { writer ->
+                writer.write("id\nexit\n")
+                writer.flush()
+            }
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+            output.contains("uid=0(root)")
+        } catch (e: Exception) {
+            false
+        }
     }
 
     suspend fun grantMockLocation(): Boolean = withContext(Dispatchers.IO) {
