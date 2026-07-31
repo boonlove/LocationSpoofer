@@ -241,7 +241,7 @@ fun DraggableBottomSheet(
                 BottomSheetValue.COLLAPSED at (expandedHeightPx - collapsedHeightPx)
             }
         }
-        LaunchedEffect(anchors) {
+        LaunchedEffect(anchors, sheetState) {
             // 单参 updateAnchors 保持当前 offset，不 snap；COLLAPSED 锚点静默加入
             sheetState.updateAnchors(anchors)
             // 缓存锚点位置供 animateTo 使用

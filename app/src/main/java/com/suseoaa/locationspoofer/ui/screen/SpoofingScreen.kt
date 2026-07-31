@@ -253,9 +253,11 @@ fun SpoofingScreen(
     */
 
     val density = LocalDensity.current
-    // configuration.screenHeightDp 为系统原始 dp（不受界面缩放影响）：先用系统 density 转物理 px，
-    // 再用当前(缩放后) density 转回 dp —— 得到"缩放视觉 dp"，使 Modifier.height 渲染出正确物理高度
-    val screenHeightPx = configuration.screenHeightDp.dp.value * LocalContext.current.resources.displayMetrics.density
+    // 根容器 onGloballyPositioned 的实测高度是唯一可靠来源：小窗下 configuration 返回
+    // 全屏尺寸。首帧未布局时用 configuration 估计值兜底（必非 0），布局后由实测值覆盖。
+    var measuredScreenHeightPx by remember { mutableFloatStateOf(0f) }
+    val screenHeightPx = if (measuredScreenHeightPx > 0) measuredScreenHeightPx
+        else configuration.screenHeightDp.dp.value * LocalContext.current.resources.displayMetrics.density
     val screenHeightDp = with(density) { screenHeightPx.toDp() }
     val expandedFraction = 0.75f
     val halfFraction = 0.375f
@@ -290,6 +292,7 @@ fun SpoofingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .onGloballyPositioned { measuredScreenHeightPx = it.size.height.toFloat() }
     ) {
         // 地图（可跟随底部Sheet自适应）、搜索栏及搜索结果、浮动按钮
         Box(
