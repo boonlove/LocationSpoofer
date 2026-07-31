@@ -69,7 +69,8 @@ class UpdateViewModel(private val context: Context) : ViewModel() {
                             val assetName = asset.optString("name", "")
                             if (assetName.endsWith(".apk")) {
                                 val url = asset.optString("browser_download_url")
-                                if (assetName.contains("armeabi-v7a") || assetName.contains("32")) {
+                                // 仅以标准 ABI 名判定
+                                if (assetName.contains("armeabi-v7a")) {
                                     downloadUrl32Bit = url
                                 } else if (assetName.contains("arm64-v8a")) {
                                     downloadUrl = url
