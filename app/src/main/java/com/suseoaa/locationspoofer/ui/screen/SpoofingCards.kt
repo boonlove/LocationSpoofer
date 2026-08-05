@@ -2,7 +2,6 @@ package com.suseoaa.locationspoofer.ui.screen
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -86,6 +85,7 @@ import com.suseoaa.locationspoofer.ui.theme.AccentOrange
 import com.suseoaa.locationspoofer.ui.theme.AppColors
 import com.suseoaa.locationspoofer.viewmodel.MainViewModel
 import com.suseoaa.locationspoofer.BuildConfig
+import com.suseoaa.locationspoofer.utils.AbiHelper
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.draw.drawWithCache
 import com.suseoaa.locationspoofer.data.model.RoutePlanStage
@@ -758,9 +758,9 @@ fun FooterLinks(isDark: Boolean) {
 }
 
 @Composable
-fun AppInfoCard(isDark: Boolean) {
+fun AppInfoCard(isDark: Boolean, abiHelper: AbiHelper) {
     // 软件信息：名称 版本名 (版本号) abi
-    val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+    val abi = abiHelper.appAbis?.firstOrNull() ?: "unknown"
     val info = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) $abi"
     Card(
         shape = RoundedCornerShape(12.dp),

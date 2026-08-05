@@ -27,6 +27,7 @@ import com.suseoaa.locationspoofer.ui.extensions.activeEngine
 import com.suseoaa.locationspoofer.ui.screen.AppPoiItem
 import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingIntent
 import com.suseoaa.locationspoofer.ui.screen.spoofing.SpoofingUiState
+import com.suseoaa.locationspoofer.utils.AbiHelper
 import com.suseoaa.locationspoofer.utils.EnvironmentScanner
 import com.suseoaa.locationspoofer.utils.LSPosedManager
 import com.suseoaa.locationspoofer.utils.OpenCellIdClient
@@ -54,6 +55,7 @@ class MainViewModel(
     private val environmentDao: EnvironmentDao,
     private val wifiRepository: WifiRepository,
     private val opencellidClient: OpenCellIdClient,
+    val abiHelper: AbiHelper,
     private val context: Context
 ) : ViewModel() {
     private var lastMapMoveTime = 0L

@@ -771,7 +771,7 @@ fun SpoofingScreen(
             FooterLinks(isDark)
             Spacer(Modifier.height(8.dp))
 
-            AppInfoCard(isDark)
+            AppInfoCard(isDark, viewModel.abiHelper)
             Spacer(Modifier.height(16.dp))
         }
     }
