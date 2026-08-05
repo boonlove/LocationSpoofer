@@ -718,9 +718,8 @@ fun SpoofingScreen(
                 SavedLocationsCard(
                     savedLocations = uiState.savedLocations,
                     onSelect = { loc ->
-                        // viewModel.loadSavedLocation(loc)
+                        viewModel.loadSavedLocation(loc)
                         smallMapRef?.animateCamera(loc.lat, loc.lng)
-                        onIntent(SpoofingIntent.ConfirmMapPoint(loc.lat, loc.lng))
                                },
                     onDelete = { loc -> viewModel.removeSavedLocation(loc) }
                 )
@@ -801,9 +800,8 @@ fun SpoofingScreen(
             savedLocations = uiState.savedLocations,
             onDismiss = { onIntent(SpoofingIntent.SetSavedLocationsVisible(false)) },
             onSelect = { loc ->
-                // viewModel.loadSavedLocation(loc)
+                viewModel.loadSavedLocation(loc)
                 smallMapRef?.animateCamera(loc.lat, loc.lng)
-                onIntent(SpoofingIntent.ConfirmMapPoint(loc.lat, loc.lng))
                 onIntent(SpoofingIntent.SetSavedLocationsVisible(false))
             },
             onDelete = { loc -> viewModel.removeSavedLocation(loc) }

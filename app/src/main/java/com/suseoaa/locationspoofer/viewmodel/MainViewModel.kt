@@ -1794,15 +1794,19 @@ class MainViewModel(
         } catch (e: Exception) {
             0
         }
-        _uiState.update {
-            it.copy(
-                latitudeInput = String.format("%.6f", loc.lat),
-                longitudeInput = String.format("%.6f", loc.lng),
-                collectedWifiJson = loc.wifiJson,
-                collectedCellJson = loc.cellJson,
-                wifiApCount = wifiCount,
-                wifiLoadStatus = if (wifiCount > 0) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
-            )
+
+        if (uiState.value.mockWifi && wifiCount > 0) {
+            _uiState.update {
+                it.copy(
+                    collectedWifiJson = loc.wifiJson,
+                    collectedCellJson = loc.cellJson,
+                    wifiApCount = wifiCount,
+                    wifiLoadStatus = if (wifiCount > 0) com.suseoaa.locationspoofer.data.model.WifiLoadStatus.DONE else com.suseoaa.locationspoofer.data.model.WifiLoadStatus.IDLE
+                )
+            }
+            confirmMapPoint(loc.lat, loc.lng, true)
+        } else {
+            confirmMapPoint(loc.lat, loc.lng)
         }
     }
 
